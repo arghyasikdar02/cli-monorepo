@@ -1,0 +1,111 @@
+export const quizzes = {
+  q001: {
+    id: 'q001',
+    title: 'Network Protocols',
+    courseId: 'c001',
+    level: 'Level 4: Advanced Networking',
+    timeLimit: 900,
+    questions: [
+      {
+        id: 'qq001',
+        text: 'Which layer of the OSI model is responsible for end-to-end communication and error recovery?',
+        options: ['Data Link', 'Network', 'Transport Layer', 'Session'],
+        correctIndex: 2,
+        tip: 'The Transport layer (Layer 4) manages flow control, segmentation, and error checking (TCP/UDP). It ensures data packets are delivered without errors and in the correct sequence between host processes.',
+      },
+      {
+        id: 'qq002',
+        text: 'What does CIDR stand for?',
+        options: ['Classless Inter-Domain Routing', 'Common Internet Data Relay', 'Centralized IP Data Routing', 'Classified Internal Domain Redirect'],
+        correctIndex: 0,
+        tip: 'CIDR (Classless Inter-Domain Routing) replaced class-based IP addressing, allowing flexible subnet masks like /24 or /22.',
+      },
+      {
+        id: 'qq003',
+        text: 'Which protocol operates on port 443?',
+        options: ['HTTP', 'FTP', 'HTTPS', 'SSH'],
+        correctIndex: 2,
+        tip: 'HTTPS uses port 443 and encrypts traffic using TLS/SSL, providing secure communication over the web.',
+      },
+      {
+        id: 'qq004',
+        text: 'What type of attack involves flooding a network with ICMP echo requests?',
+        options: ['SQL Injection', 'Ping Flood (DoS)', 'ARP Spoofing', 'Man-in-the-Middle'],
+        correctIndex: 1,
+        tip: 'A Ping Flood is a Denial of Service attack that overwhelms a target with ICMP Echo Request (ping) packets.',
+      },
+      {
+        id: 'qq005',
+        text: 'What is the purpose of a DMZ in network architecture?',
+        options: [
+          'To store encrypted passwords',
+          'To isolate public-facing servers from the internal network',
+          'To block all incoming traffic',
+          'To manage DNS records',
+        ],
+        correctIndex: 1,
+        tip: 'A DMZ (Demilitarized Zone) places public-facing servers between two firewalls, protecting the internal network if those servers are compromised.',
+      },
+      {
+        id: 'qq006',
+        text: 'Which Nmap flag performs a TCP SYN Stealth Scan?',
+        options: ['-sT', '-sU', '-sS', '-sA'],
+        correctIndex: 2,
+        tip: 'The -sS flag sends a SYN packet and resets the connection before a full handshake, making it harder to log than a full connect scan (-sT).',
+      },
+      {
+        id: 'qq007',
+        text: 'What does ARP stand for?',
+        options: ['Advanced Routing Protocol', 'Address Resolution Protocol', 'Automatic Relay Process', 'Application Response Packet'],
+        correctIndex: 1,
+        tip: 'ARP (Address Resolution Protocol) maps IP addresses to MAC addresses on a local network.',
+      },
+      {
+        id: 'qq008',
+        text: 'Which layer of the OSI model handles MAC addresses?',
+        options: ['Physical', 'Data Link', 'Network', 'Transport'],
+        correctIndex: 1,
+        tip: 'The Data Link layer (Layer 2) uses MAC addresses for node-to-node communication on the same network segment.',
+      },
+      {
+        id: 'qq009',
+        text: 'What is the default subnet mask for a Class C network?',
+        options: ['255.0.0.0', '255.255.0.0', '255.255.255.0', '255.255.255.128'],
+        correctIndex: 2,
+        tip: 'Class C networks use a /24 prefix, corresponding to subnet mask 255.255.255.0, supporting up to 254 hosts.',
+      },
+      {
+        id: 'qq010',
+        text: 'Which protocol is used for secure remote login over an encrypted channel?',
+        options: ['Telnet', 'FTP', 'SSH', 'RDP'],
+        correctIndex: 2,
+        tip: 'SSH (Secure Shell) encrypts all traffic between client and server, replacing the insecure Telnet protocol for remote management.',
+      },
+    ],
+  },
+  q002: {
+    id: 'q002',
+    title: 'Penetration Testing Basics',
+    courseId: 'c002',
+    level: 'Level 1: Reconnaissance',
+    timeLimit: 600,
+    questions: [
+      {
+        id: 'qq201',
+        text: 'What is the first phase of a standard penetration test?',
+        options: ['Exploitation', 'Reconnaissance', 'Reporting', 'Post-Exploitation'],
+        correctIndex: 1,
+        tip: 'Reconnaissance (information gathering) is always the first phase — you must understand the target before attempting exploitation.',
+      },
+      {
+        id: 'qq202',
+        text: 'What does OSINT stand for?',
+        options: ['Open Source Intelligence', 'Online Security Incident Tracking', 'Offensive Security Integration', 'Open System Internet Tools'],
+        correctIndex: 0,
+        tip: 'OSINT (Open Source Intelligence) refers to gathering information from publicly available sources such as websites, social media, and DNS records.',
+      },
+    ],
+  },
+}
+
+export const getQuizById = (id) => quizzes[id] ?? null
