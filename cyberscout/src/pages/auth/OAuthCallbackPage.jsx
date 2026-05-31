@@ -27,7 +27,7 @@ export default function OAuthCallbackPage() {
         localStorage.removeItem('cyberlab_token')
         navigate('/login?error=oauth_failed', { replace: true })
       })
-  }, [])
+  }, [loginWithToken, navigate, params])
 
   return (
     <div className="h-screen flex items-center justify-center bg-surface">

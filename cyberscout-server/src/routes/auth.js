@@ -6,13 +6,33 @@ import { findByEmail, findByGoogleId, findById, createUser, publicUser } from '.
 import { signToken, verifyToken } from '../lib/jwt.js'
 
 const router = Router()
+const trimTrailingSlash = (value) => value?.replace(/\/+$/, '')
+const FRONTEND_URL = trimTrailingSlash(process.env.FRONTEND_URL) || 'http://localhost:5173'
+const BACKEND_URL = trimTrailingSlash(process.env.BACKEND_URL) || `http://localhost:${process.env.PORT || 3001}`
+const GOOGLE_CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL || `${BACKEND_URL}/api/auth/google/callback`
+
+function hasGoogleOAuthCredentials() {
+  const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } = process.env
+  const clientId = GOOGLE_CLIENT_ID?.trim()
+  const clientSecret = GOOGLE_CLIENT_SECRET?.trim()
+  return Boolean(
+    clientId &&
+    clientSecret &&
+    clientId !== 'dummy' &&
+    clientSecret !== 'dummy' &&
+    !clientId.startsWith('your_') &&
+    !clientSecret.startsWith('your_')
+  )
+}
 
 export function setupPassport() {
+  if (!hasGoogleOAuthCredentials()) return
+
   passport.use(new GoogleStrategy(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: `http://localhost:${process.env.PORT || 3001}/api/auth/google/callback`,
+      callbackURL: GOOGLE_CALLBACK_URL,
     },
     (_accessToken, _refreshToken, profile, done) => {
       let user = findByGoogleId(profile.id)
@@ -30,6 +50,14 @@ export function setupPassport() {
   passport.serializeUser((user, done) => done(null, user.id))
   passport.deserializeUser((id, done) => done(null, findById(id)))
 }
+
+// GET /api/auth/config
+router.get('/config', (req, res) => {
+  res.json({
+    googleCallbackUrl: GOOGLE_CALLBACK_URL,
+    googleEnabled: hasGoogleOAuthCredentials(),
+  })
+})
 
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
@@ -63,17 +91,27 @@ router.post('/login', async (req, res) => {
 })
 
 // GET /api/auth/google
-router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'], session: false }))
+router.get('/google', (req, res, next) => {
+  if (!hasGoogleOAuthCredentials()) {
+    return res.redirect(`${FRONTEND_URL}/login?error=oauth_unconfigured`)
+  }
+  return passport.authenticate('google', { scope: ['profile', 'email'], session: false })(req, res, next)
+})
 
 // GET /api/auth/google/callback
 router.get('/google/callback',
-  passport.authenticate('google', {
-    session: false,
-    failureRedirect: `${process.env.FRONTEND_URL}/login?error=oauth_failed`,
-  }),
+  (req, res, next) => {
+    if (!hasGoogleOAuthCredentials()) {
+      return res.redirect(`${FRONTEND_URL}/login?error=oauth_unconfigured`)
+    }
+    return passport.authenticate('google', {
+      session: false,
+      failureRedirect: `${FRONTEND_URL}/login?error=oauth_failed`,
+    })(req, res, next)
+  },
   (req, res) => {
     const token = signToken({ sub: req.user.id, email: req.user.email })
-    res.redirect(`${process.env.FRONTEND_URL}/oauth/callback?token=${token}`)
+    res.redirect(`${FRONTEND_URL}/oauth/callback?token=${token}`)
   }
 )
 

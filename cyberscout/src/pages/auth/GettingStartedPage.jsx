@@ -1,19 +1,20 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import CLILogo from '../../components/CLILogo'
 
 const interests = [
-  { id: 'network', icon: 'router', label: 'Network Defense' },
-  { id: 'pentest', icon: 'bug_report', label: 'Penetration Testing' },
-  { id: 'cloud', icon: 'cloud', label: 'Cloud Security' },
-  { id: 'appsec', icon: 'code', label: 'Application Security' },
-  { id: 'forensics', icon: 'search', label: 'Digital Forensics' },
-  { id: 'risk', icon: 'policy', label: 'Risk & Compliance' },
+  { id: 'safety', icon: 'shield_person', label: 'Personal Cyber Safety' },
+  { id: 'scams', icon: 'report', label: 'Scam Awareness' },
+  { id: 'phishing', icon: 'mail_lock', label: 'Phishing Detection' },
+  { id: 'web', icon: 'language', label: 'Web Security Basics' },
+  { id: 'accounts', icon: 'lock', label: 'Account Security' },
+  { id: 'reporting', icon: 'assignment', label: 'Defensive Reporting' },
 ]
 
 const levels = [
   { id: 'beginner', label: 'Beginner', desc: 'New to cybersecurity' },
-  { id: 'intermediate', label: 'Intermediate', desc: '1–3 years experience' },
-  { id: 'advanced', label: 'Advanced', desc: '3+ years, seeking mastery' },
+  { id: 'nontechnical', label: 'Non-Technical Learner', desc: 'Want practical safety skills' },
+  { id: 'web-foundation', label: 'Web Foundations', desc: 'Ready to learn browser and web risks' },
 ]
 
 export default function GettingStartedPage() {
@@ -25,15 +26,16 @@ export default function GettingStartedPage() {
     setSelected(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id])
 
   return (
-    <div className="min-h-screen bg-surface flex items-center justify-center px-8 py-12">
+    <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center px-8 py-12">
       <div className="w-full max-w-2xl">
         <div className="text-center mb-10">
+          <CLILogo variant="full" tone="light" size={190} className="mx-auto mb-6" />
           <span className="material-symbols-outlined text-[56px] text-secondary mb-4 block">rocket_launch</span>
-          <h1 className="font-space-grotesk text-3xl font-bold text-primary mb-2">Welcome to CyberScout</h1>
+          <h1 className="font-space-grotesk text-3xl font-bold text-primary mb-2">Welcome to Cyber Lab IN</h1>
           <p className="text-on-surface-variant">Tell us about yourself so we can personalize your learning path.</p>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-card p-8 space-y-8">
+        <div className="bg-white rounded-xl border border-slate-200/80 shadow-[0_24px_80px_rgba(15,23,42,0.10)] p-8 space-y-8">
           <div>
             <h2 className="font-space-grotesk font-bold text-primary mb-4">What interests you?</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">

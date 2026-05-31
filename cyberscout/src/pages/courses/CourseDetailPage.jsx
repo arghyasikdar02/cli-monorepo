@@ -64,10 +64,6 @@ export default function CourseDetailPage() {
               <span className="material-symbols-outlined text-[18px]">view_module</span>
               {course.moduleCount} modules
             </span>
-            <span className="flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
-              {course.rating} ({course.students.toLocaleString()} students)
-            </span>
           </div>
         </div>
       </div>

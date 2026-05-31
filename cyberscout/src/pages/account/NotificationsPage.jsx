@@ -12,14 +12,10 @@ const TYPE_COLORS = {
   system: 'bg-slate-100 text-slate-600',
 }
 
-export default function NotificationsPage() {
-  const { clearNotifications } = useAppStore()
+function NotificationGroup({ title, items }) {
+  if (items.length === 0) return null
 
-  const today = notifications.filter(n => n.timestamp === 'Today' || n.timestamp.includes('hour'))
-  const yesterday = notifications.filter(n => n.timestamp === 'Yesterday')
-  const earlier = notifications.filter(n => !today.includes(n) && !yesterday.includes(n))
-
-  const Group = ({ title, items }) => items.length === 0 ? null : (
+  return (
     <div>
       <p className="font-space-grotesk text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">{title}</p>
       <div className="space-y-2">
@@ -42,6 +38,14 @@ export default function NotificationsPage() {
       </div>
     </div>
   )
+}
+
+export default function NotificationsPage() {
+  const { clearNotifications } = useAppStore()
+
+  const today = notifications.filter(n => n.timestamp === 'Today' || n.timestamp.includes('hour'))
+  const yesterday = notifications.filter(n => n.timestamp === 'Yesterday')
+  const earlier = notifications.filter(n => !today.includes(n) && !yesterday.includes(n))
 
   return (
     <AppShell>
@@ -54,9 +58,9 @@ export default function NotificationsPage() {
           </button>
         </div>
         <div className="space-y-7">
-          <Group title="Today" items={today} />
-          <Group title="Yesterday" items={yesterday} />
-          <Group title="Earlier" items={earlier} />
+          <NotificationGroup title="Today" items={today} />
+          <NotificationGroup title="Yesterday" items={yesterday} />
+          <NotificationGroup title="Earlier" items={earlier} />
         </div>
       </div>
     </AppShell>

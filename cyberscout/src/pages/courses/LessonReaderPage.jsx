@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import AppShell from '../../components/layout/AppShell'
 import CodeBlock from '../../components/ui/CodeBlock'
@@ -42,7 +41,6 @@ const DEFAULT_CONTENT = {
 export default function LessonReaderPage() {
   const { courseId, lessonId } = useParams()
   const navigate = useNavigate()
-  const [completed, setCompleted] = useState(false)
 
   const course = getCourseById(courseId)
   const lesson = getLessonById(lessonId)

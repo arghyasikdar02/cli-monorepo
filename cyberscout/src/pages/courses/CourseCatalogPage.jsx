@@ -1,21 +1,17 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import AppShell from '../../components/layout/AppShell'
 import CourseCard from '../../components/ui/CourseCard'
 import { courses } from '../../data/courses'
 
-const CATEGORIES = ['All', 'Network Defense', 'Penetration Testing', 'Cloud Security', 'Application Security', 'Incident Response']
-const LEVELS = ['All Levels', 'Beginner', 'Intermediate', 'Advanced']
+const CATEGORIES = ['All', 'Personal Security', 'Web Security']
+const LEVELS = ['All Levels', 'Beginner']
 
 export default function CourseCatalogPage() {
   const [searchParams] = useSearchParams()
   const [category, setCategory] = useState('All')
   const [level, setLevel] = useState('All Levels')
   const [search, setSearch] = useState(searchParams.get('q') ?? '')
-
-  useEffect(() => {
-    setSearch(searchParams.get('q') ?? '')
-  }, [searchParams])
 
   const filtered = useMemo(() =>
     courses.filter(c => {
@@ -32,7 +28,7 @@ export default function CourseCatalogPage() {
       <div className="max-w-[1280px] mx-auto px-8 py-8">
         <div className="mb-8">
           <h1 className="font-space-grotesk text-3xl font-black text-primary mb-1">Course Catalog</h1>
-          <p className="text-on-surface-variant">Master cybersecurity from fundamentals to expert-level techniques.</p>
+          <p className="text-on-surface-variant">A focused two-course beginner program built from the Basic Course I and II curriculum.</p>
         </div>
 
         {/* Filters */}

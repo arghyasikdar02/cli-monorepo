@@ -10,12 +10,12 @@ const CATEGORIES = [
 ]
 
 const ARTICLES = [
-  { title: 'How do I reset my password?', views: '2.4k views', to: '/help/account-security' },
-  { title: 'How to download course materials?', views: '1.8k views', to: '/downloads' },
-  { title: 'How does the XP and ranking system work?', views: '3.1k views', to: '/leaderboard' },
-  { title: 'Can I get a refund?', views: '956 views', to: '/refund' },
-  { title: 'How to enable 2FA on my account?', views: '1.2k views', to: '/help/account-security' },
-  { title: 'What are the system requirements for labs?', views: '788 views', to: '/help/account-security' },
+  { title: 'How do I reset my password?', views: 'Help article', to: '/help/account-security' },
+  { title: 'How to download course materials?', views: 'Help article', to: '/downloads' },
+  { title: 'How does the XP and ranking system work?', views: 'Help article', to: '/leaderboard' },
+  { title: 'Can I get a refund?', views: 'Help article', to: '/refund' },
+  { title: 'How to enable 2FA on my account?', views: 'Help article', to: '/help/account-security' },
+  { title: 'What are the system requirements for labs?', views: 'Help article', to: '/help/account-security' },
 ]
 
 export default function HelpCenterPage() {

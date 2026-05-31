@@ -12,8 +12,8 @@ const navItems = [
 ]
 
 const linkClass = ({ isActive }) =>
-  `p-2 rounded-lg transition-colors ${
-    isActive ? 'bg-violet-50 text-violet-600' : 'text-slate-400 hover:text-slate-900 hover:bg-slate-100'
+  `p-2 rounded-lg transition-all ${
+    isActive ? 'bg-white text-violet-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-400 hover:text-slate-900 hover:bg-white'
   }`
 
 export default function SideNavCollapsed() {
@@ -21,9 +21,9 @@ export default function SideNavCollapsed() {
   const navigate = useNavigate()
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-16 border-r border-slate-100 bg-white flex flex-col items-center py-6 z-50 shadow-sm">
+    <aside className="fixed left-0 top-0 h-screen w-16 border-r border-slate-200/80 bg-[#f8fafc]/95 backdrop-blur-xl flex flex-col items-center py-6 z-50">
       <div className="mb-8">
-        <CLILogo variant="mark" size={32} />
+        <CLILogo variant="mark" tone="light" size={40} />
       </div>
       <nav className="flex flex-col gap-4 flex-1">
         {navItems.map(({ to, icon, label }) => (

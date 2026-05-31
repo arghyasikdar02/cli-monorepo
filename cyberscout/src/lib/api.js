@@ -22,6 +22,7 @@ async function request(path, options = {}) {
 }
 
 export const api = {
+  authConfig: () => request('/api/auth/config'),
   register: (name, email, password) =>
     request('/api/auth/register', { method: 'POST', body: JSON.stringify({ name, email, password }) }),
   login: (email, password) =>

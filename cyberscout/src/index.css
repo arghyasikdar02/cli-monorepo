@@ -9,6 +9,31 @@
 body {
   font-family: 'Inter', sans-serif;
   background-color: #f7f9fb;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+html.dark body {
+  background-color: #020617;
+}
+
+* {
+  letter-spacing: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 .font-space-grotesk {

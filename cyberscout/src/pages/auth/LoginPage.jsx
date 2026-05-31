@@ -1,24 +1,45 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore'
 import { api } from '../../lib/api'
 import CLILogo from '../../components/CLILogo'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+const authErrors = {
+  oauth_failed: 'Google sign-in failed. Please try again.',
+  oauth_unconfigured: 'Google sign-in is not configured for this environment. Use email access or add Google OAuth credentials.',
+}
 
 export default function LoginPage() {
+  const [searchParams] = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPw, setShowPw] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [searchParams] = useSearchParams()
+  const [error, setError] = useState(authErrors[searchParams.get('error')] ?? '')
+  const [googleEnabled, setGoogleEnabled] = useState(false)
   const { loginWithToken } = useAppStore()
   const navigate = useNavigate()
 
+  const handleGoogleAuth = () => {
+    if (!googleEnabled) {
+      setError(authErrors.oauth_unconfigured)
+      return
+    }
+    window.location.href = `${API_URL}/api/auth/google`
+  }
+
   useEffect(() => {
-    if (searchParams.get('error') === 'oauth_failed') {
-      setError('Google sign-in failed. Please try again.')
+    let active = true
+    api.authConfig()
+      .then(({ googleEnabled }) => {
+        if (active) setGoogleEnabled(Boolean(googleEnabled))
+      })
+      .catch(() => {
+        if (active) setGoogleEnabled(false)
+      })
+    return () => {
+      active = false
     }
   }, [])
 
@@ -38,17 +59,17 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen">
-      <section className="hidden lg:flex w-5/12 bg-primary-container flex-col justify-between p-8 relative overflow-hidden">
+    <div className="flex min-h-screen bg-[#f8fafc]">
+      <section className="hidden lg:flex w-5/12 bg-[#020617] flex-col justify-between p-8 relative overflow-hidden">
         <div
-          className="absolute inset-0 opacity-10"
-          style={{ backgroundImage: 'radial-gradient(rgba(167,139,250,0.15) 1px, transparent 1px)', backgroundSize: '32px 32px' }}
+          className="absolute inset-0 opacity-30"
+          style={{ backgroundImage: 'linear-gradient(rgba(148,163,184,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,0.08) 1px, transparent 1px)', backgroundSize: '36px 36px' }}
         />
-        <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-secondary-container/10 rounded-full blur-[120px]" />
+        <div className="absolute inset-x-0 top-0 h-72 bg-[radial-gradient(circle_at_35%_0%,rgba(56,189,248,0.22),transparent_34%),radial-gradient(circle_at_65%_10%,rgba(124,58,237,0.22),transparent_34%)]" />
 
         <div className="relative z-10">
           <div className="mb-12">
-            <CLILogo variant="mark" size={48} className="brightness-0 invert" />
+            <CLILogo variant="full" tone="dark" size={188} />
           </div>
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 border border-white/20 rounded-full mb-6">
@@ -68,7 +89,7 @@ export default function LoginPage() {
 
         <div className="relative z-10 bg-white/5 border border-white/10 rounded-xl p-5 backdrop-blur-sm">
           <p className="font-space-grotesk text-sm text-on-primary-container">
-            Join 2,400+ active security analysts today.
+            Continue your practical cybersecurity learning path.
           </p>
         </div>
 
@@ -77,13 +98,13 @@ export default function LoginPage() {
         </div>
       </section>
 
-      <main className="flex-1 flex items-center justify-center p-8 bg-surface">
+      <main className="flex-1 flex items-center justify-center p-8 bg-[#f8fafc]">
         <div className="w-full max-w-[420px]">
           <div className="lg:hidden text-center mb-8">
-            <CLILogo variant="full" size={24} className="mx-auto mb-2" />
+            <CLILogo variant="full" tone="light" size={180} className="mx-auto mb-2" />
           </div>
 
-          <div className="bg-white rounded-xl border border-outline-variant/30 shadow-card p-8">
+          <div className="bg-white rounded-xl border border-slate-200/80 shadow-[0_24px_80px_rgba(15,23,42,0.10)] p-8">
             <div className="text-center mb-7">
               <div className="w-11 h-11 bg-surface rounded-full flex items-center justify-center mx-auto mb-3 border border-outline-variant/20">
                 <span className="material-symbols-outlined text-secondary">key</span>
@@ -101,7 +122,7 @@ export default function LoginPage() {
 
             <button
               type="button"
-              onClick={() => { window.location.href = `${API_URL}/api/auth/google` }}
+              onClick={handleGoogleAuth}
               className="w-full flex items-center justify-center gap-3 px-6 py-3 bg-white border border-outline-variant hover:bg-slate-50 transition-colors rounded-lg mb-5"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -142,7 +163,7 @@ export default function LoginPage() {
               <div>
                 <div className="flex justify-between mb-1.5">
                   <label className="font-space-grotesk text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    Access Token
+                    Password
                   </label>
                   <button type="button" className="font-space-grotesk text-xs text-secondary hover:underline">Forgot?</button>
                 </div>
@@ -184,10 +205,6 @@ export default function LoginPage() {
             </p>
           </div>
 
-          <p className="text-center font-space-grotesk text-xs text-outline flex items-center justify-center gap-1.5 mt-6">
-            <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>verified_user</span>
-            AES-256 Bit Encryption Protocol Active
-          </p>
         </div>
       </main>
     </div>

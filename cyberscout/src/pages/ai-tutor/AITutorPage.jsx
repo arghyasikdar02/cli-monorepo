@@ -6,39 +6,39 @@ import CodeBlock from '../../components/ui/CodeBlock'
 const INITIAL_MESSAGES = [
   {
     role: 'ai',
-    content: 'Welcome to your AI Tutor session. I\'m trained on the full CyberScout curriculum. Ask me anything about cybersecurity â€” concepts, tools, lab help, or theory.',
+    content: 'Welcome to your AI Tutor session. I am focused on the two Cyber Lab IN foundation courses: Introduction to Cyber Security, and Cyber Security Essentials.',
     code: null,
   },
   {
     role: 'user',
-    content: 'How do I perform a basic Nmap scan while avoiding detection?',
+    content: 'How do I inspect a suspicious email without clicking anything?',
     code: null,
   },
   {
     role: 'ai',
-    content: 'To perform a stealthy Nmap scan, use the TCP SYN Stealth Scan flag. This sends a SYN packet and resets before completing the handshake â€” harder to log than a full connect scan.',
-    code: { lang: 'TERMINAL: NMAP', snippet: 'nmap -sS -T2 -p 1-1024 192.168.1.0/24' },
-    footnote: 'The -T2 flag slows the scan for stealth. Use -T4 for speed in authorized environments.',
+    content: 'Start with evidence you can inspect safely: sender address, sender domain, link destination previews, tone, urgency, attachment type, and whether the request matches the real organization workflow.',
+    code: null,
+    footnote: 'Never open attachments or enter credentials from a message until you verify it through an official channel.',
   },
 ]
 
 const CHIPS = [
-  'Explain 3-way handshake',
-  'Show -sA scan examples',
-  'How to detect Nmap scans?',
-  'What is port scanning?',
+  'How do I spot phishing?',
+  'Explain SQL Injection simply',
+  'What are secure cookies?',
+  'How do I audit my digital footprint?',
 ]
 
 const MASTERY = [
-  { label: 'Network Discovery', pct: 82 },
-  { label: 'Packet Analysis', pct: 45 },
-  { label: 'Stealth Techniques', pct: 12 },
+  { label: 'Scam Awareness', pct: 32 },
+  { label: 'Account Safety', pct: 18 },
+  { label: 'Web Security Basics', pct: 8 },
 ]
 
 const MOCK_RESPONSES = [
-  'Great question! The 3-way handshake is the process TCP uses to establish a reliable connection: SYN â†’ SYN-ACK â†’ ACK. The client sends SYN, server responds with SYN-ACK, and the client completes with ACK.',
-  'A SYN scan (-sS) only sends the SYN packet and resets before completing the handshake â€” it\'s stealthier. A full connect scan (-sT) completes the handshake and is fully logged by most IDS systems.',
-  'That\'s a key concept in network security. Let me break it down step by step based on the course material...',
+  'Great question. Start by identifying the claim, the requested action, and the verification path. If a message asks for urgency, money, OTPs, passwords, or account recovery, treat it as high risk until verified.',
+  'In web security, unsafe input means the application receives data it should not blindly trust. Defensive controls include validation, output encoding, parameterized queries, and safe error handling.',
+  'That topic maps directly to the Basic Course curriculum. Let me break it down into observation, risk, safe action, and a short checklist.',
 ]
 
 let mockIdx = 0
@@ -76,9 +76,9 @@ export default function AITutorPage() {
           {/* Header */}
           <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
             <div>
-              <h2 className="font-space-grotesk font-bold text-primary-container">AI Tutor: Network Security</h2>
+              <h2 className="font-space-grotesk font-bold text-primary-container">AI Tutor: Cyber Lab IN Foundations</h2>
               <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mt-0.5">
-                Active Session: Penetration Testing Basics
+                Active Session: Basic Course I & II
               </p>
             </div>
             <div className="flex gap-2">
@@ -191,8 +191,8 @@ export default function AITutorPage() {
             </h3>
             <div className="space-y-3">
               {[
-                { title: 'Official Nmap Documentation', sub: 'Section 15: Port Scanning Techniques' },
-                { title: 'Advanced Port Scanning', sub: 'Module 4, CyberScout Academy' },
+                { title: 'Basic Course I', sub: 'Introduction to Cyber Security' },
+                { title: 'Basic Course II', sub: 'Cyber Security Essentials' },
               ].map(({ title, sub }) => (
                 <div key={title} className="bg-white p-4 rounded-xl shadow-card border border-slate-100 flex gap-3 hover:border-violet-200 transition-colors cursor-pointer group">
                   <div className="w-9 h-9 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400 group-hover:text-secondary transition-colors flex-shrink-0">
@@ -218,12 +218,12 @@ export default function AITutorPage() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                 <div className="absolute bottom-3 left-4">
                   <span className="bg-violet-500 text-white text-[9px] font-bold px-2 py-0.5 rounded uppercase">Next Lab</span>
-                  <h4 className="text-white text-sm font-bold mt-1">IDS Evasion Tactics</h4>
+                  <h4 className="text-white text-sm font-bold mt-1">Email Safety Investigation</h4>
                 </div>
               </div>
               <div className="p-4">
                 <p className="text-[11px] text-slate-500 leading-relaxed mb-3">
-                  You have unlocked the prerequisite knowledge for the Shadow Protocol laboratory.
+                  Continue with guided scam detection and safe verification practice.
                 </p>
                 <Link to="/courses/c002"
                   className="block w-full text-center py-2 bg-primary-container text-white text-xs font-bold rounded-lg hover:opacity-90 transition-opacity">

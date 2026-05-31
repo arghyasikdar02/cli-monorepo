@@ -12,7 +12,7 @@ import { liveClasses } from '../../data/liveClasses'
 
 const quickActions = [
   { icon: 'smart_toy', label: 'Ask AI', desc: 'Instant help with code or theory.', to: '/ai-tutor', dark: true },
-  { icon: 'school', label: 'Browse Courses', desc: 'Explore 50+ security paths.', to: '/courses', dark: false },
+  { icon: 'school', label: 'Browse Courses', desc: 'Explore the two-course foundation program.', to: '/courses', dark: false },
   { icon: 'military_tech', label: 'Achievements', desc: 'View your earned credentials.', to: '/achievements', dark: false },
   { icon: 'account_circle', label: 'My Profile', desc: 'Manage account and badges.', to: '/profile', dark: false },
 ]

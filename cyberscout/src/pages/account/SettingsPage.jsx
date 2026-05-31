@@ -8,7 +8,7 @@ const TABS = ['account', 'security', 'notifications', 'appearance']
 export default function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const tab = searchParams.get('tab') ?? 'account'
-  const { user, updateUser } = useAppStore()
+  const { user } = useAppStore()
 
   const setTab = (t) => setSearchParams({ tab: t })
 
@@ -34,7 +34,7 @@ export default function SettingsPage() {
 
           {/* Panel */}
           <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-card p-7 space-y-6">
-            {tab === 'account' && <AccountTab user={user} updateUser={updateUser} />}
+            {tab === 'account' && <AccountTab user={user} />}
             {tab === 'security' && <SecurityTab />}
             {tab === 'notifications' && <NotificationsTab />}
             {tab === 'appearance' && <AppearanceTab />}
@@ -75,7 +75,7 @@ function Toggle({ label, desc, defaultOn = false }) {
   )
 }
 
-function AccountTab({ user, updateUser }) {
+function AccountTab({ user }) {
   return (
     <>
       <h2 className="font-space-grotesk font-bold text-primary">Account Details</h2>

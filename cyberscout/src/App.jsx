@@ -52,7 +52,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         {/* Public */}
-        <Route path="/" element={<Navigate to="/splash" replace />} />
+        <Route path="/" element={<Navigate to="/welcome" replace />} />
         <Route path="/splash" element={<SplashPage />} />
         <Route path="/welcome" element={<WelcomePage />} />
         <Route path="/login" element={<LoginPage />} />

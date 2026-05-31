@@ -5,7 +5,7 @@ import AchievementModal from '../../components/ui/AchievementModal'
 import ProgressBar from '../../components/ui/ProgressBar'
 import { achievements } from '../../data/achievements'
 
-const CATEGORIES = ['All Badges', 'Network Defense', 'Penetration Testing', 'Risk Ops', 'Special Event']
+const CATEGORIES = ['All Badges', 'Cyber Safety', 'Web Security', 'Program']
 const earned = achievements.filter(a => a.earned)
 
 export default function AchievementsPage() {
