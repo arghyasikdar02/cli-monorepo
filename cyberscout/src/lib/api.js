@@ -28,4 +28,11 @@ export const api = {
   login: (email, password) =>
     request('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
   me: () => request('/api/auth/me'),
+  logout: () => request('/api/auth/logout', { method: 'POST' }),
+  get: (path) => request(path),
+  post: (path, body) => request(path, { method: 'POST', body: JSON.stringify(body) }),
+  patch: (path, body) => request(path, { method: 'PATCH', body: JSON.stringify(body) }),
+  dashboard: (kind) => request(`/api/dashboards/${kind}`),
+  publicCourses: () => request('/api/courses/public'),
+  leadCapture: (lead) => request('/api/leads', { method: 'POST', body: JSON.stringify(lead) }),
 }

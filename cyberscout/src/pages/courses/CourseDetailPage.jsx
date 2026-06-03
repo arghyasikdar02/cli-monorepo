@@ -2,6 +2,7 @@
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import AppShell from '../../components/layout/AppShell'
 import ProgressBar from '../../components/ui/ProgressBar'
+import LeadCaptureForm from '../../components/ui/LeadCaptureForm'
 import { getCourseById } from '../../data/courses'
 
 export default function CourseDetailPage() {
@@ -223,6 +224,14 @@ export default function CourseDetailPage() {
               >
                 Take Knowledge Quiz
               </Link>
+            )}
+
+            {!course.enrolled && (
+              <LeadCaptureForm
+                courseId={course.id}
+                source="locked_course_card"
+                title="Interested in this course?"
+              />
             )}
           </div>
         </div>

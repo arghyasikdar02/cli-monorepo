@@ -1,0 +1,1 @@
+import type { Config } from 'tailwindcss'; const config: Config = { content: ['./app/**/*.{ts,tsx}', '../../packages/ui/src/**/*.{ts,tsx}'], darkMode: ['class', '[data-theme="dark"]'], theme: { extend: { colors: { cli: { cyan: '#22d3ee', blue: '#2563eb', purple: '#7c3aed' } } } }, plugins: [] }; export default config;

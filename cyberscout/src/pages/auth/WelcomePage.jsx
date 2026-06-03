@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import CLILogo from '../../components/CLILogo'
+import LeadCaptureForm from '../../components/ui/LeadCaptureForm'
 
 const navItems = [
   { href: '#courses', label: 'Courses' },
@@ -20,12 +21,14 @@ const problemItems = [
 
 const courses = [
   {
+    id: 'c001',
     title: 'Introduction to Cyber Security',
     description:
       'A 7-day foundation course for non-technical learners covering digital footprint audits, scam psychology, phishing indicators, account hardening, and everyday cyber safety habits.',
     tags: ['Beginner', 'Labs', 'Certificate'],
   },
   {
+    id: 'c002',
     title: 'Cyber Security Essentials',
     description:
       'A 7-day beginner course covering web request-response basics, unsafe input, SQL Injection, XSS, session security, misconfigurations, and responsible defensive reporting.',
@@ -356,6 +359,9 @@ export default function WelcomePage() {
               {courses.map((course) => (
                 <CourseCard key={course.title} course={course} />
               ))}
+            </div>
+            <div className="mt-8">
+              <LeadCaptureForm source="landing_courses" title="Need help choosing a course?" />
             </div>
           </div>
         </section>

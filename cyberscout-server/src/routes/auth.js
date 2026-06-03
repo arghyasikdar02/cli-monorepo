@@ -2,7 +2,7 @@ import { Router } from 'express'
 import bcrypt from 'bcrypt'
 import passport from 'passport'
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20'
-import { findByEmail, findByGoogleId, findById, createUser, publicUser } from '../store/users.js'
+import { findByEmail, findByGoogleId, findById, createUser, publicUser, updateUser } from '../store/users.js'
 import { signToken, verifyToken } from '../lib/jwt.js'
 
 const router = Router()
@@ -25,6 +25,24 @@ function hasGoogleOAuthCredentials() {
   )
 }
 
+function dashboardPathForUser(user) {
+  const roles = user.roles || [user.role]
+  if (roles.includes('super_admin') || roles.includes('admin')) return '/admin/dashboard'
+  if (roles.includes('instructor')) return '/instructor/dashboard'
+  if (roles.includes('marketing') || roles.includes('sales')) return '/marketing/dashboard'
+  if (roles.includes('ops') || roles.includes('lab_creator') || roles.includes('support') || roles.includes('finance')) return '/ops/dashboard'
+  return '/dashboard'
+}
+
+function signUserToken(user) {
+  return signToken({
+    sub: user.id,
+    email: user.email,
+    role: user.role || 'student',
+    roles: user.roles || [user.role || 'student'],
+  })
+}
+
 export function setupPassport() {
   if (!hasGoogleOAuthCredentials()) return
 
@@ -42,6 +60,8 @@ export function setupPassport() {
           name: profile.displayName,
           email: profile.emails?.[0]?.value ?? '',
           passwordHash: null,
+          role: 'student',
+          roles: ['student'],
         })
       }
       done(null, user)
@@ -66,9 +86,9 @@ router.post('/register', async (req, res) => {
     if (!name || !email || !password) return res.status(400).json({ error: 'All fields required' })
     if (findByEmail(email)) return res.status(409).json({ error: 'Email already registered' })
     const passwordHash = await bcrypt.hash(password, 10)
-    const user = createUser({ name, email, passwordHash, googleId: null })
-    const token = signToken({ sub: user.id, email: user.email })
-    res.json({ token, user: publicUser(user) })
+    const user = createUser({ name, email, passwordHash, googleId: null, role: 'student', roles: ['student'] })
+    const token = signUserToken(user)
+    res.json({ token, user: publicUser(user), redirectTo: dashboardPathForUser(user) })
   } catch {
     res.status(500).json({ error: 'Registration failed' })
   }
@@ -81,10 +101,13 @@ router.post('/login', async (req, res) => {
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' })
     const user = findByEmail(email)
     if (!user || !user.passwordHash) return res.status(401).json({ error: 'Invalid credentials' })
+    if (user.status === 'suspended') return res.status(403).json({ error: 'Account suspended' })
     const valid = await bcrypt.compare(password, user.passwordHash)
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' })
-    const token = signToken({ sub: user.id, email: user.email })
-    res.json({ token, user: publicUser(user) })
+    updateUser(user.id, { lastLogin: new Date().toISOString() })
+    const freshUser = findById(user.id)
+    const token = signUserToken(freshUser)
+    res.json({ token, user: publicUser(freshUser), redirectTo: dashboardPathForUser(freshUser) })
   } catch {
     res.status(500).json({ error: 'Login failed' })
   }
@@ -110,7 +133,7 @@ router.get('/google/callback',
     })(req, res, next)
   },
   (req, res) => {
-    const token = signToken({ sub: req.user.id, email: req.user.email })
+    const token = signUserToken(req.user)
     res.redirect(`${FRONTEND_URL}/oauth/callback?token=${token}`)
   }
 )
@@ -123,10 +146,16 @@ router.get('/me', (req, res) => {
     const payload = verifyToken(auth.slice(7))
     const user = findById(payload.sub)
     if (!user) return res.status(401).json({ error: 'User not found' })
+    if (user.status === 'suspended') return res.status(403).json({ error: 'Account suspended' })
     res.json({ user: publicUser(user) })
   } catch {
     res.status(401).json({ error: 'Invalid token' })
   }
+})
+
+// POST /api/auth/logout
+router.post('/logout', (_req, res) => {
+  res.json({ ok: true })
 })
 
 export default router

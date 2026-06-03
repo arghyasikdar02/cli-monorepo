@@ -1,0 +1,20 @@
+{
+  "name": "cyberlab-in-legacy",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "install:frontend": "npm install --prefix cyberscout",
+    "install:backend": "npm install --prefix cyberscout-server",
+    "install:all": "npm run install:frontend && npm run install:backend",
+    "dev": "sh -c 'npm run dev:backend & npm run dev:frontend; wait'",
+    "stop:backend": "sh -c 'pids=$(lsof -tiTCP:3001 -sTCP:LISTEN 2>/dev/null || true); if [ -n \"$pids\" ]; then echo \"Stopping backend on port 3001: $pids\"; kill $pids; fi'",
+    "stop:frontend": "sh -c 'for port in 5173 5174; do pids=$(lsof -tiTCP:$port -sTCP:LISTEN 2>/dev/null || true); if [ -n \"$pids\" ]; then echo \"Stopping frontend on port $port: $pids\"; kill $pids; fi; done'",
+    "stop:dev": "npm run stop:backend && npm run stop:frontend",
+    "restart:dev": "npm run stop:dev && npm run dev",
+    "dev:frontend": "npm run stop:frontend && npm run dev --prefix cyberscout",
+    "dev:backend": "npm run stop:backend && npm run dev --prefix cyberscout-server",
+    "start:backend": "npm run start --prefix cyberscout-server",
+    "build": "npm run build --prefix cyberscout",
+    "lint": "npm run lint --prefix cyberscout"
+  }
+}

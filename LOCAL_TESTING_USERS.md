@@ -1,0 +1,49 @@
+# Local Testing Users
+
+All seeded users use:
+
+`password123`
+
+The role-specific login pages show a local demo credential box with a `Use demo account` button.
+
+## Student
+
+- Email: `student@cyberlabin.com`
+- Login page: `/login`
+- Redirect: `/dashboard`
+- Role: `student`
+
+## Existing Legacy Student
+
+- Email: `neel0409@gmail.com`
+- Login page: `/login`
+- Redirect: `/dashboard`
+- Role: `student`
+
+## Admin
+
+- Email: `admin@cyberlabin.com`
+- Login page: `/admin/login`
+- Redirect: `/admin/dashboard`
+- Role: `admin`
+
+## Instructor
+
+- Email: `instructor@cyberlabin.com`
+- Login page: `/instructor/login`
+- Redirect: `/instructor/dashboard`
+- Role: `instructor`
+
+## Sales/Marketing
+
+- Email: `marketing@cyberlabin.com`
+- Login page: `/marketing/login`
+- Redirect: `/marketing/dashboard`
+- Roles: `marketing`, `sales`
+
+## Ops
+
+- Email: `ops@cyberlabin.com`
+- Login page: `/ops/login`
+- Redirect: `/ops/dashboard`
+- Roles: `ops`, `lab_creator`

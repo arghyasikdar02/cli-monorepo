@@ -48,9 +48,9 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
     try {
-      const { token, user } = await api.login(email, password)
+      const { token, user, redirectTo } = await api.login(email, password)
       loginWithToken(token, user)
-      navigate('/dashboard')
+      navigate(redirectTo || '/dashboard')
     } catch (err) {
       setError(err.message || 'Login failed')
     } finally {

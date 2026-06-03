@@ -1,0 +1,2 @@
+import { prisma } from '@cyberlabin/database'; import { ok, handleError } from '../_lib/http';
+export async function GET(){ try{ const items=await prisma.course.findMany({ where:{ status:'PUBLISHED', deletedAt:null }, orderBy:{ createdAt:'desc' }, select:{ id:true, slug:true, title:true, status:true, level:true, priceCents:true } }); return ok({ items, total: items.length }); } catch(e){ return handleError(e); } }

@@ -1,0 +1,6 @@
+{
+  "framework": "nextjs",
+  "installCommand": "corepack pnpm install --no-frozen-lockfile",
+  "buildCommand": "corepack pnpm db:generate && corepack pnpm --filter @cyberlabin/web build",
+  "outputDirectory": "apps/web/.next"
+}

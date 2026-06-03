@@ -1,16 +1,22 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import ProtectedRoute from './components/layout/ProtectedRoute'
+import RoleProtectedRoute from './components/layout/RoleProtectedRoute'
 
 // Auth
 import SplashPage from './pages/auth/SplashPage'
 import WelcomePage from './pages/auth/WelcomePage'
 import LoginPage from './pages/auth/LoginPage'
+import RoleLoginPage from './pages/auth/RoleLoginPage'
 import SignUpPage from './pages/auth/SignUpPage'
 import GettingStartedPage from './pages/auth/GettingStartedPage'
 import OAuthCallbackPage from './pages/auth/OAuthCallbackPage'
 
 // Core
 import DashboardPage from './pages/dashboard/DashboardPage'
+import AdminDashboardPage from './pages/admin/AdminDashboardPage'
+import InstructorDashboardPage from './pages/instructor/InstructorDashboardPage'
+import MarketingDashboardPage from './pages/marketing/MarketingDashboardPage'
+import OpsDashboardPage from './pages/ops/OpsDashboardPage'
 import CourseCatalogPage from './pages/courses/CourseCatalogPage'
 import CourseDetailPage from './pages/courses/CourseDetailPage'
 import LessonReaderPage from './pages/courses/LessonReaderPage'
@@ -46,6 +52,16 @@ import TermsOfServicePage from './pages/support/TermsOfServicePage'
 import RefundPolicyPage from './pages/support/RefundPolicyPage'
 
 const P = ({ children }) => <ProtectedRoute>{children}</ProtectedRoute>
+const RoleP = ({ children, roles, loginPath }) => (
+  <RoleProtectedRoute roles={roles} loginPath={loginPath}>{children}</RoleProtectedRoute>
+)
+
+const roleRoutes = {
+  admin: ['admin', 'super_admin'],
+  instructor: ['instructor'],
+  marketing: ['marketing', 'sales'],
+  ops: ['ops', 'lab_creator', 'support', 'finance'],
+}
 
 export default function App() {
   return (
@@ -56,6 +72,22 @@ export default function App() {
         <Route path="/splash" element={<SplashPage />} />
         <Route path="/welcome" element={<WelcomePage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route
+          path="/admin/login"
+          element={<RoleLoginPage title="Admin Login" purpose="Access user, course, enrollment, payment, live monitoring, analytics, and audit controls." allowedRoles={roleRoutes.admin} redirectTo="/admin/dashboard" demoEmail="admin@cyberlabin.com" />}
+        />
+        <Route
+          path="/instructor/login"
+          element={<RoleLoginPage title="Instructor Login" purpose="Access assigned courses, students, attendance, quiz results, lab attempts, and progress." allowedRoles={roleRoutes.instructor} redirectTo="/instructor/dashboard" demoEmail="instructor@cyberlabin.com" />}
+        />
+        <Route
+          path="/marketing/login"
+          element={<RoleLoginPage title="Sales and Marketing Login" purpose="Access leads, course interest, source analytics, conversion status, follow-ups, and sales suggestions." allowedRoles={roleRoutes.marketing} redirectTo="/marketing/dashboard" demoEmail="marketing@cyberlabin.com" />}
+        />
+        <Route
+          path="/ops/login"
+          element={<RoleLoginPage title="Lab and Admin Ops Login" purpose="Access lab operations, lab sessions, document logs, protected resources, and system health." allowedRoles={roleRoutes.ops} redirectTo="/ops/dashboard" demoEmail="ops@cyberlabin.com" />}
+        />
         <Route path="/signup" element={<SignUpPage />} />
         <Route path="/getting-started" element={<GettingStartedPage />} />
         <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
@@ -65,6 +97,10 @@ export default function App() {
 
         {/* Protected — Core */}
         <Route path="/dashboard" element={<P><DashboardPage /></P>} />
+        <Route path="/admin/dashboard" element={<RoleP roles={roleRoutes.admin} loginPath="/admin/login"><AdminDashboardPage /></RoleP>} />
+        <Route path="/instructor/dashboard" element={<RoleP roles={roleRoutes.instructor} loginPath="/instructor/login"><InstructorDashboardPage /></RoleP>} />
+        <Route path="/marketing/dashboard" element={<RoleP roles={roleRoutes.marketing} loginPath="/marketing/login"><MarketingDashboardPage /></RoleP>} />
+        <Route path="/ops/dashboard" element={<RoleP roles={roleRoutes.ops} loginPath="/ops/login"><OpsDashboardPage /></RoleP>} />
         <Route path="/courses" element={<P><CourseCatalogPage /></P>} />
         <Route path="/courses/:id" element={<P><CourseDetailPage /></P>} />
         <Route path="/lessons/:courseId/:lessonId" element={<P><LessonReaderPage /></P>} />

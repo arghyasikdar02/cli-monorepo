@@ -1,4 +1,5 @@
-﻿import { Link } from 'react-router-dom'
+﻿import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import AppShell from '../../components/layout/AppShell'
 import ProgressBar from '../../components/ui/ProgressBar'
 import CircularProgress from '../../components/ui/CircularProgress'
@@ -9,6 +10,7 @@ import WeeklyChart from '../../components/ui/WeeklyChart'
 import { useAppStore } from '../../store/useAppStore'
 import { courses } from '../../data/courses'
 import { liveClasses } from '../../data/liveClasses'
+import { api } from '../../lib/api'
 
 const quickActions = [
   { icon: 'smart_toy', label: 'Ask AI', desc: 'Instant help with code or theory.', to: '/ai-tutor', dark: true },
@@ -19,8 +21,16 @@ const quickActions = [
 
 export default function DashboardPage() {
   const { user } = useAppStore()
+  const [platformDashboard, setPlatformDashboard] = useState(null)
+  const [platformError, setPlatformError] = useState('')
   const activeCourse = courses.find(c => c.id === 'c001')
   const recommended = courses.filter(c => !c.enrolled).slice(0, 2)
+
+  useEffect(() => {
+    api.dashboard('student')
+      .then(({ dashboard }) => setPlatformDashboard(dashboard))
+      .catch(err => setPlatformError(err.message || 'Unable to load platform access'))
+  }, [])
 
   if (!activeCourse) return (
     <AppShell>
@@ -139,6 +149,38 @@ export default function DashboardPage() {
           </div>
           <div className="flex gap-5 overflow-x-auto pb-2 no-scrollbar">
             {liveClasses.map(cls => <LiveClassCard key={cls.id} cls={cls} />)}
+          </div>
+        </section>
+
+        <section className="bg-white rounded-xl border border-slate-200 shadow-card p-6">
+          <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h4 className="font-space-grotesk text-lg font-bold text-primary">My Platform Access</h4>
+              <p className="text-sm text-slate-500">Backend-backed course isolation, live classes, labs, certificates, and AI chat state.</p>
+            </div>
+            {platformError && <p className="text-sm font-semibold text-red-600">{platformError}</p>}
+          </div>
+          <div className="mt-5 grid gap-4 md:grid-cols-5">
+            <div className="rounded-lg bg-slate-50 p-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Courses</p>
+              <p className="mt-2 text-2xl font-black text-slate-950">{platformDashboard?.enrolledCourses?.length ?? 0}</p>
+            </div>
+            <div className="rounded-lg bg-slate-50 p-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Live</p>
+              <p className="mt-2 text-2xl font-black text-slate-950">{platformDashboard?.liveClasses?.length ?? 0}</p>
+            </div>
+            <div className="rounded-lg bg-slate-50 p-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Labs</p>
+              <p className="mt-2 text-2xl font-black text-slate-950">{platformDashboard?.labs?.length ?? 0}</p>
+            </div>
+            <div className="rounded-lg bg-slate-50 p-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Certificates</p>
+              <p className="mt-2 text-2xl font-black text-slate-950">{platformDashboard?.certificates?.length ?? 0}</p>
+            </div>
+            <div className="rounded-lg bg-slate-50 p-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">AI chats</p>
+              <p className="mt-2 text-2xl font-black text-slate-950">{platformDashboard?.aiSessions?.length ?? 0}</p>
+            </div>
           </div>
         </section>
 

@@ -1,0 +1,2 @@
+@tailwind base; @tailwind components; @tailwind utilities;
+:root{color-scheme:light;--bg:#fff;--fg:#0f172a} [data-theme="dark"]{color-scheme:dark;--bg:#020617;--fg:#f8fafc} body{margin:0;background:var(--bg);color:var(--fg)} *{box-sizing:border-box} a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid #38bdf8;outline-offset:3px}

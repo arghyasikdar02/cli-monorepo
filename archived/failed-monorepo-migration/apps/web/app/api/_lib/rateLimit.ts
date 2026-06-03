@@ -1,0 +1,2 @@
+const bucket = new Map<string, { count: number; reset: number }>();
+export function rateLimit(key:string, limit=30, windowMs=60_000){ const now=Date.now(); const entry=bucket.get(key); if(!entry || entry.reset<now){ bucket.set(key,{count:1,reset:now+windowMs}); return; } entry.count++; if(entry.count>limit){ const err=new Error('Rate limit exceeded') as Error & { code:string }; err.code='RATE_LIMITED'; throw err; } }

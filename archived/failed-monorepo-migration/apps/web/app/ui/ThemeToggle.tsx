@@ -1,0 +1,3 @@
+'use client';
+import { useEffect, useState } from 'react';
+export function ThemeToggle(){ const [theme,setTheme]=useState('light'); useEffect(()=>{ const current=document.documentElement.dataset.theme || 'light'; setTheme(current); },[]); function toggle(){ const next=theme==='dark'?'light':'dark'; setTheme(next); document.documentElement.dataset.theme=next; document.documentElement.classList.toggle('dark',next==='dark'); localStorage.setItem('theme',next); } return <button type="button" aria-label="Toggle theme" onClick={toggle} className="rounded-full border border-slate-300 px-3 py-2 text-sm dark:border-slate-700">{theme==='dark'?'Light':'Dark'}</button> }

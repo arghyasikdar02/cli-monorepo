@@ -1,0 +1,21 @@
+{
+  "name": "@cyberlabin/marketing-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -p 3004",
+    "build": "next build",
+    "start": "next start -p 3004",
+    "lint": "echo lint marketing-dashboard",
+    "typecheck": "echo typecheck marketing-dashboard"
+  },
+  "dependencies": {
+    "@cyberlabin/ui": "workspace:*",
+    "@cyberlabin/api-client": "workspace:*",
+    "next": "^15.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {}
+}
