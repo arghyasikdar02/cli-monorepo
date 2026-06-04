@@ -980,7 +980,7 @@ export function getAdminAnalytics() {
   const one = (sql) => db.prepare(sql).get().count
   return {
     users: one('SELECT count(*) AS count FROM users'),
-    courses: one('SELECT count(*) AS count FROM courses WHERE status = "published"'),
+    courses: one('SELECT count(*) AS count FROM courses WHERE status = 'published''),
     enrollments: one('SELECT count(*) AS count FROM enrollments WHERE status = "active"'),
     materials: one('SELECT count(*) AS count FROM course_materials'),
     documentAccesses: one('SELECT count(*) AS count FROM document_access_logs'),
