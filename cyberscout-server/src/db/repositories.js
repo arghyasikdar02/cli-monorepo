@@ -981,7 +981,7 @@ export function getAdminAnalytics() {
   return {
     users: one('SELECT count(*) AS count FROM users'),
     courses: one("SELECT count(*) AS count FROM courses WHERE status = 'published'"),
-    enrollments: one('SELECT count(*) AS count FROM enrollments WHERE status = "active"'),
+    enrollments: one("SELECT count(*) AS count FROM enrollments WHERE status = 'active'"),
     materials: one('SELECT count(*) AS count FROM course_materials'),
     documentAccesses: one('SELECT count(*) AS count FROM document_access_logs'),
     leads: one('SELECT count(*) AS count FROM leads'),
