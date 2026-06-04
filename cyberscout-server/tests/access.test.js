@@ -52,6 +52,10 @@ async function login(email, password = 'password123') {
 
 describe('Cyber Lab IN database-backed LMS flow', () => {
   let studentToken
+  let adminToken
+  let marketingToken
+  let instructorToken
+  let opsToken
 
   before(async () => {
     const { app } = await import('../src/index.js')
@@ -59,6 +63,10 @@ describe('Cyber Lab IN database-backed LMS flow', () => {
     await new Promise(resolve => server.once('listening', resolve))
     baseUrl = `http://127.0.0.1:${server.address().port}`
     studentToken = (await login('student@cyberlabin.com')).token
+    adminToken = (await login('admin@cyberlabin.com')).token
+    marketingToken = (await login('marketing@cyberlabin.com')).token
+    instructorToken = (await login('instructor@cyberlabin.com')).token
+    opsToken = (await login('ops@cyberlabin.com')).token
   })
 
   after(async () => {
@@ -87,9 +95,111 @@ describe('Cyber Lab IN database-backed LMS flow', () => {
   })
 
   it('lists real courses from the database', async () => {
-    const result = await request('/api/courses/public', { token: studentToken })
+    const [publicCourses, courseIndex, courseDetail] = await Promise.all([
+      request('/api/courses/public', { token: studentToken }),
+      request('/api/courses'),
+      request('/api/courses/public/slug/cybersecurity/cyber-security-essentials'),
+    ])
+    assert.equal(publicCourses.response.status, 200)
+    assert.deepEqual(publicCourses.body.courses.map(course => course.id), ['c001', 'c002'])
+    assert.equal(courseIndex.response.status, 200)
+    assert.deepEqual(courseIndex.body.courses.map(course => course.id), ['c001', 'c002'])
+    assert.equal(courseDetail.response.status, 200)
+    assert.equal(courseDetail.body.course.id, 'c002')
+  })
+
+  it('returns health and published blogs', async () => {
+    const [health, blogs] = await Promise.all([
+      request('/api/health'),
+      request('/api/blogs'),
+    ])
+    assert.equal(health.response.status, 200)
+    assert.equal(health.body.ok, true)
+    assert.equal(blogs.response.status, 200)
+    assert.ok(blogs.body.blogs.some(blog => blog.slug === 'what-is-cybersecurity'))
+  })
+
+  it('logs in seeded dashboard roles with role-aware redirects', async () => {
+    const cases = [
+      ['student@cyberlabin.com', '/dashboard'],
+      ['admin@cyberlabin.com', '/admin/dashboard'],
+      ['marketing@cyberlabin.com', '/marketing/dashboard'],
+      ['instructor@cyberlabin.com', '/instructor/dashboard'],
+      ['ops@cyberlabin.com', '/ops/dashboard'],
+    ]
+    for (const [email, redirectTo] of cases) {
+      const result = await login(email)
+      assert.equal(result.redirectTo, redirectTo)
+      assert.ok(result.token)
+      assert.equal(result.user.email, email)
+    }
+  })
+
+  it('loads database-backed role dashboards without 500 errors', async () => {
+    const [admin, marketing, instructor, ops] = await Promise.all([
+      request('/api/dashboards/admin', { token: adminToken }),
+      request('/api/dashboards/marketing', { token: marketingToken }),
+      request('/api/dashboards/instructor', { token: instructorToken }),
+      request('/api/dashboards/ops', { token: opsToken }),
+    ])
+
+    assert.equal(admin.response.status, 200, admin.body.error)
+    assert.equal(typeof admin.body.dashboard.analytics.users, 'number')
+    assert.equal(typeof admin.body.dashboard.analytics.enrollments, 'number')
+    assert.ok(Array.isArray(admin.body.dashboard.users))
+    assert.ok(Array.isArray(admin.body.dashboard.auditLogs))
+
+    assert.equal(marketing.response.status, 200, marketing.body.error)
+    assert.ok(Array.isArray(marketing.body.dashboard.leads))
+    assert.equal(typeof marketing.body.dashboard.analytics.totalLeads, 'number')
+    assert.equal(typeof marketing.body.dashboard.visitorAnalytics.totalUniqueVisitors, 'number')
+
+    assert.equal(instructor.response.status, 200, instructor.body.error)
+    assert.ok(Array.isArray(instructor.body.dashboard.assignedCourses))
+    assert.ok(Array.isArray(instructor.body.dashboard.progress))
+
+    assert.equal(ops.response.status, 200, ops.body.error)
+    assert.equal(ops.body.dashboard.systemHealth.status, 'ok')
+    assert.ok(Array.isArray(ops.body.dashboard.documentAccessLogs))
+  })
+
+  it('tracks visitors and stores all lead capture sources', async () => {
+    const visitor = await request('/api/visitors/track', {
+      method: 'POST',
+      body: JSON.stringify({ analytics: true, marketing: false }),
+    })
+    assert.equal(visitor.response.status, 201, visitor.body.error)
+    assert.ok(visitor.body.visitorId)
+
+    const sources = ['landing_form', 'chatbot', 'course_popup']
+    for (const source of sources) {
+      const lead = await request('/api/leads', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: `Lead ${source}`,
+          phone: '+919999999999',
+          email: `${source}-${Date.now()}@example.com`,
+          message: `Interested through ${source}`,
+          source,
+          courseId: source === 'course_popup' ? 'c002' : undefined,
+        }),
+      })
+      assert.equal(lead.response.status, 201, lead.body.error)
+      assert.equal(lead.body.lead.source, source)
+    }
+
+    const marketingLeads = await request('/api/leads', { token: marketingToken })
+    assert.equal(marketingLeads.response.status, 200)
+    for (const source of sources) {
+      assert.ok(marketingLeads.body.leads.some(lead => lead.source === source))
+    }
+  })
+
+  it('does not return fake leaderboard users', async () => {
+    const result = await request('/api/leaderboards/course/c001', { token: studentToken })
     assert.equal(result.response.status, 200)
-    assert.deepEqual(result.body.courses.map(course => course.id), ['c001', 'c002'])
+    assert.ok(Array.isArray(result.body.leaderboard))
+    assert.equal(result.body.leaderboard.length, 0)
   })
 
   it('denies private course materials before enrollment and unlocks them after enrollment', async () => {

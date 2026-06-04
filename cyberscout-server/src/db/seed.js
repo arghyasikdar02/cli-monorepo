@@ -1,4 +1,6 @@
 import bcrypt from 'bcrypt'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { db } from './index.js'
 import {
   createUser,
@@ -6,6 +8,8 @@ import {
   findUserByEmail,
   getCourseById,
 } from './repositories.js'
+
+const __filename = fileURLToPath(import.meta.url)
 
 const PASSWORD = process.env.SEED_USER_PASSWORD || 'password123'
 const COST = Number(process.env.BCRYPT_COST || 12)
@@ -90,8 +94,21 @@ function insertMaterial(material) {
 
 async function ensureUser({ name, email, role, roles }) {
   const existing = findUserByEmail(email)
-  if (existing) return existing
-  const passwordHash = await bcrypt.hash(PASSWORD, COST)
+  const passwordHash = existing?.passwordHash ? existing.passwordHash : await bcrypt.hash(PASSWORD, COST)
+  if (existing) {
+    const mergedRoles = Array.from(new Set([...(existing.roles || []), ...(roles || [role])]))
+    const needsUpdate = existing.role !== role ||
+      JSON.stringify(existing.roles || []) !== JSON.stringify(mergedRoles) ||
+      !existing.passwordHash
+    if (needsUpdate) {
+      db.prepare(`
+        UPDATE users
+        SET role = ?, roles = ?, password_hash = ?, updated_at = datetime('now')
+        WHERE id = ?
+      `).run(role, JSON.stringify(mergedRoles), passwordHash, existing.id)
+    }
+    return findUserByEmail(email)
+  }
   return createUser({
     name,
     email,
@@ -314,7 +331,30 @@ const materials = [
   },
 ]
 
-async function seed() {
+function baselineSeedIsReady() {
+  const courseCount = db.prepare("SELECT count(*) AS count FROM courses WHERE id IN ('c001', 'c002')").get().count
+  const materialCount = db.prepare("SELECT count(*) AS count FROM course_materials WHERE id IN ('mat001_public', 'mat002_public')").get().count
+  const liveClassCount = db.prepare("SELECT count(*) AS count FROM live_classes WHERE id = 'live_c001_01'").get().count
+  const userCount = db.prepare(`
+    SELECT count(*) AS count
+    FROM users
+    WHERE email IN (
+      'student@cyberlabin.com',
+      'admin@cyberlabin.com',
+      'instructor@cyberlabin.com',
+      'marketing@cyberlabin.com',
+      'ops@cyberlabin.com'
+    )
+  `).get().count
+  return courseCount === 2 && materialCount === 2 && liveClassCount === 1 && userCount === 5
+}
+
+export async function seedBaselineData({ force = false, log = true } = {}) {
+  if (!force && baselineSeedIsReady()) {
+    if (log) console.log('Baseline seed data already ready.')
+    return { seeded: false }
+  }
+
   for (const course of courses) insertCourse(course)
   for (const module of modules) insertModule(module)
   for (const lesson of lessons) insertLesson(lesson)
@@ -331,13 +371,16 @@ async function seed() {
   db.prepare(`
     INSERT INTO live_classes (id, course_id, instructor_id, title, provider, scheduled_start, scheduled_end, status)
     VALUES ('live_c001_01', 'c001', (SELECT id FROM users WHERE email = 'instructor@cyberlabin.com'), 'Security Foundations Live Q&A', 'external', datetime('now', '+2 days'), datetime('now', '+2 days', '+1 hour'), 'scheduled')
-    ON CONFLICT(id) DO UPDATE SET title = excluded.title, scheduled_start = excluded.scheduled_start, scheduled_end = excluded.scheduled_end
+    ON CONFLICT(id) DO NOTHING
   `).run()
 
-  console.log('Seed data ready.')
+  if (log) console.log('Seed data ready.')
+  return { seeded: true }
 }
 
-seed().catch(error => {
-  console.error(error)
-  process.exit(1)
-})
+if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
+  seedBaselineData({ force: true }).catch(error => {
+    console.error(error)
+    process.exit(1)
+  })
+}

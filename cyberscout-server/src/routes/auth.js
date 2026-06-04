@@ -56,6 +56,12 @@ function dashboardPathForUser(user) {
   return '/dashboard'
 }
 
+function safeRelativeRedirect(value) {
+  if (!value || typeof value !== 'string') return ''
+  if (!value.startsWith('/') || value.startsWith('//')) return ''
+  return value
+}
+
 function signUserToken(user) {
   return signToken({
     sub: user.id,
@@ -168,7 +174,12 @@ router.get('/google', (req, res, next) => {
   if (!hasGoogleOAuthCredentials()) {
     return res.redirect(`${FRONTEND_URL}/login?error=oauth_unconfigured`)
   }
-  return passport.authenticate('google', { scope: ['profile', 'email'], session: false })(req, res, next)
+  const redirect = safeRelativeRedirect(req.query.redirect)
+  return passport.authenticate('google', {
+    scope: ['profile', 'email'],
+    session: false,
+    state: redirect || undefined,
+  })(req, res, next)
 })
 
 // GET /api/auth/google/callback
@@ -185,7 +196,9 @@ router.get('/google/callback',
   (req, res) => {
     const token = signUserToken(req.user)
     setAuthCookie(res, token)
-    res.redirect(`${FRONTEND_URL}/oauth/callback?token=${token}`)
+    const redirect = safeRelativeRedirect(req.query.state)
+    const redirectQuery = redirect ? `&redirect=${encodeURIComponent(redirect)}` : ''
+    res.redirect(`${FRONTEND_URL}/oauth/callback?token=${token}${redirectQuery}`)
   }
 )
 

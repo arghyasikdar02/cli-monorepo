@@ -7,6 +7,10 @@ function courseUrl(course) {
   return `/courses/${course.categorySlug || 'cybersecurity'}/${course.slug}`
 }
 
+function authHrefForCourse(course) {
+  return `/auth?mode=login&redirect=${encodeURIComponent(`/learn/courses/${course.id}`)}`
+}
+
 export default function PublicCoursesPage() {
   const { categorySlug } = useParams()
   const [courses, setCourses] = useState([])
@@ -89,7 +93,7 @@ export default function PublicCoursesPage() {
                   <Link to={courseUrl(course)} className="inline-flex justify-center rounded-lg bg-slate-950 px-5 py-3 text-sm font-bold text-white">
                     View Course
                   </Link>
-                  <Link to="/signup" className="inline-flex justify-center rounded-lg border border-slate-200 px-5 py-3 text-sm font-bold text-slate-900">
+                  <Link to={authHrefForCourse(course)} className="inline-flex justify-center rounded-lg border border-slate-200 px-5 py-3 text-sm font-bold text-slate-900">
                     Start Learning
                   </Link>
                 </div>

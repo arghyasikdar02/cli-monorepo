@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import CLILogo from '../../components/CLILogo'
 import { api } from '../../lib/api'
 import { useAppStore } from '../../store/useAppStore'
@@ -9,7 +9,13 @@ function hasAllowedRole(user, allowedRoles) {
   return roles.some(role => allowedRoles.includes(role))
 }
 
+function safeRedirect(value) {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return ''
+  return value
+}
+
 export default function RoleLoginPage({ title, purpose, allowedRoles, redirectTo }) {
+  const [searchParams] = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPw, setShowPw] = useState(false)
@@ -17,10 +23,11 @@ export default function RoleLoginPage({ title, purpose, allowedRoles, redirectTo
   const [loading, setLoading] = useState(false)
   const { isAuthenticated, user, loginWithToken, logout } = useAppStore()
   const navigate = useNavigate()
+  const redirectTarget = safeRedirect(searchParams.get('redirect'))
 
   useEffect(() => {
-    if (isAuthenticated && hasAllowedRole(user, allowedRoles)) navigate(redirectTo, { replace: true })
-  }, [allowedRoles, isAuthenticated, navigate, redirectTo, user])
+    if (isAuthenticated && hasAllowedRole(user, allowedRoles)) navigate(redirectTarget || redirectTo, { replace: true })
+  }, [allowedRoles, isAuthenticated, navigate, redirectTarget, redirectTo, user])
 
   const submit = async (event) => {
     event.preventDefault()
@@ -34,7 +41,7 @@ export default function RoleLoginPage({ title, purpose, allowedRoles, redirectTo
         return
       }
       loginWithToken(result.token, result.user)
-      navigate(redirectTo, { replace: true })
+      navigate(redirectTarget || redirectTo, { replace: true })
     } catch (err) {
       setError(err.message || 'Login failed')
     } finally {
@@ -128,7 +135,7 @@ export default function RoleLoginPage({ title, purpose, allowedRoles, redirectTo
             </form>
 
             <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-5 text-sm">
-              <Link to="/login" className="font-semibold text-violet-700 hover:underline">Student login</Link>
+              <Link to={`/auth?mode=login${redirectTarget ? `&redirect=${encodeURIComponent(redirectTarget)}` : ''}`} className="font-semibold text-violet-700 hover:underline">Student login</Link>
               <Link to="/" className="text-slate-500 hover:text-slate-800">Back to site</Link>
             </div>
           </div>

@@ -34,6 +34,10 @@ router.get('/public/:courseId', (req, res) => {
   res.json({ course })
 })
 
+router.get('/', (_req, res) => {
+  res.json({ courses: listPublicCourses() })
+})
+
 router.get('/enrolled', requireAuth, (req, res) => {
   res.json({ courses: listEnrolledCourses(req.user.id) })
 })

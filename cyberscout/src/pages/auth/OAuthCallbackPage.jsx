@@ -3,6 +3,11 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore'
 import { api } from '../../lib/api'
 
+function safeRedirect(value) {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return ''
+  return value
+}
+
 export default function OAuthCallbackPage() {
   const [params] = useSearchParams()
   const { loginWithToken } = useAppStore()
@@ -11,6 +16,7 @@ export default function OAuthCallbackPage() {
   useEffect(() => {
     const token = params.get('token')
     const error = params.get('error')
+    const redirectTarget = safeRedirect(params.get('redirect'))
 
     if (error || !token) {
       navigate('/login?error=oauth_failed', { replace: true })
@@ -21,7 +27,7 @@ export default function OAuthCallbackPage() {
     api.me()
       .then(({ user }) => {
         loginWithToken(token, user)
-        navigate('/dashboard', { replace: true })
+        navigate(redirectTarget || '/dashboard', { replace: true })
       })
       .catch(() => {
         localStorage.removeItem('cyberlab_token')

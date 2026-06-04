@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore'
 
 function isTokenExpired(token) {
@@ -13,9 +13,11 @@ function isTokenExpired(token) {
 
 export default function ProtectedRoute({ children }) {
   const { isAuthenticated, token, logout } = useAppStore()
+  const location = useLocation()
   if (!isAuthenticated || isTokenExpired(token)) {
     if (isAuthenticated) logout()
-    return <Navigate to="/login" replace />
+    const redirect = `${location.pathname}${location.search || ''}`
+    return <Navigate to={`/auth?mode=login&redirect=${encodeURIComponent(redirect)}`} replace />
   }
   return children
 }

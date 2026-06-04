@@ -1,25 +1,34 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore'
 import { api } from '../../lib/api'
 import CLILogo from '../../components/CLILogo'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
+function safeRedirect(value) {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return ''
+  return value
+}
+
 export default function SignUpPage() {
+  const [searchParams] = useSearchParams()
   const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [googleEnabled, setGoogleEnabled] = useState(false)
   const { loginWithToken } = useAppStore()
   const navigate = useNavigate()
+  const redirectTarget = safeRedirect(searchParams.get('redirect'))
+  const loginHref = `/auth?mode=login${redirectTarget ? `&redirect=${encodeURIComponent(redirectTarget)}` : ''}`
 
   const handleGoogleAuth = () => {
     if (!googleEnabled) {
       setError('Google sign-in is not configured for this environment. Use email access or add Google OAuth credentials.')
       return
     }
-    window.location.href = `${API_URL}/api/auth/google`
+    const query = redirectTarget ? `?redirect=${encodeURIComponent(redirectTarget)}` : ''
+    window.location.href = `${API_URL}/api/auth/google${query}`
   }
 
   useEffect(() => {
@@ -53,7 +62,7 @@ export default function SignUpPage() {
     try {
       const { token, user, redirectTo } = await api.register(form.name, form.email, form.password)
       loginWithToken(token, user)
-      navigate(redirectTo || '/dashboard')
+      navigate(redirectTarget || redirectTo || '/dashboard')
     } catch (err) {
       setError(err.message || 'Registration failed')
     } finally {
@@ -170,7 +179,7 @@ export default function SignUpPage() {
 
             <p className="text-center text-sm text-on-surface-variant mt-6 pt-5 border-t border-outline-variant/20">
               Already enlisted?{' '}
-              <Link to="/login" className="text-secondary font-semibold hover:underline">Sign In</Link>
+              <Link to={loginHref} className="text-secondary font-semibold hover:underline">Sign In</Link>
             </p>
           </div>
         </div>

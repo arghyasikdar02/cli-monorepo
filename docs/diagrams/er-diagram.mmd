@@ -1,0 +1,275 @@
+erDiagram
+  SCHEMA_MIGRATIONS {
+    integer id PK
+    string name UK
+    string applied_at
+  }
+
+  USERS {
+    string id PK
+    string name
+    string username UK
+    string email UK
+    string password_hash
+    string google_id UK
+    string role
+    string roles
+    string status
+    integer token_version
+    string password_updated_at
+    string last_login_at
+    string created_at
+    string updated_at
+  }
+
+  COURSE_CATEGORIES {
+    string id PK
+    string name
+    string slug UK
+    string description
+    string created_at
+  }
+
+  COURSES {
+    string id PK
+    string slug UK
+    string title
+    string category
+    string category_slug
+    string level
+    string duration
+    string mode
+    string credential
+    string prerequisites
+    string brochure_url
+    string audience
+    string outcomes
+    string labs
+    string description
+    string overview
+    string instructor_name
+    string instructor_title
+    string status
+    integer price
+    string created_at
+    string updated_at
+  }
+
+  COURSE_MODULES {
+    string id PK
+    string course_id FK
+    string title
+    integer sort_order
+    string created_at
+  }
+
+  LESSONS {
+    string id PK
+    string course_id FK
+    string module_id FK
+    string title
+    string duration
+    string content
+    integer sort_order
+    string status
+    string created_at
+  }
+
+  COURSE_MATERIALS {
+    string id PK
+    string course_id FK
+    string lesson_id FK
+    string type
+    string title
+    string description
+    string content
+    string resource_url
+    integer is_public
+    integer sort_order
+    string created_at
+  }
+
+  ENROLLMENTS {
+    string id PK
+    string user_id FK
+    string course_id FK
+    string status
+    string source
+    string enrolled_at
+    string updated_at
+  }
+
+  USER_PROGRESS {
+    string id PK
+    string user_id FK
+    string course_id FK
+    string lesson_id FK
+    integer completion_percentage
+    string completed_at
+    string updated_at
+  }
+
+  LIVE_CLASSES {
+    string id PK
+    string course_id FK
+    string batch_id
+    string instructor_id FK
+    string title
+    string provider
+    string join_url
+    string embed_url
+    string scheduled_start
+    string scheduled_end
+    string status
+    string created_at
+  }
+
+  LIVE_CLASS_ATTENDANCE {
+    string id PK
+    string live_class_id FK
+    string user_id FK
+    string event
+    string created_at
+  }
+
+  DOCUMENT_ACCESS_LOGS {
+    string id PK
+    string user_id FK
+    string course_id FK
+    string material_id FK
+    string event
+    string ip_address
+    string user_agent
+    string created_at
+  }
+
+  AUDIT_LOGS {
+    string id PK
+    string actor_id FK
+    string action
+    string entity_type
+    string entity_id
+    string metadata
+    string created_at
+  }
+
+  AI_CHAT_SESSIONS {
+    string id PK
+    string user_id FK
+    string course_id FK
+    string title
+    string created_at
+    string updated_at
+  }
+
+  AI_CHAT_MESSAGES {
+    string id PK
+    string session_id FK
+    string user_id FK
+    string course_id FK
+    string role
+    string content
+    string citations
+    string created_at
+  }
+
+  LEADS {
+    string id PK
+    string name
+    string phone
+    string email
+    string message
+    string course_id FK
+    string source
+    string stage
+    string owner_id FK
+    string visitor_id
+    string user_agent
+    string ip_address
+    string created_at
+    string updated_at
+  }
+
+  LEAD_NOTES {
+    string id PK
+    string lead_id FK
+    string author_id FK
+    string note
+    string created_at
+  }
+
+  FOLLOW_UPS {
+    string id PK
+    string lead_id FK
+    string owner_id FK
+    string due_at
+    string note
+    string status
+    string created_at
+  }
+
+  BLOGS {
+    string id PK
+    string slug UK
+    string title
+    string excerpt
+    string body
+    string meta_title
+    string meta_description
+    string status
+    string created_at
+    string updated_at
+  }
+
+  VISITOR_ANALYTICS {
+    string id PK
+    string visitor_id UK
+    string first_seen_at
+    string last_seen_at
+    integer visits
+    integer consent_analytics
+    integer consent_marketing
+    string user_agent
+    string ip_hash
+  }
+
+  COOKIE_CONSENTS {
+    string id PK
+    string visitor_id FK
+    integer necessary
+    integer analytics
+    integer marketing
+    string created_at
+    string updated_at
+  }
+
+  USERS ||--o{ ENROLLMENTS : enrolls
+  COURSES ||--o{ ENROLLMENTS : accepts
+  COURSES ||--o{ COURSE_MODULES : contains
+  COURSES ||--o{ LESSONS : contains
+  COURSE_MODULES ||--o{ LESSONS : groups
+  COURSES ||--o{ COURSE_MATERIALS : owns
+  LESSONS ||--o{ COURSE_MATERIALS : attaches
+  USERS ||--o{ USER_PROGRESS : records
+  COURSES ||--o{ USER_PROGRESS : tracks
+  LESSONS ||--o{ USER_PROGRESS : measures
+  COURSES ||--o{ LIVE_CLASSES : schedules
+  USERS ||--o{ LIVE_CLASSES : instructs
+  LIVE_CLASSES ||--o{ LIVE_CLASS_ATTENDANCE : emits
+  USERS ||--o{ LIVE_CLASS_ATTENDANCE : attends
+  USERS ||--o{ DOCUMENT_ACCESS_LOGS : triggers
+  COURSES ||--o{ DOCUMENT_ACCESS_LOGS : scopes
+  COURSE_MATERIALS ||--o{ DOCUMENT_ACCESS_LOGS : logs
+  USERS ||--o{ AUDIT_LOGS : acts
+  USERS ||--o{ AI_CHAT_SESSIONS : starts
+  COURSES ||--o{ AI_CHAT_SESSIONS : scopes
+  AI_CHAT_SESSIONS ||--o{ AI_CHAT_MESSAGES : contains
+  USERS ||--o{ AI_CHAT_MESSAGES : writes
+  COURSES ||--o{ AI_CHAT_MESSAGES : scopes
+  COURSES ||--o{ LEADS : interested
+  USERS ||--o{ LEADS : owns
+  LEADS ||--o{ LEAD_NOTES : has
+  USERS ||--o{ LEAD_NOTES : authors
+  LEADS ||--o{ FOLLOW_UPS : schedules
+  USERS ||--o{ FOLLOW_UPS : owns
+  VISITOR_ANALYTICS ||--o{ COOKIE_CONSENTS : records

@@ -26,6 +26,7 @@ import blogsRouter from './routes/blogs.js'
 import visitorsRouter from './routes/visitors.js'
 import videosRouter from './routes/videos.js'
 import webhooksRouter from './routes/webhooks.js'
+import { seedBaselineData } from './db/seed.js'
 
 const PORT = process.env.PORT || 3001
 const corsOrigins = (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || 'http://localhost:5173')
@@ -79,11 +80,22 @@ export function createApp() {
   app.use('/api/webhooks', webhooksRouter)
   app.use('/api/audit', auditRouter)
   app.use('/api/dashboards', dashboardsRouter)
+  app.use((err, _req, res, _next) => {
+    console.error(err)
+    res.status(500).json({ error: 'Internal server error' })
+  })
   return app
 }
 
 export const app = createApp()
 
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => console.log(`cyberscout-server running on :${PORT}`))
+  seedBaselineData({ force: process.env.SEED_BASELINE_FORCE === '1' })
+    .then(() => {
+      app.listen(PORT, () => console.log(`cyberscout-server running on :${PORT}`))
+    })
+    .catch(error => {
+      console.error('Failed to prepare database before server start:', error)
+      process.exit(1)
+    })
 }

@@ -6,6 +6,10 @@ import { api } from '../../lib/api'
 
 const siteUrl = (import.meta.env.VITE_SITE_URL || 'https://cyberlabin.com').replace(/\/+$/, '')
 
+function authHrefForCourse(course) {
+  return `/auth?mode=login&redirect=${encodeURIComponent(`/learn/courses/${course.id}`)}`
+}
+
 function Modal({ course, onClose }) {
   return (
     <div className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/45 p-3 backdrop-blur-sm sm:items-center" role="dialog" aria-modal="true" aria-label="Course guidance form">
@@ -141,7 +145,7 @@ export default function PublicCoursePage() {
           <div className="flex items-center gap-4 text-sm font-bold text-slate-700">
             <Link to="/courses" className="hover:text-slate-950">Courses</Link>
             <Link to="/blog" className="hover:text-slate-950">Blog</Link>
-            <Link to="/signup" className="rounded-lg bg-slate-950 px-4 py-2.5 text-white">Enroll</Link>
+            <Link to={authHrefForCourse(course)} className="rounded-lg bg-slate-950 px-4 py-2.5 text-white">Enroll</Link>
           </div>
         </nav>
       </header>
@@ -164,7 +168,7 @@ export default function PublicCoursePage() {
                 <h1 className="mt-4 font-space-grotesk text-4xl font-black tracking-tight sm:text-6xl">{course.title}</h1>
                 <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">{course.overview || course.description}</p>
                 <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                  <Link to="/signup" className="inline-flex justify-center rounded-lg bg-white px-6 py-3.5 text-sm font-bold text-slate-950">Enroll Now</Link>
+                  <Link to={authHrefForCourse(course)} className="inline-flex justify-center rounded-lg bg-white px-6 py-3.5 text-sm font-bold text-slate-950">Enroll Now</Link>
                   {course.brochureUrl ? (
                     <a href={course.brochureUrl} className="inline-flex justify-center rounded-lg border border-white/20 px-6 py-3.5 text-sm font-bold text-white">Download Brochure</a>
                   ) : (

@@ -10,6 +10,11 @@ const authErrors = {
   oauth_unconfigured: 'Google sign-in is not configured for this environment. Use email access or add Google OAuth credentials.',
 }
 
+function safeRedirect(value) {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return ''
+  return value
+}
+
 export default function LoginPage() {
   const [searchParams] = useSearchParams()
   const [email, setEmail] = useState('')
@@ -20,13 +25,16 @@ export default function LoginPage() {
   const [googleEnabled, setGoogleEnabled] = useState(false)
   const { loginWithToken } = useAppStore()
   const navigate = useNavigate()
+  const redirectTarget = safeRedirect(searchParams.get('redirect'))
+  const signupHref = `/auth?mode=signup${redirectTarget ? `&redirect=${encodeURIComponent(redirectTarget)}` : ''}`
 
   const handleGoogleAuth = () => {
     if (!googleEnabled) {
       setError(authErrors.oauth_unconfigured)
       return
     }
-    window.location.href = `${API_URL}/api/auth/google`
+    const query = redirectTarget ? `?redirect=${encodeURIComponent(redirectTarget)}` : ''
+    window.location.href = `${API_URL}/api/auth/google${query}`
   }
 
   useEffect(() => {
@@ -50,7 +58,7 @@ export default function LoginPage() {
     try {
       const { token, user, redirectTo } = await api.login(email, password)
       loginWithToken(token, user)
-      navigate(redirectTo || '/dashboard')
+      navigate(redirectTarget || redirectTo || '/dashboard')
     } catch (err) {
       setError(err.message || 'Login failed')
     } finally {
@@ -199,7 +207,7 @@ export default function LoginPage() {
 
             <p className="text-center text-sm text-on-surface-variant mt-6 pt-5 border-t border-outline-variant/20">
               New recruit?{' '}
-              <Link to="/signup" className="text-secondary font-semibold hover:underline">
+              <Link to={signupHref} className="text-secondary font-semibold hover:underline">
                 Apply for Enrollment
               </Link>
             </p>

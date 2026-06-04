@@ -9,6 +9,7 @@ import WelcomePage from './pages/auth/WelcomePage'
 import LoginPage from './pages/auth/LoginPage'
 import RoleLoginPage from './pages/auth/RoleLoginPage'
 import SignUpPage from './pages/auth/SignUpPage'
+import AuthPage from './pages/auth/AuthPage'
 import GettingStartedPage from './pages/auth/GettingStartedPage'
 import OAuthCallbackPage from './pages/auth/OAuthCallbackPage'
 
@@ -84,6 +85,7 @@ export default function App() {
         <Route path="/blog" element={<BlogListPage />} />
         <Route path="/blog/:slug" element={<BlogDetailPage />} />
         <Route path="/about" element={<AboutPage />} />
+        <Route path="/auth" element={<AuthPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route
           path="/admin/login"
