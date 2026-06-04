@@ -82,7 +82,7 @@ export default function ProfilePage() {
             <div className="bg-white rounded-xl border border-slate-200 shadow-card p-5">
               <h3 className="font-space-grotesk font-bold text-primary text-sm mb-3">Quick Links</h3>
               {[
-                { to: '/courses', icon: 'school', label: 'My Courses' },
+                { to: '/learn/courses', icon: 'school', label: 'My Courses' },
                 { to: '/achievements', icon: 'military_tech', label: 'All Badges' },
                 { to: '/subscription', icon: 'workspace_premium', label: 'Subscription' },
               ].map(({ to, icon, label }) => (

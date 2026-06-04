@@ -2,6 +2,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useState } from 'react'
 import AppShell from '../../components/layout/AppShell'
 import { useAppStore } from '../../store/useAppStore'
+import { api } from '../../lib/api'
 
 const TABS = ['account', 'security', 'notifications', 'appearance']
 
@@ -95,33 +96,88 @@ function AccountTab({ user }) {
 }
 
 function SecurityTab() {
+  const { user, loginWithToken } = useAppStore()
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const submit = async (event) => {
+    event.preventDefault()
+    setError('')
+    setSuccess('')
+    if (newPassword !== confirmPassword) {
+      setError('New passwords do not match.')
+      return
+    }
+    if (newPassword.length < 8 || !/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/\d/.test(newPassword)) {
+      setError('Use at least 8 characters with uppercase, lowercase, and a number.')
+      return
+    }
+    setLoading(true)
+    try {
+      const result = await api.changePassword(currentPassword, newPassword)
+      loginWithToken(result.token, result.user)
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      setSuccess(result.message || 'Password updated.')
+    } catch (err) {
+      setError(err.message || 'Password update failed.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <>
       <h2 className="font-space-grotesk font-bold text-primary">Security</h2>
-      <div className="space-y-4">
-        <Field label="Current Password" type="password" value="" />
-        <Field label="New Password" type="password" value="" />
-        <Field label="Confirm New Password" type="password" value="" />
-      </div>
-      <button className="px-5 py-2.5 bg-primary text-white font-space-grotesk font-bold text-sm rounded-xl hover:opacity-90 transition-opacity">
-        Update Password
-      </button>
-      <div className="mt-6 pt-6 border-t border-slate-200">
-        <h3 className="font-space-grotesk font-semibold text-on-surface mb-4">Two-Factor Authentication</h3>
-        <Toggle label="Enable 2FA" desc="Secure your account with an authenticator app" defaultOn={false} />
-      </div>
-      <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
-        <p className="font-space-grotesk text-sm font-semibold text-on-surface mb-2">Active Sessions</p>
-        {[{ device: 'Chrome on Windows 11', location: 'London, UK', current: true }, { device: 'Safari on iPhone', location: 'London, UK', current: false }].map(s => (
-          <div key={s.device} className="flex items-center justify-between py-2">
-            <div>
-              <p className="text-sm text-on-surface">{s.device}</p>
-              <p className="text-xs text-on-surface-variant">{s.location} {s.current && '· Current'}</p>
-            </div>
-            {!s.current && <button className="text-xs text-error hover:underline font-bold">Revoke</button>}
+      {!user?.hasPassword && (
+        <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm leading-6 text-sky-800">
+          This account was created with OAuth. Set a password here if you want email/password access too.
+        </div>
+      )}
+      <form onSubmit={submit} className="space-y-4">
+        {user?.hasPassword && (
+          <div>
+            <label className="block font-space-grotesk text-[11px] font-bold text-on-surface-variant uppercase tracking-wider mb-1.5">Current Password</label>
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={event => setCurrentPassword(event.target.value)}
+              required
+              className="w-full px-4 py-3 bg-surface border border-outline-variant rounded-xl text-sm outline-none focus:border-secondary focus:ring-1 focus:ring-secondary transition-all"
+            />
           </div>
-        ))}
-      </div>
+        )}
+        <div>
+          <label className="block font-space-grotesk text-[11px] font-bold text-on-surface-variant uppercase tracking-wider mb-1.5">New Password</label>
+          <input
+            type="password"
+            value={newPassword}
+            onChange={event => setNewPassword(event.target.value)}
+            required
+            className="w-full px-4 py-3 bg-surface border border-outline-variant rounded-xl text-sm outline-none focus:border-secondary focus:ring-1 focus:ring-secondary transition-all"
+          />
+        </div>
+        <div>
+          <label className="block font-space-grotesk text-[11px] font-bold text-on-surface-variant uppercase tracking-wider mb-1.5">Confirm New Password</label>
+          <input
+            type="password"
+            value={confirmPassword}
+            onChange={event => setConfirmPassword(event.target.value)}
+            required
+            className="w-full px-4 py-3 bg-surface border border-outline-variant rounded-xl text-sm outline-none focus:border-secondary focus:ring-1 focus:ring-secondary transition-all"
+          />
+        </div>
+        {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{error}</p>}
+        {success && <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">{success}</p>}
+        <button disabled={loading} className="px-5 py-2.5 bg-primary text-white font-space-grotesk font-bold text-sm rounded-xl hover:opacity-90 transition-opacity disabled:opacity-60">
+          {loading ? 'Updating...' : 'Update Password'}
+        </button>
+      </form>
     </>
   )
 }

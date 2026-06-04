@@ -1,5 +1,5 @@
-// Dev-only in-memory platform store.
-// DATABASE_SCHEMA.md documents the PostgreSQL-ready tables for production migration.
+// Legacy in-memory fallback store for routes not yet migrated to the SQLite repository.
+// Active auth, courses, enrollments, leads, analytics, audits, and leaderboards use the database repository.
 
 let idCounter = 1
 const now = () => new Date().toISOString()
@@ -36,9 +36,19 @@ export const courses = [
   },
 ]
 
+export const batches = [
+  { id: 'batch_intro_001', courseId: 'c001', name: 'Introduction Cohort 001', status: 'active', startsAt: '2026-06-01T00:00:00.000Z', endsAt: null, createdAt: now() },
+  { id: 'batch_web_001', courseId: 'c002', name: 'Essentials Cohort 001', status: 'active', startsAt: '2026-06-01T00:00:00.000Z', endsAt: null, createdAt: now() },
+]
+
 export const enrollments = [
   { id: 'enr_001', userId: 'usr_001', courseId: 'c001', batchId: 'batch_intro_001', status: 'active', source: 'seed', createdAt: now() },
   { id: 'enr_002', userId: 'usr_student', courseId: 'c001', batchId: 'batch_intro_001', status: 'active', source: 'seed', createdAt: now() },
+]
+
+export const lessons = [
+  { id: 'l001_01_01', courseId: 'c001', moduleId: 'm001_01', title: 'Digital Footprint Basics', order: 1, status: 'published', createdAt: now() },
+  { id: 'l002_01_01', courseId: 'c002', moduleId: 'm002_01', title: 'Browser-Server-Database Model', order: 1, status: 'published', createdAt: now() },
 ]
 
 export const liveClasses = [
@@ -53,6 +63,10 @@ export const liveClasses = [
     joinUrl: 'https://example.com/join/intro-lab',
     scheduledStart: '2026-06-03T10:00:00.000Z',
     scheduledEnd: '2026-06-03T11:00:00.000Z',
+    joinWindowBeforeMinutes: 15,
+    joinWindowAfterMinutes: 15,
+    recordingUrl: null,
+    recordingStatus: 'not_available',
     status: 'scheduled',
     createdAt: now(),
   },
@@ -67,6 +81,10 @@ export const liveClasses = [
     joinUrl: 'https://example.com/join/web-lab',
     scheduledStart: '2026-06-04T10:00:00.000Z',
     scheduledEnd: '2026-06-04T11:00:00.000Z',
+    joinWindowBeforeMinutes: 15,
+    joinWindowAfterMinutes: 15,
+    recordingUrl: null,
+    recordingStatus: 'not_available',
     status: 'scheduled',
     createdAt: now(),
   },
@@ -87,11 +105,15 @@ export const documents = [
 export const documentAccessLogs = []
 
 export const labs = [
-  { id: 'lab001', courseId: 'c001', title: 'Spot the Phishing Pattern', description: 'Review a simulated message and identify defensive red flags.', flag: 'DEFEND', points: 50, status: 'published', createdAt: now() },
-  { id: 'lab002', courseId: 'c002', title: 'Unsafe Input Review', description: 'Inspect a safe demo form and identify input validation risks.', flag: 'WEBSAFE', points: 75, status: 'published', createdAt: now() },
+  { id: 'lab001', courseId: 'c001', lessonId: 'l001_01_01', title: 'Spot the Phishing Pattern', description: 'Review a simulated message and identify defensive red flags.', points: 50, hints: ['Check sender identity.', 'Look for urgency and unsafe links.'], dockerReady: true, unsafeCloudInfra: false, status: 'published', createdAt: now() },
+  { id: 'lab002', courseId: 'c002', lessonId: 'l002_01_01', title: 'Unsafe Input Review', description: 'Inspect a controlled training form and identify input validation risks.', points: 75, hints: ['Compare client and server validation.', 'Look for untrusted input boundaries.'], dockerReady: true, unsafeCloudInfra: false, status: 'published', createdAt: now() },
 ]
 
 export const labAttempts = []
+export const labFlags = [
+  { id: 'flag001', labId: 'lab001', courseId: 'c001', value: 'DEFEND', points: 50, createdAt: now() },
+  { id: 'flag002', labId: 'lab002', courseId: 'c002', value: 'WEBSAFE', points: 75, createdAt: now() },
+]
 
 export const quizzes = [
   {
@@ -139,19 +161,25 @@ export const aiChatMessages = [
   { id: 'aim001', sessionId: 'ais001', userId: 'usr_student', courseId: 'c001', role: 'assistant', content: 'Ask me about the Introduction to Cyber Security course and I will keep the answer course-specific.', createdAt: now() },
 ]
 
-export const knowledgeBaseDocuments = [
-  { id: 'kb001', courseId: 'c001', title: 'Cyber safety course outline', status: 'ready', source: 'seed', createdAt: now() },
-  { id: 'kb002', courseId: 'c002', title: 'Web security course outline', status: 'ready', source: 'seed', createdAt: now() },
+export const ragSources = [
+  { id: 'kb001', courseId: 'c001', title: 'Cyber safety course outline', status: 'ready', sourceType: 'seed', createdAt: now() },
+  { id: 'kb002', courseId: 'c002', title: 'Web security course outline', status: 'ready', sourceType: 'seed', createdAt: now() },
 ]
 
-export const leads = [
-  { id: 'lead001', name: 'Sample Lead', email: 'lead@example.com', courseId: 'c002', source: 'course_page', stage: 'new', ownerId: 'usr_marketing', status: 'hot', followUpDate: null, createdAt: now(), updatedAt: now() },
+export const ragChunks = [
+  { id: 'chunk001', sourceId: 'kb001', courseId: 'c001', content: 'Introduction to Cyber Security covers digital footprint review, scam psychology, phishing red flags, account hardening, and everyday cyber safety.', citation: 'Cyber safety course outline', createdAt: now() },
+  { id: 'chunk002', sourceId: 'kb002', courseId: 'c002', content: 'Cyber Security Essentials covers HTTP, unsafe input, SQL Injection concepts, XSS concepts, session security, and defensive reporting.', citation: 'Web security course outline', createdAt: now() },
 ]
+
+export const leads = []
 
 export const leadNotes = []
+export const followUps = []
 
 export const payments = []
+export const paymentIntents = []
 export const processedPaymentEvents = new Set()
+export const analyticsEvents = []
 
 export const auditLogs = [
   { id: 'aud001', actorId: 'system', action: 'seed.loaded', targetType: 'system', targetId: 'legacy-mvp', metadata: {}, createdAt: now() },
@@ -161,6 +189,12 @@ export function recordAudit(action, actorId = 'system', targetType = 'system', t
   const log = { id: nextId('aud'), actorId, action, targetType, targetId, metadata, createdAt: now() }
   auditLogs.unshift(log)
   return log
+}
+
+export function recordAnalyticsEvent(eventName, actorId = null, courseId = null, metadata = {}) {
+  const event = { id: nextId('evt'), eventName, actorId, courseId, metadata, createdAt: now() }
+  analyticsEvents.unshift(event)
+  return event
 }
 
 export function getAuditLogs(filter = {}) {
@@ -173,6 +207,19 @@ export function getAuditLogs(filter = {}) {
 
 export function getCourseById(courseId) {
   return courses.find(course => course.id === courseId) || null
+}
+
+export function getBatchById(batchId) {
+  return batches.find(batch => batch.id === batchId) || null
+}
+
+export function getLessonById(lessonId) {
+  return lessons.find(lesson => lesson.id === lessonId) || null
+}
+
+export function isInstructorAssigned(userId, courseId) {
+  const course = getCourseById(courseId)
+  return Boolean(course && course.instructorId === userId)
 }
 
 export function listPublicCourses() {
@@ -224,6 +271,13 @@ export function hasActiveEnrollment(userId, courseId, batchId = null) {
   )
 }
 
+export function hasBatchMembership(userId, courseId, batchId) {
+  if (!batchId) return false
+  const batch = getBatchById(batchId)
+  if (!batch || batch.courseId !== courseId || batch.status !== 'active') return false
+  return hasActiveEnrollment(userId, courseId, batchId)
+}
+
 export function listEnrollmentsByUser(userId) {
   return enrollments.filter(enrollment => enrollment.userId === userId)
 }
@@ -272,6 +326,10 @@ export function createLiveClass(data, actorId) {
     joinUrl: data.joinUrl || null,
     scheduledStart: data.scheduledStart,
     scheduledEnd: data.scheduledEnd,
+    joinWindowBeforeMinutes: Number(data.joinWindowBeforeMinutes ?? 15),
+    joinWindowAfterMinutes: Number(data.joinWindowAfterMinutes ?? 15),
+    recordingUrl: data.recordingUrl || null,
+    recordingStatus: data.recordingStatus || 'not_available',
     status: data.status || 'scheduled',
     createdAt: now(),
   }
@@ -297,8 +355,26 @@ export function listLiveClassesByCourse(courseId) {
 }
 
 export function listUpcomingLiveClassesForUser(userId) {
-  const courseIds = listEnrollmentsByUser(userId).filter(item => item.status === 'active').map(item => item.courseId)
-  return liveClasses.filter(item => courseIds.includes(item.courseId))
+  const activeEnrollments = listEnrollmentsByUser(userId).filter(item => item.status === 'active')
+  return liveClasses.filter(item => activeEnrollments.some(enrollment =>
+    enrollment.courseId === item.courseId &&
+    (!item.batchId || enrollment.batchId === item.batchId)
+  ))
+}
+
+export function getLiveClassJoinDecision(liveClass, user, at = new Date()) {
+  if (!liveClass) return { allowed: false, reason: 'live_class_not_found' }
+  if (!user) return { allowed: false, reason: 'auth_required' }
+  const start = Date.parse(liveClass.scheduledStart)
+  const end = Date.parse(liveClass.scheduledEnd)
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return { allowed: false, reason: 'invalid_live_class_window' }
+  const beforeMs = Number(liveClass.joinWindowBeforeMinutes ?? 15) * 60 * 1000
+  const afterMs = Number(liveClass.joinWindowAfterMinutes ?? 15) * 60 * 1000
+  const atMs = at instanceof Date ? at.getTime() : Date.parse(at)
+  if (atMs < start - beforeMs) return { allowed: false, reason: 'outside_join_window_early' }
+  if (atMs > end + afterMs) return { allowed: false, reason: 'outside_join_window_late' }
+  if (!hasActiveEnrollment(user.id, liveClass.courseId, liveClass.batchId)) return { allowed: false, reason: 'active_enrollment_required' }
+  return { allowed: true, reason: 'allowed' }
 }
 
 export function recordLiveEvent(liveClassId, userId, eventType) {
@@ -318,6 +394,7 @@ export function recordLiveEvent(liveClassId, userId, eventType) {
     }
     liveClassAttendance.push(attendance)
     recordAudit('live_class.join', userId, 'live_class', liveClassId, { attendanceId: attendance.id })
+    recordAnalyticsEvent('live_class.join', userId, liveClass.courseId, { liveClassId, batchId: liveClass.batchId })
     return attendance
   }
   const active = [...liveClassAttendance].reverse().find(item => item.liveClassId === liveClassId && item.userId === userId && item.status === 'online')
@@ -326,6 +403,7 @@ export function recordLiveEvent(liveClassId, userId, eventType) {
   active.status = 'left'
   active.watchSeconds = Math.max(0, Math.round((Date.parse(active.leftAt) - Date.parse(active.joinedAt)) / 1000))
   recordAudit('live_class.leave', userId, 'live_class', liveClassId, { attendanceId: active.id, watchSeconds: active.watchSeconds })
+  recordAnalyticsEvent('live_class.leave', userId, active.courseId, { liveClassId, batchId: active.batchId, watchSeconds: active.watchSeconds })
   return active
 }
 
@@ -365,6 +443,7 @@ export function registerDocument(data, actorId) {
   const document = { id: nextId('doc'), courseId: data.courseId, title: data.title, storageKey: data.storageKey, pageCount: data.pageCount || null, status: 'active', createdAt: now() }
   documents.push(document)
   recordAudit('document.register', actorId, 'document', document.id, { courseId: document.courseId, title: document.title })
+  recordAnalyticsEvent('document.register', actorId, document.courseId, { documentId: document.id })
   return document
 }
 
@@ -374,6 +453,7 @@ export function logDocumentAccess(documentId, userId, metadata = {}) {
   const log = { id: nextId('doclog'), documentId, courseId: document.courseId, userId, metadata, createdAt: now() }
   documentAccessLogs.unshift(log)
   recordAudit('document.access', userId, 'document', documentId, metadata)
+  recordAnalyticsEvent('document.access', userId, document.courseId, { documentId, ...metadata })
   return log
 }
 
@@ -395,8 +475,21 @@ export function assignLabToCourse(labId, courseId, actorId) {
 }
 
 export function createLab(data, actorId) {
-  const lab = { id: nextId('lab'), courseId: data.courseId, title: data.title, description: data.description || '', flag: data.flag || null, points: data.points || 0, status: data.status || 'draft', createdAt: now() }
+  const lab = {
+    id: nextId('lab'),
+    courseId: data.courseId,
+    lessonId: data.lessonId || null,
+    title: data.title,
+    description: data.description || '',
+    points: data.points || 0,
+    hints: data.hints || [],
+    dockerReady: data.dockerReady !== false,
+    unsafeCloudInfra: false,
+    status: data.status || 'draft',
+    createdAt: now(),
+  }
   labs.push(lab)
+  if (data.flag) labFlags.push({ id: nextId('flag'), labId: lab.id, courseId: lab.courseId, value: data.flag, points: lab.points, createdAt: now() })
   recordAudit('lab.create', actorId, 'lab', lab.id, { courseId: lab.courseId, title: lab.title })
   return lab
 }
@@ -413,10 +506,12 @@ export function launchLab(labId, userId) {
 export function submitLabFlag(labId, userId, flag) {
   const lab = labs.find(item => item.id === labId)
   if (!lab) return null
-  const passed = Boolean(lab.flag && String(flag || '').trim().toUpperCase() === String(lab.flag).toUpperCase())
-  const attempt = { id: nextId('labatt'), labId, courseId: lab.courseId, userId, status: passed ? 'passed' : 'failed', score: passed ? lab.points : 0, submittedAt: now() }
+  const matchingFlag = labFlags.find(item => item.labId === labId && String(flag || '').trim().toUpperCase() === String(item.value).toUpperCase())
+  const passed = Boolean(matchingFlag)
+  const attempt = { id: nextId('labatt'), labId, courseId: lab.courseId, userId, status: passed ? 'passed' : 'failed', score: passed ? matchingFlag.points : 0, submittedAt: now() }
   labAttempts.push(attempt)
   recordAudit('lab.submit_flag', userId, 'lab', labId, { passed })
+  recordAnalyticsEvent('lab.submit_flag', userId, lab.courseId, { labId, passed, score: attempt.score })
   return attempt
 }
 
@@ -523,15 +618,6 @@ export function updateCourseProgress(userId, courseId, updates) {
   return item
 }
 
-export function getLeaderboard(courseId, batchId = null) {
-  const rows = progress
-    .filter(item => item.courseId === courseId)
-    .filter(item => !batchId || enrollments.find(enrollment => enrollment.userId === item.userId && enrollment.courseId === courseId && enrollment.batchId === batchId))
-    .map(item => ({ userId: item.userId, courseId: item.courseId, score: item.completionPercentage, updatedAt: item.updatedAt }))
-    .sort((a, b) => b.score - a.score)
-  return rows.map((row, index) => ({ ...row, rank: index + 1 }))
-}
-
 export function issueCertificate(data, actorId) {
   const certificate = { id: nextId('cert'), userId: data.userId, courseId: data.courseId, code: data.code || nextId('CLI-CERT'), issuedBy: actorId, issuedAt: now(), status: 'issued' }
   certificates.push(certificate)
@@ -577,21 +663,77 @@ export function addAiMessage(sessionId, userId, courseId, role, content) {
   return message
 }
 
-export function mockAiReply(courseId, prompt) {
+export function courseMaterialReply(courseId, prompt) {
   const course = getCourseById(courseId)
-  const text = String(prompt || '')
-  if (!course) return 'I cannot answer because the selected course was not found.'
-  if (/another course|other course|course b|course a/i.test(text)) {
-    return 'I can only answer from the selected course knowledge base. Please switch courses if you want help with different material.'
-  }
-  return `From ${course.title}: focus on the practical defensive workflow, explain what you observed, why it matters, and what safe action you would take next.`
+  return courseMaterialAnswer(courseId, prompt).answer || (course ? `From ${course.title}: focus on the practical defensive workflow.` : 'I cannot answer because the selected course was not found.')
 }
 
 export function listKnowledgeBaseDocuments(courseId) {
-  return knowledgeBaseDocuments.filter(document => document.courseId === courseId)
+  return ragSources.filter(document => document.courseId === courseId)
+}
+
+export const knowledgeBaseDocuments = ragSources
+
+export function ingestRagSource(data, actorId) {
+  const source = { id: nextId('kb'), courseId: data.courseId, title: data.title, status: 'ready', sourceType: data.sourceType || 'manual', createdAt: now() }
+  ragSources.push(source)
+  const chunks = (data.chunks || [data.content || '']).filter(Boolean).map(content => {
+    const chunk = { id: nextId('chunk'), sourceId: source.id, courseId: source.courseId, content, citation: source.title, createdAt: now() }
+    ragChunks.push(chunk)
+    return chunk
+  })
+  recordAudit('rag.ingest', actorId, 'rag_source', source.id, { courseId: source.courseId, chunks: chunks.length })
+  return { source, chunks }
+}
+
+export function retrieveRagChunks(courseId, query, limit = 3) {
+  const terms = String(query || '').toLowerCase().split(/\s+/).filter(Boolean)
+  return ragChunks
+    .filter(chunk => chunk.courseId === courseId)
+    .map(chunk => ({
+      ...chunk,
+      score: terms.reduce((sum, term) => sum + (chunk.content.toLowerCase().includes(term) ? 1 : 0), 0),
+    }))
+    .filter(chunk => chunk.score > 0 || terms.length === 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+}
+
+export function courseMaterialAnswer(courseId, prompt) {
+  const course = getCourseById(courseId)
+  const text = String(prompt || '')
+  if (!course) {
+    return { refused: true, answer: 'I cannot answer because the selected course was not found.', citations: [] }
+  }
+  const otherCourses = courses.filter(item => item.id !== courseId)
+  const asksOtherCourse = otherCourses.some(item =>
+    text.toLowerCase().includes(item.title.toLowerCase()) ||
+    text.toLowerCase().includes(item.slug.toLowerCase())
+  ) || /another course|other course|course b|course a/i.test(text)
+  if (asksOtherCourse) {
+    return {
+      refused: true,
+      answer: 'I can only answer from the selected course knowledge base. Please switch courses if you want help with different material.',
+      citations: [],
+    }
+  }
+  const chunks = retrieveRagChunks(courseId, text)
+  if (!chunks.length) {
+    return {
+      refused: true,
+      answer: 'I could not find this in the selected course knowledge base, so I should not guess.',
+      citations: [],
+    }
+  }
+  return {
+    refused: false,
+    answer: `From ${course.title}: ${chunks[0].content}`,
+    citations: chunks.map(chunk => ({ sourceId: chunk.sourceId, chunkId: chunk.id, title: chunk.citation })),
+  }
 }
 
 export function createLead(data) {
+  const score = scoreLead(data)
   const lead = {
     id: nextId('lead'),
     name: data.name || 'Unknown',
@@ -601,14 +743,26 @@ export function createLead(data) {
     source: data.source || 'website',
     stage: data.stage || 'new',
     ownerId: data.ownerId || null,
-    status: data.status || 'warm',
+    status: data.status || (score >= 75 ? 'hot' : score >= 40 ? 'warm' : 'cold'),
+    score,
     followUpDate: data.followUpDate || null,
     createdAt: now(),
     updatedAt: now(),
   }
   leads.unshift(lead)
   recordAudit('lead.create', 'system', 'lead', lead.id, { source: lead.source, courseId: lead.courseId })
+  recordAnalyticsEvent('lead.create', null, lead.courseId, { source: lead.source, score: lead.score })
   return lead
+}
+
+export function scoreLead(data = {}) {
+  let score = 20
+  if (data.courseId) score += 20
+  if (data.source && ['course_page', 'locked_course_card', 'pricing', 'post_login'].includes(data.source)) score += 20
+  if (data.phone) score += 15
+  if (data.email && /@(gmail|outlook|yahoo|icloud)\./i.test(data.email)) score += 5
+  if (data.stage === 'qualified') score += 25
+  return Math.min(score, 100)
 }
 
 export function listLeads(filter = {}) {
@@ -637,6 +791,17 @@ export function addLeadNote(leadId, actorId, note) {
   return row
 }
 
+export function createFollowUp(leadId, actorId, dueAt, note = '') {
+  const lead = leads.find(item => item.id === leadId)
+  if (!lead) return null
+  const followUp = { id: nextId('follow'), leadId, ownerId: actorId, dueAt, note, status: 'open', createdAt: now() }
+  followUps.unshift(followUp)
+  lead.followUpDate = dueAt
+  lead.updatedAt = now()
+  recordAudit('lead.follow_up.create', actorId, 'lead', leadId, { followUpId: followUp.id, dueAt })
+  return followUp
+}
+
 export function getSalesAnalytics() {
   const courseWise = courses.map(course => ({
     courseId: course.id,
@@ -646,9 +811,10 @@ export function getSalesAnalytics() {
   }))
   return {
     totalLeads: leads.length,
+    openFollowUps: followUps.filter(item => item.status === 'open').length,
     courseWise,
     stages: leads.reduce((acc, lead) => ({ ...acc, [lead.stage]: (acc[lead.stage] || 0) + 1 }), {}),
-    suggestions: ['Follow up with hot leads within 24 hours.', 'Create a short intro lab demo for undecided course leads.'],
+    suggestions: ['Follow up with hot leads within 24 hours.', 'Create a short intro lab walkthrough for undecided course leads.'],
   }
 }
 
@@ -666,7 +832,20 @@ export function createPaymentOrder(data, actorId = 'system') {
     createdAt: now(),
   }
   payments.push(payment)
+  paymentIntents.push({
+    id: payment.id,
+    userId: payment.userId,
+    courseId: payment.courseId,
+    amount: payment.amount,
+    currency: payment.currency,
+    provider: payment.provider,
+    providerIntentId: payment.providerOrderId,
+    status: payment.status,
+    metadata: payment.metadata,
+    createdAt: payment.createdAt,
+  })
   recordAudit('payment.create', actorId, 'payment', payment.id, payment)
+  recordAnalyticsEvent('payment_intent.create', actorId, payment.courseId, { paymentId: payment.id, amount: payment.amount })
   return payment
 }
 
@@ -702,6 +881,7 @@ export function getAdminAnalytics() {
     labAttempts: labAttempts.length,
     aiMessages: aiChatMessages.length,
     documentAccesses: documentAccessLogs.length,
+    analyticsEvents: analyticsEvents.length,
   }
 }
 

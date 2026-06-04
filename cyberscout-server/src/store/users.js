@@ -70,7 +70,7 @@ const seeds = [
   }),
   createSeedUser({
     id: 'usr_student',
-    name: 'Demo Student',
+    name: 'Student Learner',
     email: 'student@cyberlabin.com',
     passwordHash: seedHash,
     googleId: null,
@@ -82,7 +82,7 @@ const seeds = [
   }),
   createSeedUser({
     id: 'usr_admin',
-    name: 'Demo Admin',
+    name: 'Cyber Lab Admin',
     email: 'admin@cyberlabin.com',
     passwordHash: seedHash,
     googleId: null,
@@ -91,7 +91,7 @@ const seeds = [
   }),
   createSeedUser({
     id: 'usr_instructor',
-    name: 'Demo Instructor',
+    name: 'Cyber Lab Instructor',
     email: 'instructor@cyberlabin.com',
     passwordHash: seedHash,
     googleId: null,
@@ -100,7 +100,7 @@ const seeds = [
   }),
   createSeedUser({
     id: 'usr_marketing',
-    name: 'Demo Marketing',
+    name: 'Cyber Lab Marketing',
     email: 'marketing@cyberlabin.com',
     passwordHash: seedHash,
     googleId: null,
@@ -109,7 +109,7 @@ const seeds = [
   }),
   createSeedUser({
     id: 'usr_ops',
-    name: 'Demo Ops',
+    name: 'Cyber Lab Ops',
     email: 'ops@cyberlabin.com',
     passwordHash: seedHash,
     googleId: null,

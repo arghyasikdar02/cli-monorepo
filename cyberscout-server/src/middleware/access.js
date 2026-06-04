@@ -1,6 +1,6 @@
 import { verifyToken } from '../lib/jwt.js'
-import { findById, userHasRole } from '../store/users.js'
-import { hasActiveEnrollment, getCourseById } from '../store/platformStore.js'
+import { findUserById, userHasRole } from '../db/repositories.js'
+import { assertDecision, canAccessBatch, canAccessCourse, canInstructorAccessCourse, canManageCourse } from '../services/authorization.js'
 
 export const ROLE_GROUPS = {
   student: ['student'],
@@ -16,13 +16,17 @@ export function currentRoles(user) {
 
 export function requireAuth(req, res, next) {
   const auth = req.headers.authorization
-  if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'Authentication required' })
+  const token = auth?.startsWith('Bearer ') ? auth.slice(7) : req.cookies?.cli_session
+  if (!token) return res.status(401).json({ error: 'Authentication required' })
 
   try {
-    const payload = verifyToken(auth.slice(7))
-    const user = findById(payload.sub)
+    const payload = verifyToken(token)
+    const user = findUserById(payload.sub)
     if (!user) return res.status(401).json({ error: 'User not found' })
     if (user.status === 'suspended') return res.status(403).json({ error: 'Account suspended' })
+    if (Number(payload.tokenVersion || 0) !== Number(user.tokenVersion || 0)) {
+      return res.status(401).json({ error: 'Session expired' })
+    }
     req.auth = payload
     req.user = user
     return next()
@@ -48,16 +52,13 @@ function extractCourseId(req) {
 }
 
 export function requireCourseAccess(options = {}) {
-  const allowRoles = options.allowRoles || []
   return (req, res, next) => {
     if (!req.user) return res.status(401).json({ error: 'Authentication required' })
     const courseId = extractCourseId(req)
     if (!courseId) return res.status(400).json({ error: 'courseId is required' })
-    const course = getCourseById(courseId)
-    if (!course) return res.status(404).json({ error: 'Course not found' })
-    if (allowRoles.length && userHasRole(req.user, allowRoles)) return next()
-    if (hasActiveEnrollment(req.user.id, courseId)) return next()
-    return res.status(403).json({ error: 'Active enrollment required for this course' })
+    const decision = canAccessCourse(req.user, courseId, { ...options, batchId: req.params.batchId || req.body?.batchId || req.query?.batchId })
+    if (assertDecision(decision, res)) return
+    return next()
   }
 }
 
@@ -65,9 +66,29 @@ export function requireCourseManager(req, res, next) {
   if (!req.user) return res.status(401).json({ error: 'Authentication required' })
   const courseId = extractCourseId(req)
   if (!courseId) return res.status(400).json({ error: 'courseId is required' })
-  const course = getCourseById(courseId)
-  if (!course) return res.status(404).json({ error: 'Course not found' })
-  if (userHasRole(req.user, ['admin', 'super_admin', 'ops', 'lab_creator'])) return next()
-  if (userHasRole(req.user, ['instructor']) && course.instructorId === req.user.id) return next()
-  return res.status(403).json({ error: 'Course manager access required' })
+  const decision = canManageCourse(req.user, courseId)
+  if (assertDecision(decision, res)) return
+  return next()
+}
+
+export function requireBatchMembership(options = {}) {
+  return (req, res, next) => {
+    if (!req.user) return res.status(401).json({ error: 'Authentication required' })
+    const courseId = extractCourseId(req)
+    const batchId = req.params.batchId || req.body?.batchId || req.query?.batchId
+    if (!courseId) return res.status(400).json({ error: 'courseId is required' })
+    if (!batchId) return res.status(400).json({ error: 'batchId is required' })
+    const decision = canAccessBatch(req.user, courseId, batchId, options)
+    if (assertDecision(decision, res)) return
+    return next()
+  }
+}
+
+export function requireInstructorAssignment(req, res, next) {
+  if (!req.user) return res.status(401).json({ error: 'Authentication required' })
+  const courseId = extractCourseId(req)
+  if (!courseId) return res.status(400).json({ error: 'courseId is required' })
+  const decision = canInstructorAccessCourse(req.user, courseId)
+  if (assertDecision(decision, res)) return
+  return next()
 }

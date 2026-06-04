@@ -9,7 +9,7 @@ function hasAllowedRole(user, allowedRoles) {
   return roles.some(role => allowedRoles.includes(role))
 }
 
-export default function RoleLoginPage({ title, purpose, allowedRoles, redirectTo, demoEmail }) {
+export default function RoleLoginPage({ title, purpose, allowedRoles, redirectTo }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPw, setShowPw] = useState(false)
@@ -21,12 +21,6 @@ export default function RoleLoginPage({ title, purpose, allowedRoles, redirectTo
   useEffect(() => {
     if (isAuthenticated && hasAllowedRole(user, allowedRoles)) navigate(redirectTo, { replace: true })
   }, [allowedRoles, isAuthenticated, navigate, redirectTo, user])
-
-  const useDemoAccount = () => {
-    setEmail(demoEmail)
-    setPassword('password123')
-    setError('')
-  }
 
   const submit = async (event) => {
     event.preventDefault()
@@ -88,20 +82,6 @@ export default function RoleLoginPage({ title, purpose, allowedRoles, redirectTo
             )}
 
             <form onSubmit={submit} className="space-y-4">
-              {demoEmail && (
-                <div className="rounded-lg border border-violet-100 bg-violet-50 px-4 py-3 text-sm text-violet-950">
-                  <p className="font-space-grotesk font-bold">Local demo account</p>
-                  <p className="mt-1 break-all text-xs text-violet-800">{demoEmail} / password123</p>
-                  <button
-                    type="button"
-                    onClick={useDemoAccount}
-                    className="mt-3 rounded-md bg-violet-700 px-3 py-2 text-xs font-bold text-white transition hover:bg-violet-800"
-                  >
-                    Use demo account
-                  </button>
-                </div>
-              )}
-
               <label className="block">
                 <span className="mb-1.5 block font-space-grotesk text-[11px] font-bold uppercase tracking-wider text-slate-500">Email</span>
                 <input
@@ -125,7 +105,7 @@ export default function RoleLoginPage({ title, purpose, allowedRoles, redirectTo
                     required
                     autoComplete="current-password"
                     className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 pr-12 text-sm outline-none transition focus:border-violet-500 focus:bg-white focus:ring-2 focus:ring-violet-100"
-                    placeholder="password123"
+                    placeholder="Enter your password"
                   />
                   <button
                     type="button"
@@ -149,7 +129,7 @@ export default function RoleLoginPage({ title, purpose, allowedRoles, redirectTo
 
             <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-5 text-sm">
               <Link to="/login" className="font-semibold text-violet-700 hover:underline">Student login</Link>
-              <Link to="/welcome" className="text-slate-500 hover:text-slate-800">Back to site</Link>
+              <Link to="/" className="text-slate-500 hover:text-slate-800">Back to site</Link>
             </div>
           </div>
         </div>

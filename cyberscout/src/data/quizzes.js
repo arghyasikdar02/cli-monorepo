@@ -83,7 +83,7 @@ export const quizzes = {
         text: 'What should beginner web security testing be limited to in this course?',
         options: ['Instructor-controlled safe environments', 'Any public website', 'Random login portals', 'Production systems without permission'],
         correctIndex: 0,
-        tip: 'The course is defensive and ethical. Practice belongs in controlled labs and authorized demo environments.',
+        tip: 'The course is defensive and ethical. Practice belongs in controlled labs and authorized training environments.',
       },
     ],
   },

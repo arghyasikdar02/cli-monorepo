@@ -1,6 +1,19 @@
 import { Router } from 'express'
-import { requireAuth, requireCourseAccess, requireRole } from '../middleware/access.js'
-import { archiveCourse, createCourse, getCourseById, listEnrolledCourses, listPublicCourses, publishCourse, updateCourse } from '../store/platformStore.js'
+import { requireAuth, requireRole } from '../middleware/access.js'
+import {
+  archiveCourse,
+  createCourse,
+  enrollUser,
+  getCourseById,
+  getCourseForUser,
+  getPublicCourse,
+  getPublicCourseBySlug,
+  listCourseMaterialsForUser,
+  listEnrolledCourses,
+  listPublicCourses,
+  publishCourse,
+  updateCourse,
+} from '../db/repositories.js'
 import { pick, requireFields } from '../lib/validation.js'
 
 const router = Router()
@@ -9,13 +22,23 @@ router.get('/public', (_req, res) => {
   res.json({ courses: listPublicCourses() })
 })
 
+router.get('/public/slug/:categorySlug/:courseSlug', (req, res) => {
+  const course = getPublicCourseBySlug(req.params.categorySlug, req.params.courseSlug)
+  if (!course) return res.status(404).json({ error: 'Course not found' })
+  res.json({ course })
+})
+
 router.get('/public/:courseId', (req, res) => {
-  const course = getCourseById(req.params.courseId)
-  if (!course || course.status !== 'published') return res.status(404).json({ error: 'Course not found' })
+  const course = getPublicCourse(req.params.courseId)
+  if (!course) return res.status(404).json({ error: 'Course not found' })
   res.json({ course })
 })
 
 router.get('/enrolled', requireAuth, (req, res) => {
+  res.json({ courses: listEnrolledCourses(req.user.id) })
+})
+
+router.get('/my', requireAuth, (req, res) => {
   res.json({ courses: listEnrolledCourses(req.user.id) })
 })
 
@@ -26,8 +49,34 @@ router.post('/', requireAuth, requireRole('admin', 'super_admin'), (req, res) =>
   res.status(201).json({ course })
 })
 
-router.get('/:courseId', requireAuth, requireCourseAccess({ allowRoles: ['admin', 'super_admin', 'instructor', 'marketing', 'sales', 'ops', 'lab_creator', 'support'] }), (req, res) => {
-  res.json({ course: getCourseById(req.params.courseId) })
+router.get('/:courseId', requireAuth, (req, res) => {
+  const course = getCourseForUser(req.params.courseId, req.user)
+  if (!course) return res.status(404).json({ error: 'Course not found' })
+  res.json({ course })
+})
+
+router.post('/:courseId/enroll', requireAuth, (req, res) => {
+  try {
+    const enrollment = enrollUser(req.user.id, req.params.courseId, 'self_service')
+    res.status(201).json({ enrollment, courses: listEnrolledCourses(req.user.id) })
+  } catch (error) {
+    const message = error.message || 'Enrollment failed'
+    res.status(message.includes('not found') ? 404 : 400).json({ error: message })
+  }
+})
+
+router.get('/:courseId/materials', requireAuth, (req, res) => {
+  const { allowed, materials } = listCourseMaterialsForUser(req.user, req.params.courseId, {
+    ipAddress: req.ip,
+    userAgent: req.headers['user-agent'],
+  })
+  if (!allowed) {
+    return res.status(403).json({
+      error: 'Active enrollment required for private course materials',
+      publicMaterials: materials,
+    })
+  }
+  res.json({ materials })
 })
 
 router.patch('/:courseId', requireAuth, requireRole('admin', 'super_admin', 'instructor'), (req, res) => {

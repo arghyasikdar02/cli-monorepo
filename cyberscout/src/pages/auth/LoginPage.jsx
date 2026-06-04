@@ -75,14 +75,14 @@ export default function LoginPage() {
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 border border-white/20 rounded-full mb-6">
               <span className="w-2 h-2 bg-secondary-container rounded-full animate-pulse" />
               <span className="font-space-grotesk text-[11px] font-bold text-secondary-container tracking-widest uppercase">
-                ENCRYPTED SESSION
+                SECURE LEARNING PORTAL
               </span>
             </div>
             <h1 className="font-space-grotesk text-[32px] font-bold text-white leading-tight mb-4">
-              Master the Craft of Digital Defense
+              Continue Your Cybersecurity Training
             </h1>
             <p className="text-on-primary-container text-base">
-              Enter the academy portal to continue your elite cybersecurity training.
+              Log in to access your courses, labs, materials, and progress.
             </p>
           </div>
         </div>
@@ -193,7 +193,7 @@ export default function LoginPage() {
                 disabled={loading}
                 className="w-full bg-primary text-white py-4 rounded-lg font-space-grotesk font-semibold text-base hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-primary/10 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {loading ? 'Authenticating...' : 'Establish Session'}
+                {loading ? 'Logging in...' : 'Log in'}
               </button>
             </form>
 

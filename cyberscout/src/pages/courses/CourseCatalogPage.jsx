@@ -1,17 +1,41 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import AppShell from '../../components/layout/AppShell'
 import CourseCard from '../../components/ui/CourseCard'
-import { courses } from '../../data/courses'
-
-const CATEGORIES = ['All', 'Personal Security', 'Web Security']
-const LEVELS = ['All Levels', 'Beginner']
+import { api } from '../../lib/api'
 
 export default function CourseCatalogPage() {
   const [searchParams] = useSearchParams()
+  const [courses, setCourses] = useState([])
   const [category, setCategory] = useState('All')
   const [level, setLevel] = useState('All Levels')
   const [search, setSearch] = useState(searchParams.get('q') ?? '')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let active = true
+    setLoading(true)
+    api.publicCourses()
+      .then(({ courses }) => {
+        if (!active) return
+        setCourses(courses)
+        setError('')
+      })
+      .catch(err => {
+        if (!active) return
+        setError(err.message || 'Unable to load courses')
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const categories = useMemo(() => ['All', ...Array.from(new Set(courses.map(course => course.category).filter(Boolean)))], [courses])
+  const levels = useMemo(() => ['All Levels', ...Array.from(new Set(courses.map(course => course.level).filter(Boolean)))], [courses])
 
   const filtered = useMemo(() =>
     courses.filter(c => {
@@ -20,7 +44,7 @@ export default function CourseCatalogPage() {
       if (search && !c.title.toLowerCase().includes(search.toLowerCase())) return false
       return true
     }),
-    [category, level, search]
+    [courses, category, level, search]
   )
 
   return (
@@ -47,13 +71,13 @@ export default function CourseCatalogPage() {
             onChange={e => setLevel(e.target.value)}
             className="border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 bg-white outline-none focus:border-secondary"
           >
-            {LEVELS.map(l => <option key={l}>{l}</option>)}
+            {levels.map(l => <option key={l}>{l}</option>)}
           </select>
         </div>
 
         {/* Category chips */}
         <div className="flex flex-wrap gap-2 mb-8">
-          {CATEGORIES.map(cat => (
+          {categories.map(cat => (
             <button
               key={cat}
               onClick={() => setCategory(cat)}
@@ -68,23 +92,35 @@ export default function CourseCatalogPage() {
           ))}
         </div>
 
-        {/* Results count */}
-        <p className="text-sm text-on-surface-variant mb-5">
-          Showing <span className="font-bold text-on-surface">{filtered.length}</span> courses
-        </p>
+        {loading && (
+          <div className="rounded-xl border border-slate-200 bg-white p-8 text-sm text-slate-500 shadow-card">
+            Loading courses from the database...
+          </div>
+        )}
 
-        {/* Grid */}
-        {filtered.length > 0 ? (
+        {error && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        {!loading && !error && (
+          <p className="text-sm text-on-surface-variant mb-5">
+            Showing <span className="font-bold text-on-surface">{filtered.length}</span> courses
+          </p>
+        )}
+
+        {!loading && !error && filtered.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {filtered.map(c => <CourseCard key={c.id} course={c} />)}
           </div>
-        ) : (
+        ) : !loading && !error ? (
           <div className="text-center py-20 text-on-surface-variant">
             <span className="material-symbols-outlined text-6xl text-slate-300 block mb-3">search_off</span>
             <p className="font-space-grotesk font-semibold">No courses found</p>
-            <p className="text-sm mt-1">Try adjusting your filters</p>
+            <p className="text-sm mt-1">Try adjusting your filters or run the seed command if the database is empty.</p>
           </div>
-        )}
+        ) : null}
       </div>
     </AppShell>
   )

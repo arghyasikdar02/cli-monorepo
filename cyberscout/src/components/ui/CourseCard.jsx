@@ -10,7 +10,7 @@ const LEVEL_COLORS = {
 export default function CourseCard({ course }) {
   return (
     <Link
-      to={`/courses/${course.id}`}
+      to={`/learn/courses/${course.id}`}
       className="bg-white rounded-xl border border-slate-200 shadow-card hover:shadow-card-hover hover:border-violet-200 transition-all block group"
     >
       <div className="aspect-video rounded-t-xl overflow-hidden bg-gradient-to-br from-primary-container to-secondary flex items-center justify-center">

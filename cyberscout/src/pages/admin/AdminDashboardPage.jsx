@@ -30,7 +30,12 @@ export default function AdminDashboardPage() {
             <DashboardMetric label="Users" value={analytics.users ?? 0} helper="Role-aware accounts" />
             <DashboardMetric label="Courses" value={analytics.courses ?? 0} helper="Published and draft" />
             <DashboardMetric label="Enrollments" value={analytics.enrollments ?? 0} helper="Active course access" />
-            <DashboardMetric label="Audit logs" value={dashboard.auditLogs?.length ?? 0} helper="Recent admin/system events" />
+            <DashboardMetric label="Unique visitors" value={analytics.visitors?.totalUniqueVisitors ?? 0} helper="Privacy-conscious total" />
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            <DashboardMetric label="Visitors today" value={analytics.visitors?.visitorsToday ?? 0} helper="First seen today" />
+            <DashboardMetric label="Visitors this week" value={analytics.visitors?.visitorsThisWeek ?? 0} helper="First seen in 7 days" />
+            <DashboardMetric label="Visitors this month" value={analytics.visitors?.visitorsThisMonth ?? 0} helper="First seen in 30 days" />
           </div>
 
           <div className="grid gap-6 xl:grid-cols-2">

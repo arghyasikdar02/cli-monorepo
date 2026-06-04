@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { requireAuth, requireCourseAccess, requireRole } from '../middleware/access.js'
-import { userHasRole } from '../store/users.js'
+import { userHasRole } from '../db/repositories.js'
 import { getDocumentById, hasActiveEnrollment, listDocumentsByCourse, logDocumentAccess, registerDocument } from '../store/platformStore.js'
 import { requireFields } from '../lib/validation.js'
 

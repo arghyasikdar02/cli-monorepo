@@ -62,7 +62,7 @@ export default function QuizPage() {
       {/* Quiz top bar */}
       <div className="sticky top-0 z-40 h-14 bg-white/90 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-6">
         <div className="flex items-center gap-3">
-          <Link to={`/courses/${quiz.courseId}`} className="text-slate-500 hover:text-primary transition-colors">
+          <Link to={`/learn/courses/${quiz.courseId}`} className="text-slate-500 hover:text-primary transition-colors">
             <span className="material-symbols-outlined text-[20px]">close</span>
           </Link>
           <div className="h-5 w-px bg-slate-200" />

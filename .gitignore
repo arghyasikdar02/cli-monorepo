@@ -1,5 +1,6 @@
 node_modules/
 dist/
+cyberscout-server/data/
 .next/
 coverage/
 *.tsbuildinfo

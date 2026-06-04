@@ -1,38 +1,122 @@
 import { Router } from 'express'
 import { requireAuth, requireCourseAccess } from '../middleware/access.js'
-import { addAiMessage, createAiSession, getAiMessages, getAiUsage, listAiSessions, listKnowledgeBaseDocuments, mockAiReply } from '../store/platformStore.js'
+import {
+  addAiMessage,
+  countAuditActionsSince,
+  createAiSession,
+  getAiSession,
+  listAiMessages,
+  listAiSessions,
+  listCourseMaterialsForUser,
+  recordAudit,
+} from '../db/repositories.js'
 import { requireFields } from '../lib/validation.js'
 
 const router = Router()
 const AI_USAGE_LIMIT = Number(process.env.AI_DAILY_LIMIT || 20)
 
+function startOfTodayIso() {
+  const date = new Date()
+  date.setHours(0, 0, 0, 0)
+  return date.toISOString()
+}
+
+function buildCourseAnswer(materials, message) {
+  const terms = String(message || '')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(term => term.length > 3)
+
+  const scored = materials
+    .map(material => {
+      const haystack = `${material.title} ${material.description} ${material.content}`.toLowerCase()
+      const score = terms.reduce((total, term) => total + (haystack.includes(term) ? 1 : 0), 0)
+      return { material, score }
+    })
+    .sort((a, b) => b.score - a.score)
+
+  const selected = scored.filter(item => item.score > 0).slice(0, 3)
+  const grounded = selected.length ? selected : scored.slice(0, 2)
+
+  if (!grounded.length) {
+    return {
+      refused: true,
+      answer: 'I can only answer from enrolled course materials. This course does not have knowledge-base material available yet.',
+      citations: [],
+    }
+  }
+
+  const answer = grounded
+    .map(({ material }) => `${material.title}: ${material.content || material.description}`)
+    .join('\n\n')
+
+  return {
+    refused: selected.length === 0,
+    answer: selected.length
+      ? answer
+      : `I could not find a direct match in this course. The closest course materials are:\n\n${answer}`,
+    citations: grounded.map(({ material }) => ({
+      id: material.id,
+      title: material.title,
+      type: material.type,
+      courseId: material.courseId,
+    })),
+  }
+}
+
 router.use(requireAuth)
 
 router.get('/courses/:courseId/knowledge-base', requireCourseAccess({ allowRoles: ['admin', 'super_admin', 'instructor', 'support'] }), (req, res) => {
-  res.json({ documents: listKnowledgeBaseDocuments(req.params.courseId) })
+  const { materials } = listCourseMaterialsForUser(req.user, req.params.courseId)
+  res.json({
+    documents: materials.map(material => ({
+      id: material.id,
+      title: material.title,
+      type: material.type,
+      isPublic: material.isPublic,
+    })),
+  })
 })
 
 router.get('/courses/:courseId/sessions', requireCourseAccess({ allowRoles: ['admin', 'super_admin', 'instructor', 'support'] }), (req, res) => {
-  res.json({ sessions: listAiSessions(req.user.id, req.params.courseId), usage: getAiUsage(req.user.id, req.params.courseId), limit: AI_USAGE_LIMIT })
+  const usage = countAuditActionsSince(req.user.id, 'ai.chat', req.params.courseId, startOfTodayIso())
+  res.json({ sessions: listAiSessions(req.user.id, req.params.courseId), usage, limit: AI_USAGE_LIMIT })
 })
 
 router.post('/courses/:courseId/sessions', requireCourseAccess({ allowRoles: ['admin', 'super_admin', 'instructor', 'support'] }), (req, res) => {
-  res.status(201).json({ session: createAiSession(req.user.id, req.params.courseId, req.body.title || 'New chat') })
+  res.status(201).json({ session: createAiSession(req.user.id, req.params.courseId, req.body.title || 'Course chat') })
 })
 
 router.get('/courses/:courseId/sessions/:sessionId/messages', requireCourseAccess({ allowRoles: ['admin', 'super_admin', 'instructor', 'support'] }), (req, res) => {
-  res.json({ messages: getAiMessages(req.params.sessionId, req.user.id, req.params.courseId) })
+  res.json({ messages: listAiMessages(req.params.sessionId, req.user.id, req.params.courseId) })
 })
 
 router.post('/courses/:courseId/chat', requireCourseAccess({ allowRoles: ['admin', 'super_admin', 'instructor', 'support'] }), (req, res) => {
   const error = requireFields(req.body, ['message'])
   if (error) return res.status(400).json({ error })
-  const usage = getAiUsage(req.user.id, req.params.courseId)
+  const usage = countAuditActionsSince(req.user.id, 'ai.chat', req.params.courseId, startOfTodayIso())
   if (usage >= AI_USAGE_LIMIT) return res.status(429).json({ error: 'AI usage limit reached for this course' })
-  const sessionId = req.body.sessionId || createAiSession(req.user.id, req.params.courseId, 'Course chat').id
-  const userMessage = addAiMessage(sessionId, req.user.id, req.params.courseId, 'user', req.body.message)
-  const assistantMessage = addAiMessage(sessionId, req.user.id, req.params.courseId, 'assistant', mockAiReply(req.params.courseId, req.body.message))
-  res.json({ sessionId, messages: [userMessage, assistantMessage], usage: usage + 1, limit: AI_USAGE_LIMIT })
+  const { allowed, materials } = listCourseMaterialsForUser(req.user, req.params.courseId)
+  if (!allowed) return res.status(403).json({ error: 'Active enrollment required for course AI' })
+  const result = buildCourseAnswer(materials, req.body.message)
+  const session = req.body.sessionId
+    ? getAiSession(req.body.sessionId, req.user.id, req.params.courseId)
+    : createAiSession(req.user.id, req.params.courseId, 'Course chat')
+  if (!session) return res.status(404).json({ error: 'AI chat session not found' })
+  const userMessage = addAiMessage(session.id, req.user.id, req.params.courseId, 'user', req.body.message)
+  const assistantMessage = addAiMessage(session.id, req.user.id, req.params.courseId, 'assistant', result.answer, result.citations)
+  recordAudit('ai.chat', req.user.id, 'course', req.params.courseId, {
+    refused: result.refused,
+    citations: result.citations.map(citation => citation.id),
+  })
+  res.json({
+    sessionId: session.id,
+    messages: [userMessage, assistantMessage],
+    citations: result.citations,
+    refused: result.refused,
+    usage: usage + 1,
+    limit: AI_USAGE_LIMIT,
+  })
 })
 
 export default router

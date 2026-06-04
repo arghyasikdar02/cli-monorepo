@@ -1,10 +1,11 @@
 ﻿import { NavLink, useNavigate } from 'react-router-dom'
 import CLILogo from '../CLILogo'
 import { useAppStore } from '../../store/useAppStore'
+import { api } from '../../lib/api'
 
 const mainNav = [
   { to: '/dashboard', icon: 'dashboard', label: 'Dashboard' },
-  { to: '/courses', icon: 'school', label: 'Courses' },
+  { to: '/learn/courses', icon: 'school', label: 'Courses' },
   { to: '/ai-tutor', icon: 'smart_toy', label: 'AI Tutor' },
   { to: '/live-classes', icon: 'video_chat', label: 'Live Classes' },
   { to: '/leaderboard', icon: 'leaderboard', label: 'Leaderboard' },
@@ -30,7 +31,8 @@ export default function SideNav() {
   const { logout } = useAppStore()
   const navigate = useNavigate()
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await api.logout().catch(() => {})
     logout()
     navigate('/login')
   }

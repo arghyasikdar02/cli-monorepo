@@ -4,7 +4,7 @@ import AppShell from '../../components/layout/AppShell'
 
 const CATEGORIES = [
   { icon: 'lock', label: 'Account & Security', to: '/help/account-security', desc: 'Passwords, 2FA, login issues' },
-  { icon: 'school', label: 'Courses & Labs', to: '/courses', desc: 'Enrollment, progress, certificates' },
+  { icon: 'school', label: 'Courses & Labs', to: '/learn/courses', desc: 'Enrollment, progress, certificates' },
   { icon: 'payment', label: 'Billing', to: '/billing/history', desc: 'Invoices, refunds, plan changes' },
   { icon: 'build', label: 'Technical Issues', to: '/report-bug', desc: 'Bugs, performance, compatibility' },
 ]

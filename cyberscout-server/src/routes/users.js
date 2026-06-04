@@ -1,7 +1,6 @@
 import { Router } from 'express'
 import { requireAuth, requireRole } from '../middleware/access.js'
-import { assignRole, findById, listUsers, publicUser, suspendUser, updateUser, VALID_ROLES } from '../store/users.js'
-import { recordAudit } from '../store/platformStore.js'
+import { assignRole, findUserById, listUsers, publicUser, recordAudit, suspendUser, updateUser, VALID_ROLES } from '../db/repositories.js'
 import { pick, requireFields } from '../lib/validation.js'
 
 const router = Router()
@@ -14,7 +13,7 @@ router.get('/', (_req, res) => {
 })
 
 router.get('/:userId', (req, res) => {
-  const user = findById(req.params.userId)
+  const user = findUserById(req.params.userId)
   if (!user) return res.status(404).json({ error: 'User not found' })
   res.json({ user: publicUser(user) })
 })

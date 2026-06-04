@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { requireAuth, requireRole } from '../middleware/access.js'
-import { addEnrollment, hasActiveEnrollment, listEnrollmentsByCourse, listEnrollmentsByUser } from '../store/platformStore.js'
+import { addEnrollment, hasActiveEnrollment, listEnrollmentsByCourse, listEnrollmentsByUser } from '../db/repositories.js'
 import { requireFields } from '../lib/validation.js'
 
 const router = Router()
@@ -10,8 +10,12 @@ router.use(requireAuth)
 router.post('/', requireRole('admin', 'super_admin', 'support'), (req, res) => {
   const error = requireFields(req.body, ['userId', 'courseId'])
   if (error) return res.status(400).json({ error })
-  const enrollment = addEnrollment(req.body, req.user.id)
-  res.status(201).json({ enrollment })
+  try {
+    const enrollment = addEnrollment({ ...req.body, source: 'manual' }, req.user.id)
+    res.status(201).json({ enrollment })
+  } catch (err) {
+    res.status(400).json({ error: err.message || 'Enrollment failed' })
+  }
 })
 
 router.get('/me', (req, res) => {

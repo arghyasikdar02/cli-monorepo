@@ -9,7 +9,7 @@ export default function TopAppBar() {
 
   const handleSearch = (e) => {
     if (e.key === 'Enter' && search.trim()) {
-      navigate(`/courses?q=${encodeURIComponent(search.trim())}`)
+      navigate(`/learn/courses?q=${encodeURIComponent(search.trim())}`)
       setSearch('')
     }
   }

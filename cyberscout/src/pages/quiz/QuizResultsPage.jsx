@@ -67,7 +67,7 @@ export default function QuizResultsPage() {
             className="flex-1 text-center py-3 border-2 border-slate-200 text-slate-700 font-space-grotesk font-bold text-sm rounded-xl hover:border-primary hover:text-primary transition-colors">
             Retake Quiz
           </Link>
-          <Link to={`/courses/${quiz?.courseId}`}
+          <Link to={`/learn/courses/${quiz?.courseId}`}
             className="flex-1 text-center py-3 bg-primary text-white font-space-grotesk font-bold text-sm rounded-xl hover:opacity-90 transition-opacity">
             Back to Course
           </Link>

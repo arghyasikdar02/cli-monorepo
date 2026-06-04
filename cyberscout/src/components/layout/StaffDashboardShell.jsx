@@ -15,7 +15,7 @@ export default function StaffDashboardShell({ title, subtitle, children, loginPa
     <main className="min-h-screen bg-slate-50 text-slate-950">
       <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/85 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
-          <Link to="/welcome" className="flex items-center">
+          <Link to="/" className="flex items-center">
             <CLILogo variant="full" tone="light" size={150} />
           </Link>
           <div className="flex items-center gap-3">

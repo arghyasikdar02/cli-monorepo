@@ -45,15 +45,15 @@ export default function SignUpPage() {
       setError("Passwords don't match")
       return
     }
-    if (form.password.length < 6) {
-      setError('Password must be at least 6 characters')
+    if (form.password.length < 8) {
+      setError('Password must be at least 8 characters')
       return
     }
     setLoading(true)
     try {
-      const { token, user } = await api.register(form.name, form.email, form.password)
+      const { token, user, redirectTo } = await api.register(form.name, form.email, form.password)
       loginWithToken(token, user)
-      navigate('/getting-started')
+      navigate(redirectTo || '/dashboard')
     } catch (err) {
       setError(err.message || 'Registration failed')
     } finally {
