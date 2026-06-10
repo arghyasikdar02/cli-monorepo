@@ -60,7 +60,19 @@ http://localhost:3001
 ```
 
 ## Public Landing Page
-The domain root `/` renders the Cyber Security Essentials course landing page directly. The old generic welcome route redirects back to `/`.
+The domain root `/` renders the platform-level Cyber Lab IN homepage directly. The old generic welcome route redirects back to `/`.
+
+Primary homepage positioning:
+
+```text
+Online Cybersecurity Courses with Hands-On Labs
+```
+
+The dedicated Cyber Security Essentials course page remains at:
+
+```text
+/courses/cybersecurity/cyber-security-essentials
+```
 
 Clean public course routes:
 
@@ -69,9 +81,28 @@ Clean public course routes:
 /courses
 /courses/cybersecurity
 /courses/cybersecurity/cyber-security-essentials
+/courses/cybersecurity/web-application-security
+/courses/cybersecurity/soc-analyst-foundations
+/courses/cybersecurity/ethical-hacking-foundations
+/learning-paths
+/learning-paths/beginner-cybersecurity
+/learning-paths/ethical-hacking
+/learning-paths/soc-analyst
+/learning-paths/network-cloud-security
+/learning-paths/digital-forensics
+/labs
+/resources
 /blog
 /blog/:slug
 /about
+/instructors
+/instructors/arghya-sikdar
+/contact
+/privacy-policy
+/terms
+/refund-policy
+/cookie-policy
+/certificate-verification
 ```
 
 Authenticated LMS course routes:
@@ -86,6 +117,14 @@ Frontend landing-page environment variables:
 ```text
 VITE_SITE_URL=https://cyberlabin.com
 VITE_CSE_COURSE_FEE=0
+```
+
+Homepage SEO/AEO implementation notes:
+
+```text
+SEO_AEO_HOMEPAGE_IMPLEMENTATION.md
+LANDING_PAGE_CONTENT_MAP.md
+TECHNICAL_SEO_CHECKLIST.md
 ```
 
 ## Build

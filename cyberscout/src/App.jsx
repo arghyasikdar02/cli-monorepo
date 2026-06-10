@@ -29,6 +29,19 @@ import PublicCoursePage from './pages/public/PublicCoursePage'
 import BlogListPage from './pages/public/BlogListPage'
 import BlogDetailPage from './pages/public/BlogDetailPage'
 import AboutPage from './pages/public/AboutPage'
+import {
+  CertificateVerificationPage,
+  ContactPage,
+  CookiePolicyPage,
+  ForOrganisationsPage,
+  InstructorProfilePage,
+  InstructorsPage,
+  LabsPage,
+  LearningPathDetailPage,
+  LearningPathsPage,
+  PlannedCoursePage,
+  ResourcesPage,
+} from './pages/public/PlatformInfoPages'
 
 // Learning
 import AITutorPage from './pages/ai-tutor/AITutorPage'
@@ -80,8 +93,23 @@ export default function App() {
         <Route path="/splash" element={<SplashPage />} />
         <Route path="/welcome" element={<Navigate to="/" replace />} />
         <Route path="/courses" element={<PublicCoursesPage />} />
+        <Route path="/courses/cybersecurity/web-application-security" element={<PlannedCoursePage slug="web-application-security" />} />
+        <Route path="/courses/cybersecurity/soc-analyst-foundations" element={<PlannedCoursePage slug="soc-analyst-foundations" />} />
+        <Route path="/courses/cybersecurity/ethical-hacking-foundations" element={<PlannedCoursePage slug="ethical-hacking-foundations" />} />
         <Route path="/courses/:categorySlug" element={<PublicCoursesPage />} />
         <Route path="/courses/:categorySlug/:courseSlug" element={<PublicCoursePage />} />
+        <Route path="/learning-paths" element={<LearningPathsPage />} />
+        <Route path="/learning-paths/beginner-cybersecurity" element={<LearningPathDetailPage slug="beginner-cybersecurity" />} />
+        <Route path="/learning-paths/ethical-hacking" element={<LearningPathDetailPage slug="ethical-hacking" />} />
+        <Route path="/learning-paths/soc-analyst" element={<LearningPathDetailPage slug="soc-analyst" />} />
+        <Route path="/learning-paths/network-cloud-security" element={<LearningPathDetailPage slug="network-cloud-security" />} />
+        <Route path="/learning-paths/digital-forensics" element={<LearningPathDetailPage slug="digital-forensics" />} />
+        <Route path="/labs" element={<LabsPage />} />
+        <Route path="/resources" element={<ResourcesPage />} />
+        <Route path="/instructors" element={<InstructorsPage />} />
+        <Route path="/instructors/arghya-sikdar" element={<InstructorProfilePage />} />
+        <Route path="/contact" element={<ContactPage />} />
+        <Route path="/for-organisations" element={<ForOrganisationsPage />} />
         <Route path="/blog" element={<BlogListPage />} />
         <Route path="/blog/:slug" element={<BlogDetailPage />} />
         <Route path="/about" element={<AboutPage />} />
@@ -107,8 +135,12 @@ export default function App() {
         <Route path="/getting-started" element={<GettingStartedPage />} />
         <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
         <Route path="/privacy" element={<PrivacyPolicyPage />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="/terms" element={<TermsOfServicePage />} />
         <Route path="/refund" element={<RefundPolicyPage />} />
+        <Route path="/refund-policy" element={<RefundPolicyPage />} />
+        <Route path="/cookie-policy" element={<CookiePolicyPage />} />
+        <Route path="/certificate-verification" element={<CertificateVerificationPage />} />
 
         {/* Protected — Core */}
         <Route path="/dashboard" element={<P><DashboardPage /></P>} />

@@ -1328,6 +1328,10 @@ function blogFromRow(row) {
     body: row.body,
     metaTitle: row.meta_title,
     metaDescription: row.meta_description,
+    category: row.category || 'Beginner Cybersecurity',
+    authorName: row.author_name || 'Arghya Sikdar',
+    publishedAt: row.published_at || row.created_at,
+    lastReviewedAt: row.last_reviewed_at || row.updated_at,
     status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -1338,7 +1342,7 @@ export function listPublishedBlogs() {
   return db.prepare(`
     SELECT * FROM blogs
     WHERE status = 'published'
-    ORDER BY created_at DESC
+    ORDER BY published_at DESC, created_at DESC
   `).all().map(blogFromRow)
 }
 

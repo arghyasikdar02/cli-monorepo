@@ -340,13 +340,14 @@ function baselineSeedIsReady() {
     FROM users
     WHERE email IN (
       'student@cyberlabin.com',
+      'neel0409@gmail.com',
       'admin@cyberlabin.com',
       'instructor@cyberlabin.com',
       'marketing@cyberlabin.com',
       'ops@cyberlabin.com'
     )
   `).get().count
-  return courseCount === 2 && materialCount === 2 && liveClassCount === 1 && userCount === 5
+  return courseCount === 2 && materialCount === 2 && liveClassCount === 1 && userCount === 6
 }
 
 export async function seedBaselineData({ force = false, log = true } = {}) {
@@ -361,12 +362,14 @@ export async function seedBaselineData({ force = false, log = true } = {}) {
   for (const material of materials) insertMaterial(material)
 
   const student = await ensureUser({ name: 'Student Learner', email: 'student@cyberlabin.com', role: 'student', roles: ['student'] })
+  const neel = await ensureUser({ name: 'Neel Cyber Lab Learner', email: 'neel0409@gmail.com', role: 'student', roles: ['student'] })
   await ensureUser({ name: 'Cyber Lab Admin', email: 'admin@cyberlabin.com', role: 'admin', roles: ['admin'] })
   await ensureUser({ name: 'Cyber Lab Instructor', email: 'instructor@cyberlabin.com', role: 'instructor', roles: ['instructor'] })
   await ensureUser({ name: 'Cyber Lab Marketing', email: 'marketing@cyberlabin.com', role: 'marketing', roles: ['marketing'] })
   await ensureUser({ name: 'Cyber Lab Ops', email: 'ops@cyberlabin.com', role: 'ops', roles: ['ops'] })
 
   if (getCourseById('c001')) enrollUser(student.id, 'c001', 'seed')
+  if (getCourseById('c002')) enrollUser(neel.id, 'c002', 'seed')
 
   db.prepare(`
     INSERT INTO live_classes (id, course_id, instructor_id, title, provider, scheduled_start, scheduled_end, status)

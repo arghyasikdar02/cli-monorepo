@@ -135,6 +135,12 @@ export default function PublicCoursePage() {
     ['Fee', Number(course.price || 0) > 0 ? `INR ${Number(course.price).toLocaleString('en-IN')}` : 'Free'],
   ]
 
+  const relatedGuides = [
+    ['What is cybersecurity?', '/blog/what-is-cybersecurity'],
+    ['What is phishing and how to prevent it?', '/blog/what-is-phishing-and-how-to-prevent-it'],
+    ['How to learn cybersecurity for beginners?', '/blog/how-to-learn-cybersecurity-for-beginners'],
+  ]
+
   return (
     <div className="min-h-screen bg-white text-slate-950">
       {schema && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }} />}
@@ -213,12 +219,36 @@ export default function PublicCoursePage() {
         <section className="border-y border-slate-200 bg-slate-50 px-5 py-20 sm:px-8 lg:px-10">
           <div className="mx-auto max-w-7xl">
             <h2 className="font-space-grotesk text-3xl font-black tracking-tight sm:text-5xl">Labs and modules</h2>
+            <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">
+              These labs connect course concepts to safe, guided cybersecurity practice and defensive reporting.
+            </p>
             <div className="mt-10 grid gap-4 md:grid-cols-2">
               {(course.labs || []).map((lab, index) => (
                 <div key={lab} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                   <p className="font-space-grotesk text-sm font-bold text-sky-700">Lab {String(index + 1).padStart(2, '0')}</p>
                   <h3 className="mt-2 font-space-grotesk text-lg font-bold">{lab}</h3>
                 </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="px-5 py-16 sm:px-8 lg:px-10">
+          <div className="mx-auto grid max-w-7xl gap-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:grid-cols-[0.8fr_1.2fr]">
+            <div>
+              <h2 className="font-space-grotesk text-2xl font-black">Related cybersecurity resources</h2>
+              <p className="mt-3 text-sm leading-7 text-slate-600">
+                These guides help learners understand the concepts behind the course before they practise them in labs.
+              </p>
+              <Link to="/learning-paths/beginner-cybersecurity" className="mt-5 inline-flex rounded-xl border border-slate-300 px-5 py-3 text-sm font-black text-slate-800">
+                View beginner learning path
+              </Link>
+            </div>
+            <div className="grid gap-3">
+              {relatedGuides.map(([label, href]) => (
+                <Link key={href} to={href} className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition hover:border-sky-300 hover:text-sky-800">
+                  {label}
+                </Link>
               ))}
             </div>
           </div>

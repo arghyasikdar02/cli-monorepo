@@ -19,7 +19,7 @@ function matchAnswer(text) {
 
 export default function FaqChatbot() {
   const [open, setOpen] = useState(false)
-  const [messages, setMessages] = useState([{ role: 'assistant', text: 'Choose a question and I will guide you with clear course information.' }])
+  const [messages, setMessages] = useState([{ role: 'assistant', text: 'How can I help you or guide you today?' }])
   const [showLead, setShowLead] = useState(false)
   const [text, setText] = useState('')
 
@@ -53,7 +53,6 @@ export default function FaqChatbot() {
         <section className="fixed bottom-24 right-3 z-[70] w-[calc(100vw-1.5rem)] max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-950 shadow-[0_24px_90px_rgba(15,23,42,0.24)] dark:border-white/10 dark:bg-slate-900 dark:text-white sm:right-4">
           <header className="border-b border-slate-200 p-4 dark:border-white/10">
             <p className="font-space-grotesk text-sm font-bold">Cyber Lab IN FAQ Assistant</p>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Option-based guidance, not an AI model.</p>
           </header>
           <div className="max-h-[58vh] space-y-3 overflow-y-auto p-4">
             {messages.map((message, index) => (

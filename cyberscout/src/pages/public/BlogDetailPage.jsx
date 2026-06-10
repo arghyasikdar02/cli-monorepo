@@ -5,6 +5,13 @@ import { api } from '../../lib/api'
 
 const siteUrl = (import.meta.env.VITE_SITE_URL || 'https://cyberlabin.com').replace(/\/+$/, '')
 
+function formatDate(value) {
+  if (!value) return 'Date pending'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }).format(date)
+}
+
 export default function BlogDetailPage() {
   const { slug } = useParams()
   const [blog, setBlog] = useState(null)
@@ -41,6 +48,14 @@ export default function BlogDetailPage() {
       headline: blog.title,
       description: blog.excerpt,
       url: `${siteUrl}/blog/${blog.slug}`,
+      articleSection: blog.category,
+      datePublished: blog.publishedAt || blog.createdAt,
+      dateModified: blog.lastReviewedAt || blog.updatedAt,
+      author: {
+        '@type': 'Person',
+        name: blog.authorName || 'Arghya Sikdar',
+        url: `${siteUrl}/instructors/arghya-sikdar`,
+      },
       publisher: { '@type': 'Organization', name: 'Cyber Lab IN', url: siteUrl },
     }
   }, [blog])
@@ -65,18 +80,36 @@ export default function BlogDetailPage() {
         <Link to="/blog" className="text-sm font-bold text-sky-700 hover:text-sky-900">Back to blog</Link>
         <h1 className="mt-6 font-space-grotesk text-4xl font-black tracking-tight sm:text-6xl">{blog.title}</h1>
         <p className="mt-5 text-lg leading-8 text-slate-600">{blog.excerpt}</p>
+        <div className="mt-6 flex flex-wrap gap-x-5 gap-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-600">
+          <Link to={`/blog?category=${encodeURIComponent(blog.category || 'Beginner Cybersecurity')}`} className="text-sky-700 hover:text-sky-900">
+            {blog.category || 'Cybersecurity Guide'}
+          </Link>
+          <Link to="/instructors/arghya-sikdar" className="text-slate-700 hover:text-sky-800">
+            By {blog.authorName || 'Arghya Sikdar'}
+          </Link>
+          <span>Published {formatDate(blog.publishedAt || blog.createdAt)}</span>
+          <span>Last reviewed {formatDate(blog.lastReviewedAt || blog.updatedAt)}</span>
+        </div>
         <article className="mt-10 space-y-6 text-base leading-8 text-slate-700">
           {blog.body.split('\n\n').map(paragraph => (
             <p key={paragraph}>{paragraph}</p>
           ))}
         </article>
-        <section className="mt-12 rounded-2xl border border-slate-200 bg-slate-50 p-6">
-          <h2 className="font-space-grotesk text-xl font-black">Learn by doing</h2>
-          <p className="mt-2 text-sm leading-7 text-slate-600">
-            Build practical confidence with guided labs, phishing analysis, web security basics, and defensive reporting.
-          </p>
-          <Link to="/courses/cybersecurity/cyber-security-essentials" className="mt-5 inline-flex rounded-lg bg-slate-950 px-5 py-3 text-sm font-bold text-white">
+        <section className="mt-12 grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-6 sm:grid-cols-3">
+          <div className="sm:col-span-3">
+            <h2 className="font-space-grotesk text-xl font-black">Learn by doing</h2>
+            <p className="mt-2 text-sm leading-7 text-slate-600">
+              Build practical confidence with guided labs, phishing analysis, web security basics, learning paths and defensive reporting.
+            </p>
+          </div>
+          <Link to="/courses/cybersecurity/cyber-security-essentials" className="rounded-xl bg-slate-950 px-4 py-3 text-center text-sm font-bold text-white">
             Explore Cyber Security Essentials
+          </Link>
+          <Link to="/learning-paths/beginner-cybersecurity" className="rounded-xl border border-slate-300 px-4 py-3 text-center text-sm font-bold text-slate-800">
+            Beginner Cybersecurity Path
+          </Link>
+          <Link to="/instructors/arghya-sikdar" className="rounded-xl border border-slate-300 px-4 py-3 text-center text-sm font-bold text-slate-800">
+            Author profile
           </Link>
         </section>
       </main>
