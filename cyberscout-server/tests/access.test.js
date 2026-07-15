@@ -179,13 +179,17 @@ describe('Cyber Lab IN database-backed LMS flow', () => {
   })
 
   it('returns health and published blogs', async () => {
-    const [health, rootHealth, blogs] = await Promise.all([
+    const [root, health, rootHealth, blogs] = await Promise.all([
+      request('/'),
       request('/api/health'),
       request('/health'),
       request('/api/blogs'),
     ])
+    assert.equal(root.response.status, 200)
+    assert.equal(root.body.health, '/health')
     assert.equal(health.response.status, 200)
     assert.equal(health.body.ok, true)
+    assert.equal(health.body.database, 'connected')
     assert.equal(rootHealth.response.status, 200)
     assert.equal(rootHealth.body.service, 'cyberlabin-api')
     assert.equal(blogs.response.status, 200)

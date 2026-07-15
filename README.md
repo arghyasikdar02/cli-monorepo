@@ -44,7 +44,7 @@ npm run db:setup
 ```
 
 Migrations are additive and recorded in `schema_migrations`. Migration `008_persistent_learning_modules.sql` replaces the former in-memory learning store with persistent batches, videos, protected documents, labs, quizzes, assignments, progress, certificates and payment records.
-`db:seed` is repeatable and uses stable identifiers with `ON CONFLICT DO NOTHING`. Render runs it after migrations to initialize only missing public catalogue rows. Development identities are created only when `SEED_DEVELOPMENT_USERS=1` outside production.
+`db:seed` is an explicit, repeatable operation using stable identifiers with `ON CONFLICT DO NOTHING`. Render does not run it during normal startup. Development identities are created only when `SEED_DEVELOPMENT_USERS=1` outside production.
 
 ## Authentication
 
@@ -83,7 +83,7 @@ npm run cliadm -- audit search --json
 
 Mutation commands require `--admin-token`; destructive commands also require `--dry-run` or `--confirm YES`. See `npm run cliadm -- --help` and `docs/architecture/API_ROUTES_DOCUMENTATION.md`.
 
-Development seeding creates local test identities only when `SEED_DEVELOPMENT_USERS=1` and `NODE_ENV` is not `production`. Production startup may safely run the baseline seed because it inserts only missing catalogue records and never creates development identities. Bootstrap the first production administrator from a protected Render shell with a strong password and `cliadm`:
+Development seeding creates local test identities only when `SEED_DEVELOPMENT_USERS=1` and `NODE_ENV` is not `production`. Production startup runs tracked migrations but does not seed. Run the baseline seed deliberately only when the catalogue is missing, then bootstrap the first production administrator from a protected Render shell with a strong password and `cliadm`:
 
 ```bash
 read -s CLIADM_NEW_PASSWORD
@@ -106,7 +106,7 @@ unset CLIADM_NEW_PASSWORD CLIADM_TOKEN
 
 - Root directory: `cyberscout-server`
 - Build command: `npm ci`
-- Start command: `npm run db:setup && npm start`
+- Start command: `npm run db:migrate && npm start`
 - Health endpoint: `/api/health`
 - Render readiness endpoint: `/health`
 

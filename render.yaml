@@ -5,7 +5,7 @@ services:
     rootDir: cyberscout-server
     plan: starter
     buildCommand: npm ci
-    startCommand: npm run db:setup && npm start
+    startCommand: npm run db:migrate && npm start
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV

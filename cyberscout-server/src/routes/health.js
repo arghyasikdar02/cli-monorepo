@@ -6,9 +6,21 @@ const router = Router()
 router.get('/', async (_req, res) => {
   try {
     await checkDatabaseConnection()
-    res.json({ ok: true, status: 'ok', service: 'cyberlabin-api', timestamp: new Date().toISOString() })
+    res.json({
+      ok: true,
+      status: 'ok',
+      service: 'cyberlabin-api',
+      database: 'connected',
+      timestamp: new Date().toISOString(),
+    })
   } catch {
-    res.status(503).json({ ok: false, status: 'unavailable', service: 'cyberlabin-api', timestamp: new Date().toISOString() })
+    res.status(503).json({
+      ok: false,
+      status: 'unavailable',
+      service: 'cyberlabin-api',
+      database: 'unavailable',
+      timestamp: new Date().toISOString(),
+    })
   }
 })
 

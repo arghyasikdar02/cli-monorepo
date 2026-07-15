@@ -95,6 +95,7 @@ export function createApp() {
   })
   setupPassport()
   app.use(passport.initialize())
+  app.get('/', (_req, res) => res.json({ status: 'ok', service: 'cyberlabin-api', health: '/health' }))
   app.use('/health', healthRouter)
   app.use('/api/health', healthRouter)
   app.use('/api/auth', authRouter)
@@ -130,6 +131,7 @@ export function createApp() {
 }
 
 export const app = createApp()
+let server
 
 if (process.env.NODE_ENV !== 'test') {
   try {
@@ -137,7 +139,7 @@ if (process.env.NODE_ENV !== 'test') {
     console.log('Database URL configured:', databaseStatus.configured)
     console.log('Database SSL enabled:', databaseStatus.sslEnabled)
     await checkDatabaseConnection()
-    app.listen(PORT, HOST, () => console.log(`cyberscout-server ready on ${HOST}:${PORT}; database=postgresql`))
+    server = app.listen(PORT, HOST, () => console.log(`cyberscout-server ready on ${HOST}:${PORT}; database=postgresql`))
   } catch (error) {
     console.error('PostgreSQL connection failed before server start:', error.message)
     process.exit(1)
@@ -146,6 +148,9 @@ if (process.env.NODE_ENV !== 'test') {
 
 for (const signal of ['SIGTERM', 'SIGINT']) {
   process.once(signal, async () => {
+    if (server) {
+      await new Promise(resolve => server.close(resolve))
+    }
     await closeDatabase().catch(() => {})
     process.exit(0)
   })

@@ -11,10 +11,10 @@ The Render service is stateless. Supabase PostgreSQL is the only production data
 | Runtime | Node |
 | Node version | `22.x` (pinned in `cyberscout-server/package.json`) |
 | Build command | `npm ci` |
-| Start command | `npm run db:setup && npm start` |
+| Start command | `npm run db:migrate && npm start` |
 | Health check | `/health` |
 
-The start command runs pending tracked migrations and the idempotent baseline catalogue seed. The seed uses stable identifiers and `ON CONFLICT DO NOTHING`; it does not overwrite records, reset data, or create test identities in production.
+The start command runs only pending tracked migrations before Express starts. It does not seed, overwrite records, reset data, or create test identities.
 
 ## Required variables
 
@@ -62,9 +62,9 @@ Configure every value in an optional group together or leave the group unset.
 3. Deploy from the root `render.yaml` or enter the service settings above.
 4. Confirm the logs show each new PostgreSQL migration and `database=postgresql`.
 5. Verify `https://cyberlabin.onrender.com/health` returns HTTP 200.
-6. Confirm the baseline catalogue seed reports either `Public catalogue ready` or `Public catalogue already ready`.
+6. If the public catalogue is absent, run `npm run db:seed` once from a protected Render shell. Re-running it is safe because inserts use stable identifiers and `ON CONFLICT DO NOTHING`.
 
-Do not set `SEED_DEVELOPMENT_USERS=1` in production. Re-running the production seed is safe because baseline inserts use stable identifiers and `ON CONFLICT DO NOTHING`.
+Do not set `SEED_DEVELOPMENT_USERS=1` in production.
 
 ## Verification
 
@@ -93,7 +93,7 @@ Use an authenticated smoke test for `/api/auth/me`, dashboards, enrollment and l
 - [ ] Production HTTPS origins configured.
 - [ ] No `DATABASE_PATH`, Render disk, or file URL configured.
 - [ ] Node is selected from the `22.x` package engine.
-- [ ] Start command is `npm run db:setup && npm start`.
+- [ ] Start command is `npm run db:migrate && npm start`.
 - [ ] `/health` returns HTTP 200.
 - [ ] Logs identify `database=postgresql`.
 - [ ] Seed run once only if catalogue rows were absent.
