@@ -1,58 +1,11 @@
 import pg from 'pg'
+import { databaseConfig } from './config.js'
 
 const { Pool } = pg
 
-function parseDatabaseUrl(value = process.env.DATABASE_URL) {
-  const raw = String(value || '').trim()
-  if (!raw) {
-    throw new Error('DATABASE_URL is required. Configure the Supabase PostgreSQL connection string.')
-  }
-
-  let url
-  try {
-    url = new URL(raw)
-  } catch {
-    throw new Error('DATABASE_URL must be a valid PostgreSQL URL.')
-  }
-
-  if (!['postgres:', 'postgresql:'].includes(url.protocol)) {
-    throw new Error('DATABASE_URL must use the postgresql:// or postgres:// protocol.')
-  }
-  if (!url.hostname || !url.username || !url.pathname || url.pathname === '/') {
-    throw new Error('DATABASE_URL must include a PostgreSQL host, user, and database name.')
-  }
-  return { raw, url }
-}
-
-function sslConfiguration(url) {
-  const setting = String(process.env.DATABASE_SSL || '').trim().toLowerCase()
-  if (['0', 'false', 'disable', 'off'].includes(setting)) {
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error('DATABASE_SSL cannot be disabled in production.')
-    }
-    return false
-  }
-
-  const localHost = ['localhost', '127.0.0.1', '::1'].includes(url.hostname)
-  if (!setting && localHost && process.env.NODE_ENV !== 'production') return false
-
-  const certificate = String(process.env.DATABASE_SSL_CA || '').replace(/\\n/g, '\n').trim()
-  return certificate
-    ? { ca: certificate, rejectUnauthorized: true }
-    : { rejectUnauthorized: true }
-}
-
-const { raw: connectionString, url: databaseUrl } = parseDatabaseUrl()
-
 export const databaseEngine = 'postgresql'
-export const pool = new Pool({
-  connectionString,
-  ssl: sslConfiguration(databaseUrl),
-  max: Number(process.env.DATABASE_POOL_MAX || 10),
-  idleTimeoutMillis: Number(process.env.DATABASE_IDLE_TIMEOUT_MS || 30_000),
-  connectionTimeoutMillis: Number(process.env.DATABASE_CONNECT_TIMEOUT_MS || 10_000),
-  application_name: process.env.DATABASE_APPLICATION_NAME || 'cyberlabin-api',
-})
+export { databaseConfig }
+export const pool = new Pool(databaseConfig)
 
 pool.on('error', (error) => {
   console.error('Unexpected PostgreSQL pool error:', error.message)

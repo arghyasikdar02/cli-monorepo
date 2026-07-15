@@ -29,6 +29,7 @@ import visitorsRouter from './routes/visitors.js'
 import videosRouter from './routes/videos.js'
 import webhooksRouter from './routes/webhooks.js'
 import { checkDatabaseConnection, closeDatabase } from './db/index.js'
+import { databaseConfigurationStatus } from './db/config.js'
 import { normalizeOrigin, validateEnvironment } from './lib/environment.js'
 import { apiLimiter, csrfProtection, requestContext } from './middleware/security.js'
 
@@ -132,6 +133,9 @@ export const app = createApp()
 
 if (process.env.NODE_ENV !== 'test') {
   try {
+    const databaseStatus = databaseConfigurationStatus()
+    console.log('Database URL configured:', databaseStatus.configured)
+    console.log('Database SSL enabled:', databaseStatus.sslEnabled)
     await checkDatabaseConnection()
     app.listen(PORT, HOST, () => console.log(`cyberscout-server ready on ${HOST}:${PORT}; database=postgresql`))
   } catch (error) {

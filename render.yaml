@@ -5,13 +5,11 @@ services:
     rootDir: cyberscout-server
     plan: starter
     buildCommand: npm ci
-    startCommand: npm run db:migrate && npm start
+    startCommand: npm run db:setup && npm start
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
-      - key: NODE_VERSION
-        value: 24.14.1
       - key: FRONTEND_URL
         value: https://cyberlabin.com
       - key: BACKEND_URL

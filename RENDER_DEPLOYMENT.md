@@ -9,12 +9,12 @@ The Render service is stateless. Supabase PostgreSQL is the only production data
 | Service type | Web service |
 | Root directory | `cyberscout-server` |
 | Runtime | Node |
-| Node version | `24.14.1` |
+| Node version | `22.x` (pinned in `cyberscout-server/package.json`) |
 | Build command | `npm ci` |
-| Start command | `npm run db:migrate && npm start` |
+| Start command | `npm run db:setup && npm start` |
 | Health check | `/health` |
 
-The start command runs only pending tracked migrations. It does not run `db:seed`, create test users, reset data, or require a Render disk.
+The start command runs pending tracked migrations and the idempotent baseline catalogue seed. The seed uses stable identifiers and `ON CONFLICT DO NOTHING`; it does not overwrite records, reset data, or create test identities in production.
 
 ## Required variables
 
@@ -39,6 +39,8 @@ CLIADM_ADMIN_TOKEN=<random 32+ characters>
 
 Generate independent secrets with `openssl rand -hex 32`. `DATABASE_URL` must begin with `postgresql://` or `postgres://` and include the database password. Use the Supabase connection string appropriate for a persistent server; use the direct connection for migrations when network support permits, or a Supabase pooler connection documented as DDL-compatible.
 
+`DATABASE_SSL=require` enables TLS for the PostgreSQL connection and uses connection-scoped compatibility for the provider-managed certificate chain. URL parameters such as `sslmode`, `sslcert`, `sslkey`, and `sslrootcert` are removed before `pg` creates the connection so they cannot override the shared policy. To require CA verification instead, configure `DATABASE_SSL_CA` with the provider's PEM CA chain. The application never disables TLS verification globally.
+
 Optional complete groups:
 
 ```text
@@ -60,13 +62,9 @@ Configure every value in an optional group together or leave the group unset.
 3. Deploy from the root `render.yaml` or enter the service settings above.
 4. Confirm the logs show each new PostgreSQL migration and `database=postgresql`.
 5. Verify `https://cyberlabin.onrender.com/health` returns HTTP 200.
-6. Run the catalogue seed once from a protected shell only when baseline rows are missing:
+6. Confirm the baseline catalogue seed reports either `Public catalogue ready` or `Public catalogue already ready`.
 
-```bash
-npm run db:seed
-```
-
-Do not set `SEED_DEVELOPMENT_USERS=1` in production. Re-running the seed is safe because baseline inserts use `ON CONFLICT DO NOTHING`, but it is not part of normal restart or deploy behavior.
+Do not set `SEED_DEVELOPMENT_USERS=1` in production. Re-running the production seed is safe because baseline inserts use stable identifiers and `ON CONFLICT DO NOTHING`.
 
 ## Verification
 
@@ -81,7 +79,7 @@ Use an authenticated smoke test for `/api/auth/me`, dashboards, enrollment and l
 
 - `DATABASE_URL is required`: enter the Supabase connection string as a Render secret.
 - `must use postgresql://`: a file URL or malformed database URL is configured.
-- TLS/certificate failure: use the current Supabase connection string and keep `DATABASE_SSL=require`; supply `DATABASE_SSL_CA` only when Supabase provides a CA chain. Do not disable verification in production.
+- TLS/certificate failure: keep `DATABASE_SSL=require` and confirm Render deployed the shared `src/db/config.js` configuration. Remove stale Render overrides such as `NODE_TLS_REJECT_UNAUTHORIZED`; they are neither needed nor permitted. Supply `DATABASE_SSL_CA` only when the database provider supplies a CA chain that should be verified.
 - CORS rejection: ensure the browser origin exactly matches an HTTPS origin in `CORS_ORIGINS`.
 - Existing-schema compatibility failure: no tracked migration was applied. Back up Supabase and complete an explicit data migration; do not alter IDs or delete tables to force deployment.
 - Migration failure: note the migration filename in the log, take a backup, and correct the schema conflict. Do not delete `schema_migrations` or reset production tables.
@@ -94,7 +92,8 @@ Use an authenticated smoke test for `/api/auth/me`, dashboards, enrollment and l
 - [ ] Four independent application secrets generated and entered.
 - [ ] Production HTTPS origins configured.
 - [ ] No `DATABASE_PATH`, Render disk, or file URL configured.
-- [ ] Start command is `npm run db:migrate && npm start`.
+- [ ] Node is selected from the `22.x` package engine.
+- [ ] Start command is `npm run db:setup && npm start`.
 - [ ] `/health` returns HTTP 200.
 - [ ] Logs identify `database=postgresql`.
 - [ ] Seed run once only if catalogue rows were absent.
