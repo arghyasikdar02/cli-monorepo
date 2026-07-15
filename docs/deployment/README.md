@@ -1,5 +1,7 @@
 # Deployment Documentation
 
+The current Render backend procedure is maintained in [`../../RENDER_DEPLOYMENT.md`](../../RENDER_DEPLOYMENT.md).
+
 ## Active deployment shape
 
 - Frontend: Vercel, root directory `cyberscout`, build command `npm run build`, output `dist`.

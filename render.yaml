@@ -3,15 +3,19 @@ services:
     name: cyberlabin-api
     runtime: node
     rootDir: cyberscout-server
-    plan: free
+    plan: starter
     buildCommand: npm ci
     startCommand: npm start
-    healthCheckPath: /api/health
+    healthCheckPath: /health
+    disk:
+      name: cyberlabin-sqlite-data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 3001
+      - key: NODE_VERSION
+        value: 24.14.1
       - key: FRONTEND_URL
         value: https://cyberlabin.com
       - key: BACKEND_URL
@@ -22,8 +26,12 @@ services:
         value: "true"
       - key: COOKIE_SAME_SITE
         value: lax
-      - key: DATABASE_URL
-        value: file:./data/cyberlab.sqlite
+      - key: BCRYPT_COST
+        value: "12"
+      - key: DATABASE_PATH
+        value: /var/data/cyberlab.sqlite
+      - key: SEED_BASELINE_FORCE
+        value: "0"
       - key: JWT_SECRET
         sync: false
       - key: VISITOR_HASH_SALT

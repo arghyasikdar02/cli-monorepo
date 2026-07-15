@@ -39,7 +39,8 @@
 
 - `.env`, SQLite files, logs and build output are ignored.
 - Development seed identities are hard-disabled in production. Startup may create public catalogue records, but the first administrator must be bootstrapped explicitly through protected `cliadm` access.
-- Production startup rejects placeholder or short JWT, visitor-hash and lab-flag secrets.
+- Production startup rejects placeholder or short JWT, visitor-hash, lab-flag and CLI administration secrets before opening the database.
+- `FRONTEND_URL`, `BACKEND_URL` and CORS origins must be explicit public HTTPS origins in production; localhost and implicit defaults fail closed.
 - OAuth credentials must be configured as a complete non-placeholder pair.
 - Razorpay credentials must be configured as a complete non-placeholder set.
 - Rotate any secret previously shared in a chat, screenshot, shell history or deployment log.
@@ -52,4 +53,4 @@
 
 ## Production limitation
 
-SQLite on Render free storage is not durable. This is the most important unresolved production risk. Use the current deployment only for testing until the Postgres/Supabase adapter migration and isolation tests are complete.
+SQLite is durable on Render only when the configured Starter service and `/var/data` persistent disk are present. It remains a single-instance database with operational limits; maintain tested off-site backups and complete the Postgres/Supabase adapter migration before higher-scale production use.

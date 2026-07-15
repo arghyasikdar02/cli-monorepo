@@ -1,44 +1,197 @@
+import path from 'node:path'
+
+const PLACEHOLDER_PATTERN = /change[_-]?me|replace(?:[_-]|\s+)(?:me|with)|your[_-]|placeholder|dummy|password123|test[_-]?secret/i
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1'])
+
 function isPlaceholder(value) {
-  return !value || /change_me|replace_|your_|dummy/i.test(String(value))
+  return !value || PLACEHOLDER_PATTERN.test(String(value))
 }
 
-export function validateEnvironment() {
-  if (process.env.NODE_ENV !== 'production') return
+function normalizeUrl(value) {
+  try {
+    const url = new URL(String(value || '').trim())
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return ''
+    return url.origin
+  } catch {
+    return ''
+  }
+}
+
+export function normalizeOrigin(value) {
+  return normalizeUrl(value)
+}
+
+export function getAllowedOrigins(env = process.env) {
+  const isProduction = env.NODE_ENV === 'production'
+  const configured = String(env.CORS_ORIGINS || env.FRONTEND_URL || (isProduction ? '' : 'http://localhost:5173'))
+    .split(',')
+    .map(normalizeOrigin)
+    .filter(Boolean)
+  const local = isProduction
+    ? []
+    : ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:4173', 'http://127.0.0.1:4173']
+  return [...new Set([...configured, ...local])]
+}
+
+function validateSecret(env, name, minimumLength, errors, { required = true } = {}) {
+  const value = String(env[name] || '')
+  if (!value && !required) return
+  if (isPlaceholder(value) || value.length < minimumLength) {
+    errors.push(`${name}: set a non-placeholder random value of at least ${minimumLength} characters`)
+  }
+}
+
+function validateHttpsOrigin(env, name, errors) {
+  const raw = String(env[name] || '').trim()
+  if (!raw) {
+    errors.push(`${name}: required in production; set an absolute HTTPS origin`)
+    return ''
+  }
+  let url
+  try {
+    url = new URL(raw)
+  } catch {
+    errors.push(`${name}: must be an absolute HTTPS URL such as https://service.example.com`)
+    return ''
+  }
+  if (url.protocol !== 'https:' || url.username || url.password || LOCAL_HOSTS.has(url.hostname)) {
+    errors.push(`${name}: must be a public absolute HTTPS URL without credentials`)
+    return ''
+  }
+  if ((url.pathname && url.pathname !== '/') || url.search || url.hash) {
+    errors.push(`${name}: must contain only the HTTPS origin, without a path, query or fragment`)
+    return ''
+  }
+  return url.origin
+}
+
+function validateHttpsUrl(env, name, errors) {
+  const raw = String(env[name] || '').trim()
+  if (!raw) {
+    errors.push(`${name}: required when Google OAuth is enabled`)
+    return ''
+  }
+  try {
+    const url = new URL(raw)
+    if (url.protocol !== 'https:' || url.username || url.password || LOCAL_HOSTS.has(url.hostname)) {
+      errors.push(`${name}: must be a public absolute HTTPS URL without credentials`)
+      return ''
+    }
+    return url.toString()
+  } catch {
+    errors.push(`${name}: must be an absolute HTTPS URL`)
+    return ''
+  }
+}
+
+function resolveDatabasePath(env) {
+  const explicitPath = String(env.DATABASE_PATH || '').trim()
+  if (explicitPath) return explicitPath
+  const databaseUrl = String(env.DATABASE_URL || '').trim()
+  if (databaseUrl.startsWith('file:')) return databaseUrl.slice('file:'.length)
+  if (databaseUrl.startsWith('sqlite:')) return databaseUrl.slice('sqlite:'.length)
+  return ''
+}
+
+export function validateEnvironment(env = process.env) {
+  const isProduction = env.NODE_ENV === 'production'
+  const developmentFrontend = normalizeOrigin(env.FRONTEND_URL) || 'http://localhost:5173'
+  const developmentBackend = normalizeOrigin(env.BACKEND_URL) || `http://localhost:${env.PORT || 3001}`
+
+  if (!isProduction) {
+    return {
+      frontendUrl: developmentFrontend,
+      backendUrl: developmentBackend,
+      allowedOrigins: getAllowedOrigins(env),
+      databasePath: resolveDatabasePath(env),
+    }
+  }
 
   const errors = []
-  if (isPlaceholder(process.env.JWT_SECRET) || String(process.env.JWT_SECRET).length < 32) {
-    errors.push('JWT_SECRET must be a non-placeholder value of at least 32 characters')
+  validateSecret(env, 'JWT_SECRET', 32, errors)
+  validateSecret(env, 'VISITOR_HASH_SALT', 24, errors)
+  validateSecret(env, 'LAB_FLAG_SALT', 24, errors)
+  validateSecret(env, 'CLIADM_ADMIN_TOKEN', 32, errors)
+
+  const frontendUrl = validateHttpsOrigin(env, 'FRONTEND_URL', errors)
+  const backendUrl = validateHttpsOrigin(env, 'BACKEND_URL', errors)
+  const allowedOrigins = getAllowedOrigins(env)
+  const rawCorsOrigins = String(env.CORS_ORIGINS || env.FRONTEND_URL || '').split(',').map(value => value.trim()).filter(Boolean)
+  if (!rawCorsOrigins.length) {
+    errors.push('CORS_ORIGINS: set at least the production FRONTEND_URL origin')
+  } else {
+    rawCorsOrigins.forEach((origin, index) => {
+      const normalized = normalizeOrigin(origin)
+      let parsed
+      try {
+        parsed = new URL(origin)
+      } catch {
+        parsed = null
+      }
+      if (
+        !parsed ||
+        !normalized ||
+        parsed.protocol !== 'https:' ||
+        parsed.username ||
+        parsed.password ||
+        LOCAL_HOSTS.has(parsed.hostname) ||
+        (parsed.pathname && parsed.pathname !== '/') ||
+        parsed.search ||
+        parsed.hash
+      ) {
+        errors.push(`CORS_ORIGINS: entry ${index + 1} must be a public HTTPS origin`)
+      }
+    })
   }
-  if (isPlaceholder(process.env.VISITOR_HASH_SALT) || String(process.env.VISITOR_HASH_SALT).length < 24) {
-    errors.push('VISITOR_HASH_SALT must be a non-placeholder value of at least 24 characters')
+  if (frontendUrl && !allowedOrigins.includes(frontendUrl)) {
+    errors.push('CORS_ORIGINS: must include the normalized FRONTEND_URL origin')
   }
-  if (isPlaceholder(process.env.LAB_FLAG_SALT) || String(process.env.LAB_FLAG_SALT).length < 24) {
-    errors.push('LAB_FLAG_SALT must be a non-placeholder value of at least 24 characters')
+
+  const databasePath = resolveDatabasePath(env)
+  if (!databasePath) {
+    errors.push('DATABASE_PATH: required in production; use an absolute path on a persistent disk such as /var/data/cyberlab.sqlite')
+  } else if (!path.isAbsolute(databasePath)) {
+    errors.push('DATABASE_PATH: must be an absolute production path; use /var/data/cyberlab.sqlite on Render')
   }
-  if (!String(process.env.FRONTEND_URL || '').startsWith('https://')) {
-    errors.push('FRONTEND_URL must use HTTPS in production')
+  if (/^(?:postgres|postgresql):/i.test(String(env.DATABASE_URL || ''))) {
+    errors.push('DATABASE_URL: PostgreSQL URLs are not supported by the active SQLite repository; configure DATABASE_PATH instead')
   }
-  if (!String(process.env.BACKEND_URL || '').startsWith('https://')) {
-    errors.push('BACKEND_URL must use HTTPS in production')
+
+  if (String(env.COOKIE_SECURE || 'true').toLowerCase() !== 'true') {
+    errors.push('COOKIE_SECURE: must be true in production')
   }
-  if (!String(process.env.CORS_ORIGINS || process.env.FRONTEND_URL || '').trim()) {
-    errors.push('CORS_ORIGINS must contain at least one approved frontend origin')
+  const sameSite = String(env.COOKIE_SAME_SITE || 'lax').toLowerCase()
+  if (!['lax', 'strict', 'none'].includes(sameSite)) {
+    errors.push('COOKIE_SAME_SITE: must be lax, strict or none')
   }
-  const hasGoogleClient = Boolean(process.env.GOOGLE_CLIENT_ID)
-  const hasGoogleSecret = Boolean(process.env.GOOGLE_CLIENT_SECRET)
+  const bcryptCost = Number(env.BCRYPT_COST || 12)
+  if (!Number.isInteger(bcryptCost) || bcryptCost < 10 || bcryptCost > 15) {
+    errors.push('BCRYPT_COST: must be an integer from 10 through 15 in production')
+  }
+
+  const hasGoogleClient = Boolean(env.GOOGLE_CLIENT_ID)
+  const hasGoogleSecret = Boolean(env.GOOGLE_CLIENT_SECRET)
   if (hasGoogleClient !== hasGoogleSecret) {
-    errors.push('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be configured together')
-  } else if (hasGoogleClient && (isPlaceholder(process.env.GOOGLE_CLIENT_ID) || isPlaceholder(process.env.GOOGLE_CLIENT_SECRET))) {
-    errors.push('Google OAuth credentials must not use placeholder values')
+    errors.push('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET: configure both values together or leave both unset')
+  } else if (hasGoogleClient) {
+    if (isPlaceholder(env.GOOGLE_CLIENT_ID)) errors.push('GOOGLE_CLIENT_ID: replace the placeholder with the Google OAuth client ID')
+    validateSecret(env, 'GOOGLE_CLIENT_SECRET', 16, errors)
+    validateHttpsUrl(env, 'GOOGLE_CALLBACK_URL', errors)
   }
-  const razorpayValues = [process.env.RAZORPAY_KEY_ID, process.env.RAZORPAY_KEY_SECRET, process.env.RAZORPAY_WEBHOOK_SECRET]
+
+  const razorpayNames = ['RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET', 'RAZORPAY_WEBHOOK_SECRET']
+  const razorpayValues = razorpayNames.map(name => env[name])
   if (razorpayValues.some(Boolean) && !razorpayValues.every(Boolean)) {
-    errors.push('RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET must be configured together')
-  } else if (razorpayValues.every(Boolean) && razorpayValues.some(isPlaceholder)) {
-    errors.push('Razorpay credentials must not use placeholder values')
+    errors.push('RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET: configure all three values together or leave all unset')
+  } else if (razorpayValues.every(Boolean)) {
+    validateSecret(env, 'RAZORPAY_KEY_ID', 8, errors)
+    validateSecret(env, 'RAZORPAY_KEY_SECRET', 16, errors)
+    validateSecret(env, 'RAZORPAY_WEBHOOK_SECRET', 24, errors)
   }
 
   if (errors.length) {
     throw new Error(`Invalid production environment:\n- ${errors.join('\n- ')}`)
   }
+
+  return { frontendUrl, backendUrl, allowedOrigins, databasePath }
 }

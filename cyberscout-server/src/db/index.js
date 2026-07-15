@@ -8,8 +8,13 @@ const __dirname = path.dirname(__filename)
 const serverRoot = path.resolve(__dirname, '../..')
 const migrationsDir = path.resolve(serverRoot, 'db/migrations')
 
-function databaseFileFromUrl(value = process.env.DATABASE_URL) {
+function databaseFileFromEnvironment() {
   const fallback = path.join(serverRoot, 'data/cyberlab.sqlite')
+  const configuredPath = String(process.env.DATABASE_PATH || '').trim()
+  if (configuredPath) {
+    return path.isAbsolute(configuredPath) ? configuredPath : path.resolve(serverRoot, configuredPath)
+  }
+  const value = process.env.DATABASE_URL
   if (!value) return fallback
   if (value.startsWith('file:')) {
     const rawPath = value.slice('file:'.length)
@@ -19,13 +24,18 @@ function databaseFileFromUrl(value = process.env.DATABASE_URL) {
     const rawPath = value.slice('sqlite:'.length)
     return path.isAbsolute(rawPath) ? rawPath : path.resolve(serverRoot, rawPath)
   }
-  return fallback
+  throw new Error('Unsupported DATABASE_URL. The active repository requires DATABASE_PATH or a file:/sqlite: URL.')
 }
 
-const dbPath = databaseFileFromUrl()
-fs.mkdirSync(path.dirname(dbPath), { recursive: true })
+const dbPath = databaseFileFromEnvironment()
+fs.mkdirSync(path.dirname(dbPath), { recursive: true, mode: 0o700 })
 
 export const db = new Database(dbPath)
+try {
+  fs.chmodSync(dbPath, 0o600)
+} catch {
+  // Some mounted filesystems do not expose POSIX mode changes to the process.
+}
 db.pragma('foreign_keys = ON')
 db.pragma('journal_mode = WAL')
 

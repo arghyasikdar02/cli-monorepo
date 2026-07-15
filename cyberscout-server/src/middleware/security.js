@@ -1,16 +1,8 @@
 import { randomUUID, timingSafeEqual } from 'node:crypto'
 import { rateLimit } from 'express-rate-limit'
+import { getAllowedOrigins, normalizeOrigin } from '../lib/environment.js'
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
-
-function configuredOrigins() {
-  return (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || 'http://localhost:5173')
-    .split(',')
-    .map(origin => origin.trim())
-    .filter(Boolean)
-}
-
-const allowedOrigins = configuredOrigins()
 
 function safelyEqual(left, right) {
   const leftBuffer = Buffer.from(String(left || ''))
@@ -73,7 +65,7 @@ export function csrfProtection(req, res, next) {
   if (!req.cookies?.cli_session) return next()
 
   const origin = req.headers.origin
-  if (origin && !allowedOrigins.includes(origin)) {
+  if (origin && !getAllowedOrigins().includes(normalizeOrigin(origin))) {
     return res.status(403).json({ error: 'Request origin is not allowed' })
   }
 

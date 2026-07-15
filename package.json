@@ -2,6 +2,10 @@
   "name": "cyberlab-in-legacy",
   "private": true,
   "version": "0.0.0",
+  "engines": {
+    "node": "24.14.x",
+    "npm": ">=10"
+  },
   "scripts": {
     "install:frontend": "npm install --prefix cyberscout",
     "install:backend": "npm install --prefix cyberscout-server && npm run db:setup --prefix cyberscout-server",

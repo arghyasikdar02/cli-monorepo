@@ -4,7 +4,8 @@
 
 - Rebuilt the public website around the published beginner course and the clear position: learn cybersecurity by investigating real scenarios.
 - Replaced decorative terminal and cyberpunk presentation with a restrained white, navy and blue editorial system.
-- Added a real read-only phishing investigation preview that explains evidence, learner action and expected finding.
+- Replaced the former phishing-email preview with a beginner-to-role cybersecurity roadmap that branches from a shared foundation into defensive, offensive, cloud/DevSecOps and governance/training directions.
+- Added a stable rotating investigation headline using lightweight CSS transitions, visibility-aware timing, keyboard-safe content and a reduced-motion fallback.
 - Simplified navigation to Courses, Labs, Learning Paths, For Organisations and Resources.
 - Kept the homepage learner-first; organisation training has a separate route.
 - Separated published courses from clearly labelled planned courses.
@@ -60,13 +61,17 @@
 - Preserved the archived monorepo and legacy backup locally but removed 261 archived files from version control and active deployment.
 - Added a legacy-stack GitHub Actions workflow, Render blueprint, smoke test and organised documentation folders.
 - Active architecture remains `cyberscout/` plus `cyberscout-server/`; no monorepo or framework migration was created.
+- Pinned Node 24.14.1 across package engines, `.nvmrc`, CI and the Render Blueprint.
+- Added a strict pre-database startup gate, aggregated production environment validation, normalized HTTPS origin handling and a public database-aware `/health` readiness route.
+- Configured Render for a 1 GB persistent disk at `/var/data`, idempotent migrations and production-safe catalogue preparation without predictable test identities.
 
 ## Verification result
 
 - Frontend lint: pass.
-- Backend integration and security suite: 18/18 pass.
+- Backend integration, security and environment suite: 24/24 pass.
+- Clean Node 24.14.1 production install and startup: pass; all eight migrations applied, public catalogue seeded without test users, and `/health` returned ready.
 - Production build and 41-route prerender: pass.
-- Production-bundle Lighthouse: performance 99, accessibility 100, best practices 100 and SEO 100; LCP 2.1 seconds, CLS 0 and no console errors.
+- Production-bundle Lighthouse after the roadmap implementation: performance 96, accessibility 100, best practices 100 and SEO 100; LCP 2.5 seconds, CLS 0 and total blocking time 130 ms.
 - API smoke checks and `cliadm` health, analytics and audit commands: pass.
 - Mermaid ER, context DFD, level-one DFD and component sources: all export successfully with Mermaid CLI.
-- Browser checks: homepage, login-first flow, student login, protected dashboard and 390px public/learner layouts pass without horizontal overflow.
+- Browser checks: rotating headline, keyboard-selectable roadmap and responsive layouts at 320, 375, 390, 430, 768, 1024, 1280, 1440 and 1920 pixels pass without horizontal overflow.

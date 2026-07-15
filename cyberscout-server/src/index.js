@@ -28,21 +28,15 @@ import visitorsRouter from './routes/visitors.js'
 import videosRouter from './routes/videos.js'
 import webhooksRouter from './routes/webhooks.js'
 import { seedBaselineData } from './db/seed.js'
-import { validateEnvironment } from './lib/environment.js'
+import { normalizeOrigin, validateEnvironment } from './lib/environment.js'
 import { apiLimiter, csrfProtection, requestContext } from './middleware/security.js'
 
-const PORT = process.env.PORT || 3001
-const configuredCorsOrigins = (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || 'http://localhost:5173')
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean)
-const localPreviewOrigins = process.env.NODE_ENV === 'production'
-  ? []
-  : ['http://localhost:4173', 'http://127.0.0.1:4173']
-const corsOrigins = [...new Set([...configuredCorsOrigins, ...localPreviewOrigins])]
+const PORT = Number(process.env.PORT || 3001)
+const HOST = process.env.HOST || '0.0.0.0'
 
 export function createApp() {
-  validateEnvironment()
+  const runtimeEnvironment = validateEnvironment()
+  const corsOrigins = runtimeEnvironment.allowedOrigins
   const app = express()
   app.set('trust proxy', 1)
   app.disable('x-powered-by')
@@ -70,8 +64,11 @@ export function createApp() {
   })
   app.use(cors({
     origin: (origin, cb) => {
-      if (!origin || corsOrigins.includes(origin)) return cb(null, true)
-      return cb(new Error(`CORS blocked for origin: ${origin}`))
+      if (!origin || corsOrigins.includes(normalizeOrigin(origin))) return cb(null, true)
+      const error = new Error('Origin is not permitted by the configured CORS allowlist')
+      error.status = 403
+      error.publicMessage = 'Request origin is not allowed'
+      return cb(error)
     },
     credentials: true,
   }))
@@ -96,6 +93,7 @@ export function createApp() {
   })
   setupPassport()
   app.use(passport.initialize())
+  app.use('/health', healthRouter)
   app.use('/api/health', healthRouter)
   app.use('/api/auth', authRouter)
   app.use('/api/users', usersRouter)
@@ -124,7 +122,7 @@ export function createApp() {
     const summary = { requestId: req.requestId, method: req.method, path: req.path, message: err.message }
     if (process.env.NODE_ENV === 'production') console.error(summary)
     else console.error(err)
-    res.status(err.status || 500).json({ error: 'Internal server error', requestId: req.requestId })
+    res.status(err.status || 500).json({ error: err.publicMessage || 'Internal server error', requestId: req.requestId })
   })
   return app
 }
@@ -134,7 +132,7 @@ export const app = createApp()
 if (process.env.NODE_ENV !== 'test') {
   seedBaselineData({ force: process.env.SEED_BASELINE_FORCE === '1' })
     .then(() => {
-      app.listen(PORT, () => console.log(`cyberscout-server running on :${PORT}`))
+      app.listen(PORT, HOST, () => console.log(`cyberscout-server ready on ${HOST}:${PORT}`))
     })
     .catch(error => {
       console.error('Failed to prepare database before server start:', error)

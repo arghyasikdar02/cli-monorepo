@@ -2,11 +2,11 @@
 
 Only items blocked by missing production access, approved facts or human assets are listed here.
 
-## Durable production database
+## Managed production database migration
 
 **Blocked by:** Supabase project access and a deployment window.
 
-The active repository adapter uses SQLite. Render free storage is ephemeral. Before accepting paid enrolments, port the repository layer to Postgres, apply the reviewed `/supabase/schema.sql` and RLS policies, migrate data, run the isolation suite against Postgres, and switch `DATABASE_URL` only after a verified backup and rollback plan.
+The active repository adapter uses SQLite. The Render Blueprint now keeps it on a paid persistent disk at `/var/data`, which is suitable for controlled early operation but remains single-instance. Before higher-scale enrolment and payment workloads, port the repository layer to Postgres, apply the reviewed `/supabase/schema.sql` and RLS policies, migrate data, run the isolation suite against Postgres, and switch only after a verified backup and rollback plan.
 
 ## Google OAuth production activation
 
@@ -36,7 +36,7 @@ The API stores guarded document metadata and access events and never returns a s
 
 **Blocked by:** Approved screenshots and photographs.
 
-Replace the CSS-built read-only product proof with sharp, privacy-reviewed screenshots when the live lab and lesson interfaces are ready. Add an approved instructor photograph to the homepage and profile page.
+Add sharp, privacy-reviewed lab and lesson screenshots when those interfaces are ready. The public homepage currently uses an honest career roadmap instead of a fabricated product interface. Add an approved instructor photograph to the homepage and profile page.
 
 ## Verified commercial and legal content
 
@@ -48,4 +48,4 @@ Publish course schedule, language, fee, refund terms, legal entity details, supp
 
 **Blocked by:** a deployed production build and stable backend/database.
 
-The local production bundle scores 99 performance, 100 accessibility, 100 best practices and 100 SEO in Lighthouse. Repeat the audit against the final Vercel/Render/Supabase deployment from representative Indian mobile connections and use real-user Web Vitals to validate CDN, cold-start and database latency.
+The local production bundle scores 96 performance, 100 accessibility, 100 best practices and 100 SEO in Lighthouse. Repeat the audit against the final Vercel/Render deployment from representative Indian mobile connections and use real-user Web Vitals to validate CDN, cold-start and database latency.

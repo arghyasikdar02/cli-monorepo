@@ -5902,13 +5902,13 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
 }
 
 .home-hero-focused .home-hero-grid {
-  grid-template-columns: minmax(0, 0.9fr) minmax(30rem, 1.1fr);
-  align-items: center;
-  gap: clamp(3rem, 7vw, 7rem);
+  grid-template-columns: minmax(0, 1.25fr) minmax(20rem, 0.75fr);
+  align-items: end;
+  gap: clamp(3rem, 8vw, 8rem);
 }
 
 .home-hero-focused .home-hero-copy h1 {
-  max-width: 42rem;
+  max-width: 52rem;
   font-size: clamp(2.7rem, 4.4vw, 4.7rem);
   line-height: 1.03;
 }
@@ -5916,6 +5916,65 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
 .home-hero-focused .home-hero-copy > p:not(.site-eyebrow) {
   max-width: 40rem;
   font-size: clamp(1.02rem, 1.4vw, 1.18rem);
+}
+
+.home-hero-context {
+  max-width: 31rem;
+  padding-top: 1.4rem;
+  border-top: 1px solid var(--site-ink);
+}
+
+.home-hero-context > p {
+  margin: 0;
+  color: var(--site-muted);
+  font-size: 0.98rem;
+  line-height: 1.7;
+}
+
+.rotating-investigation-headline {
+  margin: 0;
+}
+
+.rotating-headline-stable,
+.rotating-headline-window {
+  display: block;
+}
+
+.rotating-headline-window {
+  position: relative;
+  height: 1.12em;
+  margin-top: 0.08em;
+  overflow: hidden;
+  color: var(--site-blue-dark);
+  font-size: 0.86em;
+  line-height: 1.05;
+  white-space: nowrap;
+}
+
+.rotating-headline-phrase {
+  position: absolute;
+  inset: 0;
+  display: block;
+  max-width: 100%;
+  transform: translateY(0);
+}
+
+.rotating-headline-phrase.is-entering {
+  animation: rotating-headline-enter 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.rotating-headline-phrase.is-leaving {
+  animation: rotating-headline-leave 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes rotating-headline-enter {
+  from { transform: translateY(112%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes rotating-headline-leave {
+  from { transform: translateY(0); }
+  to { transform: translateY(-112%); }
 }
 
 .home-hero-facts {
@@ -5949,141 +6008,293 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
   font-weight: 750;
 }
 
-.sample-lab-preview {
-  margin: 0;
-  border: 1px solid #cdd8df;
-  background: #f8fafb;
-  box-shadow: 0 20px 46px rgb(16 24 32 / 0.1);
+.site-visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
 }
 
-.sample-lab-preview figcaption {
-  display: flex;
-  min-height: 3.6rem;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.8rem 1rem;
+.career-roadmap {
+  margin: clamp(4rem, 7vw, 6.5rem) 0 0;
+  border-top: 1px solid var(--site-border);
+  border-bottom: 1px solid var(--site-border);
+  background: var(--site-surface);
+}
+
+.career-roadmap-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 2rem;
+  padding: clamp(1.5rem, 3vw, 2.5rem);
   border-bottom: 1px solid var(--site-border);
   background: var(--site-white);
 }
 
-.sample-lab-preview figcaption span {
-  color: var(--site-blue-dark);
-  font-size: 0.7rem;
-  font-weight: 800;
-  text-transform: uppercase;
+.career-roadmap-heading h2 {
+  max-width: 43rem;
+  margin: 0;
+  font-size: clamp(1.8rem, 3.1vw, 3rem);
+  line-height: 1.12;
 }
 
-.sample-lab-preview figcaption strong {
-  font-size: 0.84rem;
-}
-
-.sample-lab-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 0.88fr);
-  min-height: 27rem;
-}
-
-.sample-lab-evidence,
-.sample-lab-task {
-  padding: clamp(1.25rem, 2.5vw, 2rem);
-}
-
-.sample-lab-evidence {
-  border-right: 1px solid var(--site-border);
-  background: var(--site-white);
-}
-
-.sample-lab-evidence > p,
-.sample-lab-task > p {
-  margin: 0 0 1rem;
+.career-roadmap-heading > div > p:last-child {
+  max-width: 42rem;
+  margin: 0.8rem 0 0;
   color: var(--site-muted);
+  line-height: 1.65;
+}
+
+.career-roadmap-map {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(13rem, 0.82fr) minmax(14rem, 0.92fr) minmax(24rem, 1.45fr);
+  align-items: center;
+  gap: clamp(3rem, 5vw, 5.5rem);
+  min-height: 38rem;
+  padding: clamp(2rem, 4vw, 3.5rem);
+  overflow: hidden;
+}
+
+.career-roadmap-connections {
+  position: absolute;
+  inset: 3.5rem;
+  z-index: 0;
+  width: calc(100% - 7rem);
+  height: calc(100% - 7rem);
+  overflow: visible;
+}
+
+.career-roadmap-line {
+  fill: none;
+  stroke: #b8c7d1;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.career-roadmap-line.is-shared,
+.career-roadmap-line.is-active {
+  stroke: var(--site-blue);
+}
+
+.career-roadmap.is-in-view .career-roadmap-line.is-shared {
+  stroke-dasharray: 300;
+  animation: roadmap-line-draw 850ms ease-out both;
+}
+
+.career-roadmap.is-in-view .career-roadmap-line.is-active {
+  stroke-dasharray: 520;
+  animation: roadmap-line-draw 950ms 280ms ease-out both;
+}
+
+@keyframes roadmap-line-draw {
+  from { stroke-dashoffset: 520; }
+  to { stroke-dashoffset: 0; }
+}
+
+.career-roadmap-stage,
+.career-roadmap-specialisations {
+  position: relative;
+  z-index: 1;
+}
+
+.career-roadmap-stage {
+  padding: 1.35rem;
+  border: 1px solid var(--site-border);
+  border-top: 3px solid var(--site-blue);
+  border-radius: 0.2rem;
+  background: var(--site-white);
+  box-shadow: 0 10px 24px rgb(16 24 32 / 0.07);
+}
+
+.career-roadmap.is-in-view .career-roadmap-foundation {
+  animation: roadmap-stage-activate 650ms ease-out both;
+}
+
+.career-roadmap.is-in-view .career-roadmap-core {
+  animation: roadmap-stage-activate 650ms 300ms ease-out both;
+}
+
+@keyframes roadmap-stage-activate {
+  from { opacity: 0.55; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.career-roadmap-step,
+.career-roadmap-track-heading span {
+  color: var(--site-blue-dark);
   font-size: 0.68rem;
   font-weight: 800;
   text-transform: uppercase;
 }
 
-.sample-lab-evidence dl {
-  display: grid;
-  margin: 0;
+.career-roadmap-stage h3 {
+  margin: 0.3rem 0 0;
+  font-size: 1.18rem;
 }
 
-.sample-lab-evidence dl div {
-  display: grid;
-  grid-template-columns: 4.3rem 1fr;
-  gap: 0.75rem;
-  padding: 0.7rem 0;
-  border-bottom: 1px solid var(--site-border);
-}
-
-.sample-lab-evidence dt {
+.career-roadmap-stage > p {
+  margin: 0.55rem 0 1rem;
   color: var(--site-muted);
-  font-size: 0.72rem;
-}
-
-.sample-lab-evidence dd {
-  min-width: 0;
-  margin: 0;
-  overflow-wrap: anywhere;
   font-size: 0.78rem;
-  font-weight: 650;
+  line-height: 1.55;
 }
 
-.sample-lab-evidence blockquote {
-  margin: 1.5rem 0 0;
-  padding: 1rem;
-  border-left: 3px solid #c64f4f;
-  background: #fff8f7;
-  color: #503437;
-  font-size: 0.82rem;
-  line-height: 1.6;
-}
-
-.sample-lab-task h2 {
-  margin: 0;
-  font-size: 1.25rem;
-  line-height: 1.3;
-}
-
-.sample-lab-task ul {
+.career-roadmap-stage ul,
+.career-roadmap-detail ul {
   display: grid;
-  gap: 0.75rem;
-  margin: 1.4rem 0;
+  gap: 0.48rem;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.sample-lab-task li {
-  display: flex;
-  align-items: start;
-  gap: 0.55rem;
-  color: var(--site-muted);
-  font-size: 0.78rem;
-  line-height: 1.45;
+.career-roadmap-stage li,
+.career-roadmap-detail li {
+  position: relative;
+  padding-left: 0.8rem;
+  color: #34444f;
+  font-size: 0.74rem;
+  line-height: 1.4;
 }
 
-.sample-lab-task li svg {
-  margin-top: 0.1rem;
-  color: var(--site-blue);
+.career-roadmap-stage li::before,
+.career-roadmap-detail li::before {
+  position: absolute;
+  top: 0.55em;
+  left: 0;
+  width: 0.28rem;
+  height: 0.28rem;
+  border-radius: 50%;
+  background: var(--site-blue);
+  content: '';
 }
 
-.sample-lab-task > div {
-  padding: 0.85rem;
+.career-roadmap-core ul {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.career-roadmap-specialisations {
+  align-self: stretch;
+  display: grid;
+  grid-template-columns: minmax(12rem, 0.72fr) minmax(0, 1.28fr);
+  gap: 1rem;
+  align-content: center;
+}
+
+.career-roadmap-track-heading {
+  grid-column: 1 / -1;
+}
+
+.career-roadmap-track-heading strong {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 1.05rem;
+}
+
+.career-roadmap-tabs {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.career-roadmap-tabs button {
+  min-height: 4.3rem;
+  padding: 0.65rem 0.8rem;
   border: 1px solid var(--site-border);
+  border-left: 3px solid transparent;
+  border-radius: 0.15rem;
+  background: rgb(255 255 255 / 0.78);
+  color: var(--site-ink);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--site-motion), background var(--site-motion);
+}
+
+.career-roadmap-tabs button:hover {
+  border-color: #9fb6c5;
+}
+
+.career-roadmap-tabs button[aria-selected='true'] {
+  border-color: var(--site-blue);
+  border-left-color: var(--site-blue);
   background: var(--site-white);
 }
 
-.sample-lab-task > div span {
-  color: var(--site-blue-dark);
-  font-size: 0.68rem;
-  font-weight: 800;
+.career-roadmap-tabs button:focus-visible,
+.career-roadmap-detail:focus-visible {
+  outline: 3px solid rgb(11 101 163 / 0.28);
+  outline-offset: 2px;
+}
+
+.career-roadmap-tabs span,
+.career-roadmap-tabs strong {
+  display: block;
+}
+
+.career-roadmap-tabs span {
+  color: var(--site-muted);
+  font-size: 0.65rem;
+}
+
+.career-roadmap-tabs strong {
+  margin-top: 0.18rem;
+  font-size: 0.78rem;
+  line-height: 1.3;
+}
+
+.career-roadmap-detail {
+  min-height: 20.1rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--site-border);
+  border-top: 3px solid var(--site-blue);
+  background: var(--site-white);
+  animation: roadmap-detail-enter 420ms ease-out both;
+}
+
+@keyframes roadmap-detail-enter {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.career-roadmap-detail-copy {
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid var(--site-border);
+}
+
+.career-roadmap-detail-copy p {
+  margin: 0;
+  font-size: 0.83rem;
+  line-height: 1.55;
+}
+
+.career-roadmap-detail-copy span {
+  display: block;
+  margin-top: 0.55rem;
+  color: var(--site-muted);
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.career-roadmap-detail h4 {
+  margin: 0.9rem 0 0.55rem;
+  color: var(--site-muted);
+  font-size: 0.65rem;
   text-transform: uppercase;
 }
 
-.sample-lab-task > div p {
-  margin: 0.35rem 0 0;
+.career-roadmap-note {
+  margin: 0;
+  padding: 0.85rem clamp(1.5rem, 3vw, 2.5rem);
+  border-top: 1px solid var(--site-border);
+  background: var(--site-white);
   color: var(--site-muted);
-  font-size: 0.76rem;
+  font-size: 0.7rem;
   line-height: 1.5;
 }
 
@@ -6544,8 +6755,21 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
   }
 
   .home-hero-focused .home-hero-grid {
-    grid-template-columns: minmax(0, 0.9fr) minmax(27rem, 1.1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 0.65fr);
     gap: 3rem;
+  }
+
+  .career-roadmap-map {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    min-height: 0;
+  }
+
+  .career-roadmap-connections {
+    display: none;
+  }
+
+  .career-roadmap-specialisations {
+    grid-column: 1 / -1;
   }
 
   .home-path-status-list {
@@ -6574,8 +6798,9 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
     max-width: 46rem;
   }
 
-  .sample-lab-preview {
+  .home-hero-context {
     max-width: 46rem;
+    margin-top: 0.5rem;
   }
 
   .home-course-product {
@@ -6621,6 +6846,12 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
     font-size: clamp(2.25rem, 11vw, 3.25rem);
   }
 
+  .rotating-headline-window {
+    height: 1.12em;
+    font-size: 0.8em;
+    white-space: nowrap;
+  }
+
   .home-hero-facts {
     grid-template-columns: 1fr;
   }
@@ -6640,13 +6871,28 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
     border-bottom: 0;
   }
 
-  .sample-lab-layout {
+  .career-roadmap-heading {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .career-roadmap-map {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    padding: 1.5rem;
+  }
+
+  .career-roadmap-specialisations {
+    grid-column: auto;
     grid-template-columns: 1fr;
   }
 
-  .sample-lab-evidence {
-    border-right: 0;
-    border-bottom: 1px solid var(--site-border);
+  .career-roadmap-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .career-roadmap-detail {
+    min-height: 0;
   }
 
   .home-trust-list,
@@ -6734,13 +6980,11 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
     width: 100%;
   }
 
-  .sample-lab-preview figcaption {
-    align-items: flex-start;
-    flex-direction: column;
+  .career-roadmap-tabs {
+    grid-template-columns: 1fr;
   }
 
-  .sample-lab-evidence dl div {
+  .career-roadmap-core ul {
     grid-template-columns: 1fr;
-    gap: 0.25rem;
   }
 }

@@ -2,12 +2,16 @@
   "name": "cyberscout-server",
   "version": "1.0.0",
   "type": "module",
+  "engines": {
+    "node": "24.14.x",
+    "npm": ">=10"
+  },
   "scripts": {
     "db:migrate": "node src/db/migrate.js",
     "db:seed": "node src/db/seed.js",
     "db:setup": "npm run db:migrate && npm run db:seed",
-    "dev": "node --watch src/index.js",
-    "start": "node src/index.js",
+    "dev": "node --watch src/start.js",
+    "start": "node src/start.js",
     "test": "NODE_ENV=test DATABASE_URL=file:./data/test.sqlite JWT_SECRET=test_secret_at_least_32_chars_1234567890 CLIADM_ADMIN_TOKEN=test_admin_token node --test tests/*.test.js"
   },
   "dependencies": {

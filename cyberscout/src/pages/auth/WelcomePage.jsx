@@ -4,6 +4,8 @@ import PublicSiteLayout, { StatePanel } from '../../components/site/PublicSiteLa
 import LeadCaptureForm from '../../components/ui/LeadCaptureForm'
 import FaqChatbot from '../../components/ui/FaqChatbot'
 import SiteIcon from '../../components/ui/SiteIcon'
+import CyberCareerRoadmap from '../../components/home/CyberCareerRoadmap'
+import RotatingInvestigationHeadline from '../../components/home/RotatingInvestigationHeadline'
 import { api } from '../../lib/api'
 import { trackEvent } from '../../lib/analytics'
 import { featuredCourseFallback, homepageFaqs, learningPaths, learningSteps, sampleLabs } from '../../content/homeContent'
@@ -14,7 +16,7 @@ const ogImageUrl = `${siteUrl}/social/cyber-lab-in-home.png`
 const metadata = {
   title: 'Online Cybersecurity Courses with Hands-On Labs | Cyber Lab IN',
   description: 'Learn cybersecurity online through guided lessons, hands-on labs and practical security scenarios. Explore beginner courses in phishing, web security, SOC analysis, ethical hacking and defensive security.',
-  ogTitle: 'Learn Cybersecurity by Investigating Real Scenarios',
+  ogTitle: 'Learn Cybersecurity Through Real Investigations',
   ogDescription: 'Beginner-friendly cybersecurity training with guided labs, clear defensive workflows and course-specific learning.',
 }
 
@@ -43,31 +45,6 @@ function courseUrl(course) {
 function formatDate(value) {
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? '' : new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }).format(date)
-}
-
-function SampleLabPreview() {
-  return (
-    <figure className="sample-lab-preview" aria-labelledby="sample-lab-title">
-      <figcaption><span>Read-only sample lab</span><strong id="sample-lab-title">Phishing email analysis</strong></figcaption>
-      <div className="sample-lab-layout">
-        <div className="sample-lab-evidence">
-          <p>Evidence</p>
-          <dl>
-            <div><dt>From</dt><dd>account-notice@example.test</dd></div>
-            <div><dt>Subject</dt><dd>Review requested account action</dd></div>
-            <div><dt>Link</dt><dd>External destination</dd></div>
-          </dl>
-          <blockquote>“Your access will be suspended today. Review the account immediately.”</blockquote>
-        </div>
-        <div className="sample-lab-task">
-          <p>Investigation task</p>
-          <h2>Identify the warning signs without opening the link.</h2>
-          <ul><li><SiteIcon name="check" />Compare sender and expected domain</li><li><SiteIcon name="check" />Review urgency and requested action</li><li><SiteIcon name="check" />Record the safest next step</li></ul>
-          <div><span>Finding</span><p>Document evidence, risk and a defensive recommendation.</p></div>
-        </div>
-      </div>
-    </figure>
-  )
 }
 
 export default function WelcomePage() {
@@ -123,7 +100,7 @@ export default function WelcomePage() {
     const structuredData = {
       '@context': 'https://schema.org',
       '@graph': [
-        { '@type': 'EducationalOrganization', '@id': `${siteUrl}/#organization`, name: 'Cyber Lab IN', url: `${siteUrl}/`, logo: `${siteUrl}/brand/cyber-lab-in-full-light.png`, founder: { '@type': 'Person', name: 'Arghya Sikdar', url: `${siteUrl}/instructors/arghya-sikdar` } },
+        { '@type': 'EducationalOrganization', '@id': `${siteUrl}/#organization`, name: 'Cyber Lab IN', url: `${siteUrl}/`, logo: `${siteUrl}/brand/cyber-lab-in-full-light.webp`, founder: { '@type': 'Person', name: 'Arghya Sikdar', url: `${siteUrl}/instructors/arghya-sikdar` } },
         { '@type': 'WebSite', '@id': `${siteUrl}/#website`, url: `${siteUrl}/`, name: 'Cyber Lab IN', publisher: { '@id': `${siteUrl}/#organization` } },
         { '@type': 'WebPage', '@id': `${siteUrl}/#webpage`, url: `${siteUrl}/`, name: metadata.title, description: metadata.description, isPartOf: { '@id': `${siteUrl}/#website` } },
         { '@type': 'ItemList', name: 'Published Cyber Lab IN courses', itemListElement: [
@@ -153,18 +130,23 @@ export default function WelcomePage() {
   return (
     <PublicSiteLayout chatbot={<FaqChatbot />}>
       <section className="home-hero home-hero-focused">
-        <div className="site-container home-hero-grid">
-          <div className="home-hero-copy">
+        <div className="site-container">
+          <div className="home-hero-grid">
+            <div className="home-hero-copy">
             <p className="site-eyebrow">Beginner cybersecurity training</p>
-            <h1>Learn cybersecurity by investigating real scenarios, not just watching videos.</h1>
-            <p>Cyber Lab IN combines clear explanations, guided cyber labs and practical reporting exercises for students, beginners, career switchers and early-career IT professionals.</p>
+            <RotatingInvestigationHeadline />
+            <p>Start with clear explanations, then inspect evidence, make decisions and report what you found. Learning goes beyond watching videos.</p>
             <div className="site-action-row">
               <Link to="/courses/cybersecurity/cyber-security-essentials" className="site-button-primary" onClick={() => trackEvent('hero_primary_cta', { destination: 'cyber_security_essentials' })}>Explore Cyber Security Essentials<SiteIcon name="arrow_forward" /></Link>
               <Link to="/labs/phishing-indicator-analysis" className="site-button-secondary" onClick={() => trackEvent('hero_secondary_cta', { destination: 'sample_lab' })}>See a sample lab</Link>
             </div>
-            <dl className="home-hero-facts">{facts.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+            </div>
+            <div className="home-hero-context">
+              <p>Cyber Lab IN combines structured teaching, live guidance and guided practical work for complete beginners, college students, career switchers and early-career IT professionals.</p>
+              <dl className="home-hero-facts">{facts.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+            </div>
           </div>
-          <SampleLabPreview />
+          <CyberCareerRoadmap />
         </div>
       </section>
 

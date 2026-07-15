@@ -12,7 +12,7 @@ The archived migration copies remain local and are ignored by Git. Active script
 
 ## Local setup
 
-Requirements: Node.js 22.13 or newer and npm 10 or newer.
+Requirements: Node.js 24.14.1 and npm 10 or newer. The runtime is pinned in `.nvmrc`, package engines, CI and `render.yaml`.
 
 ```bash
 cp cyberscout-server/.env.example cyberscout-server/.env
@@ -34,7 +34,7 @@ The root scripts stop an existing process on ports 3001, 5173 or 5174 before sta
 
 ## Database
 
-Local SQLite data is stored in `cyberscout-server/data/cyberlab.sqlite` and ignored by Git.
+Local SQLite data is stored in `cyberscout-server/data/cyberlab.sqlite` and ignored by Git. `DATABASE_PATH` selects another file when needed.
 
 ```bash
 npm run db:migrate
@@ -106,10 +106,11 @@ unset CLIADM_NEW_PASSWORD CLIADM_TOKEN
 - Build command: `npm ci`
 - Start command: `npm start`
 - Health endpoint: `/api/health`
+- Render readiness endpoint: `/health`
 
-Use `render.yaml` as a safe starter and configure every secret from `.env.example`. Google OAuth must authorize `https://cyberlabin.com/api/auth/google/callback`.
+Use the root `render.yaml`, enter every `sync: false` secret in Render and follow `RENDER_DEPLOYMENT.md`. Google OAuth must authorize `https://cyberlabin.com/api/auth/google/callback`.
 
-SQLite on Render free is ephemeral. It is acceptable for deployment testing, not durable production. Complete the repository migration to Supabase Postgres before accepting paid enrolments or relying on production records. See `docs/deployment/README.md` and `REMAINING_WORK.md`.
+The Blueprint mounts a persistent disk at `/var/data` and therefore requires a paid Render instance. Free Render storage is ephemeral and must not hold production enrolment, lead or payment records. Complete the repository migration to Supabase Postgres before higher-scale production use. See `RENDER_DEPLOYMENT.md` and `REMAINING_WORK.md`.
 
 ## Documentation
 
