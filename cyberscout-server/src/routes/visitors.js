@@ -2,19 +2,9 @@ import { Router } from 'express'
 import { randomUUID } from 'node:crypto'
 import { getVisitorStats, recordCookieConsent, recordVisitor } from '../db/repositories.js'
 import { requireAuth, requireRole } from '../middleware/access.js'
+import { visitorCookieOptions } from '../lib/cookies.js'
 
 const router = Router()
-const isProduction = process.env.NODE_ENV === 'production'
-
-function visitorCookieOptions() {
-  return {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? 'none' : 'lax',
-    path: '/',
-    maxAge: 365 * 24 * 60 * 60 * 1000,
-  }
-}
 
 router.post('/track', (req, res) => {
   const visitorId = req.cookies?.cli_visitor_id || `visitor_${randomUUID()}`

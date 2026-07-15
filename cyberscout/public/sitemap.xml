@@ -75,6 +75,14 @@
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
+  <url><loc>https://cyberlabin.com/labs/phishing-indicator-analysis</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://cyberlabin.com/labs/account-hardening-review</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://cyberlabin.com/labs/web-request-response-practice</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://cyberlabin.com/labs/network-packet-inspection</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://cyberlabin.com/labs/log-analysis</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://cyberlabin.com/labs/unsafe-input-awareness</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://cyberlabin.com/labs/session-security-basics</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://cyberlabin.com/labs/defensive-reporting-practice</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <url>
     <loc>https://cyberlabin.com/resources</loc>
     <changefreq>weekly</changefreq>

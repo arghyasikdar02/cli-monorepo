@@ -1,10 +1,11 @@
-import { getCourseById, hasActiveEnrollment, userHasRole } from '../db/repositories.js'
 import {
   getBatchById,
-  getLiveClassJoinDecision,
   hasBatchMembership,
+  getCourseById,
+  hasActiveEnrollment,
   isInstructorAssigned,
-} from '../store/platformStore.js'
+  userHasRole,
+} from '../db/repositories.js'
 
 export const ADMIN_ROLES = ['admin', 'super_admin']
 export const OPS_ROLES = ['ops', 'lab_creator', 'support', 'finance']
@@ -77,8 +78,18 @@ export function canInstructorAccessCourse(user, courseId) {
 
 export function canJoinLiveClass(user, liveClass, at = new Date()) {
   if (!user) return deny('auth_required')
-  if (isAdmin(user) || userHasRole(user, [...INSTRUCTOR_ROLES, ...OPS_ROLES])) return allow('staff_monitoring')
-  return getLiveClassJoinDecision(liveClass, user, at)
+  if (isAdmin(user) || userHasRole(user, OPS_ROLES)) return allow('staff_monitoring')
+  if (userHasRole(user, INSTRUCTOR_ROLES) && isInstructorAssigned(user.id, liveClass.courseId)) return allow('assigned_instructor')
+  const access = liveClass.batchId
+    ? canAccessBatch(user, liveClass.courseId, liveClass.batchId)
+    : canAccessCourse(user, liveClass.courseId)
+  if (!access.allowed) return access
+  const start = new Date(liveClass.scheduledStart)
+  const end = new Date(liveClass.scheduledEnd)
+  const opens = new Date(start.getTime() - 15 * 60 * 1000)
+  if (at < opens) return deny('outside_join_window_early')
+  if (at > end) return deny('outside_join_window_late')
+  return allow('join_window_open')
 }
 
 export function assertDecision(decision, res, statusByReason = {}) {

@@ -63,7 +63,7 @@ classDiagram
   class ApiClient {
     fetchJson
     credentialsInclude
-    bearerFallback
+    csrfHeader
     errorHandling
   }
   class ProtectedRoute {
@@ -297,4 +297,4 @@ classDiagram
 ## Current Versus Planned
 
 - Current: Vite React, Express, SQLite, JWT/cookie auth, role dashboards, database-backed leads/blogs/visitors/courses/enrollments.
-- Planned: Supabase Postgres, Supabase RLS, Supabase Storage, stronger batch model, production RAG source/chunk tables, and real payment/certificate/lab persistence beyond MVP starter routes.
+- Planned: Supabase Postgres, Supabase RLS, Supabase Storage, and production RAG source/chunk persistence. Batch, lab, assessment, certificate, payment, and audit flows are database-backed in the current SQLite runtime.

@@ -5,14 +5,14 @@ import AppShell from '../../components/layout/AppShell'
 const CATEGORIES = [
   { icon: 'lock', label: 'Account & Security', to: '/help/account-security', desc: 'Passwords, 2FA, login issues' },
   { icon: 'school', label: 'Courses & Labs', to: '/learn/courses', desc: 'Enrollment, progress, certificates' },
-  { icon: 'payment', label: 'Billing', to: '/billing/history', desc: 'Invoices, refunds, plan changes' },
+  { icon: 'payments', label: 'Fees and refunds', to: '/refund-policy', desc: 'Published course fee and refund information' },
   { icon: 'build', label: 'Technical Issues', to: '/report-bug', desc: 'Bugs, performance, compatibility' },
 ]
 
 const ARTICLES = [
   { title: 'How do I reset my password?', views: 'Help article', to: '/help/account-security' },
   { title: 'How to download course materials?', views: 'Help article', to: '/downloads' },
-  { title: 'How does the XP and ranking system work?', views: 'Help article', to: '/leaderboard' },
+  { title: 'How is course progress calculated?', views: 'Help article', to: '/learn/courses' },
   { title: 'Can I get a refund?', views: 'Help article', to: '/refund' },
   { title: 'How to enable 2FA on my account?', views: 'Help article', to: '/help/account-security' },
   { title: 'What are the system requirements for labs?', views: 'Help article', to: '/help/account-security' },

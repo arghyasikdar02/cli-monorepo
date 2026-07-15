@@ -54,7 +54,6 @@ const LiveClassSessionPage = lazy(() => import('./pages/live-classes/LiveClassSe
 
 // Gamification
 const LeaderboardPage = lazy(() => import('./pages/gamification/LeaderboardPage'))
-const AchievementsPage = lazy(() => import('./pages/gamification/AchievementsPage'))
 
 // Account
 const ProfilePage = lazy(() => import('./pages/account/ProfilePage'))
@@ -63,8 +62,6 @@ const NotificationsPage = lazy(() => import('./pages/account/NotificationsPage')
 const DownloadsPage = lazy(() => import('./pages/account/DownloadsPage'))
 
 // Subscription
-const SubscriptionPage = lazy(() => import('./pages/subscription/SubscriptionPage'))
-const BillingHistoryPage = lazy(() => import('./pages/subscription/BillingHistoryPage'))
 
 // Support
 const HelpCenterPage = lazy(() => import('./pages/support/HelpCenterPage'))
@@ -90,7 +87,7 @@ export default function App() {
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <CookieConsent />
-      <Suspense fallback={<div className="route-loading" role="status"><span className="material-symbols-outlined" aria-hidden="true">progress_activity</span><span>Loading Cyber Lab IN</span></div>}>
+      <Suspense fallback={<div className="route-loading" role="status"><span className="route-loading-indicator" aria-hidden="true" /><span>Loading Cyber Lab IN</span></div>}>
         <Routes>
         {/* Public */}
         <Route path="/" element={<WelcomePage />} />
@@ -176,7 +173,7 @@ export default function App() {
 
         {/* Protected — Gamification */}
         <Route path="/leaderboard" element={<P><LeaderboardPage /></P>} />
-        <Route path="/achievements" element={<P><AchievementsPage /></P>} />
+        <Route path="/achievements" element={<P><Navigate to="/dashboard" replace /></P>} />
 
         {/* Protected — Account */}
         <Route path="/profile" element={<P><ProfilePage /></P>} />
@@ -185,8 +182,8 @@ export default function App() {
         <Route path="/downloads" element={<P><DownloadsPage /></P>} />
 
         {/* Protected — Subscription */}
-        <Route path="/subscription" element={<P><SubscriptionPage /></P>} />
-        <Route path="/billing/history" element={<P><BillingHistoryPage /></P>} />
+        <Route path="/subscription" element={<P><Navigate to="/learn/courses" replace /></P>} />
+        <Route path="/billing/history" element={<P><Navigate to="/settings" replace /></P>} />
 
         {/* Protected — Support */}
         <Route path="/help" element={<P><HelpCenterPage /></P>} />

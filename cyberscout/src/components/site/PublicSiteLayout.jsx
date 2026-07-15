@@ -1,477 +1,185 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import CLILogo from '../CLILogo'
+import SiteIcon from '../ui/SiteIcon'
+import { useFocusTrap } from '../../hooks/useFocusTrap'
 
-const utilityLinks = [
-  ['For institutions', '/for-organisations#institutions'],
-  ['For businesses', '/for-organisations#businesses'],
+const primaryLinks = [
+  ['Courses', '/courses'],
+  ['Labs', '/labs'],
+  ['Learning Paths', '/learning-paths'],
+  ['For Organisations', '/for-organisations'],
   ['Resources', '/resources'],
-  ['Contact', '/contact'],
 ]
 
-const megaMenus = [
-  {
-    label: 'Courses',
-    columns: [
-      {
-        title: 'Build your foundation',
-        links: [
-          ['Cyber Security Essentials', '/courses/cybersecurity/cyber-security-essentials', 'Guided beginner training with practical exercises.'],
-          ['Introduction to Cyber Security', '/courses/cybersecurity/introduction-to-cyber-security', 'Core awareness, networking and defensive thinking.'],
-          ['All courses', '/courses', 'Browse every published Cyber Lab IN course.'],
-        ],
-      },
-      {
-        title: 'Specialise',
-        links: [
-          ['Web security', '/courses/cybersecurity/web-application-security', 'Application risk and defensive web concepts.'],
-          ['SOC analyst training', '/courses/cybersecurity/soc-analyst-foundations', 'Security operations and investigation foundations.'],
-          ['Ethical hacking', '/courses/cybersecurity/ethical-hacking-foundations', 'Responsible security testing concepts.'],
-        ],
-      },
-    ],
-    feature: {
-      eyebrow: 'Featured course',
-      title: 'Start with Cyber Security Essentials',
-      description: 'A seven-day beginner course with guided labs, phishing analysis and web security foundations.',
-      href: '/courses/cybersecurity/cyber-security-essentials',
-      linkLabel: 'View course details',
-    },
-  },
-  {
-    label: 'Learning Paths',
-    columns: [
-      {
-        title: 'Start and progress',
-        links: [
-          ['Complete beginner', '/learning-paths/beginner-cybersecurity', 'Build essential security knowledge in sequence.'],
-          ['SOC analyst', '/learning-paths/soc-analyst', 'Develop investigation and defensive operations skills.'],
-          ['Ethical hacking', '/learning-paths/ethical-hacking', 'Learn responsible testing and web security foundations.'],
-        ],
-      },
-      {
-        title: 'Broaden your skills',
-        links: [
-          ['Network and cloud security', '/learning-paths/network-cloud-security', 'Connect infrastructure, identity and cloud controls.'],
-          ['Digital forensics', '/learning-paths/digital-forensics', 'Study evidence, timelines and investigation structure.'],
-          ['All learning paths', '/learning-paths', 'Compare every structured progression route.'],
-        ],
-      },
-    ],
-    feature: {
-      eyebrow: 'How learning works',
-      title: 'From concepts to evidence of skill',
-      description: 'Follow guided lessons, practise safely and document what you find.',
-      href: '/learning-paths',
-      linkLabel: 'Explore learning paths',
-    },
-  },
-  {
-    label: 'Cyber Labs',
-    columns: [
-      {
-        title: 'Practise',
-        links: [
-          ['Guided labs', '/labs#guided-labs', 'Step-by-step exercises tied to course outcomes.'],
-          ['Practice environments', '/labs#practice-environments', 'Contained learning activities and evidence capture.'],
-          ['Challenges', '/labs#challenges', 'Apply course concepts in focused tasks.'],
-        ],
-      },
-      {
-        title: 'Track progress',
-        links: [
-          ['Lab workflow', '/labs#lab-workflow', 'See how access, attempts and scoring work.'],
-          ['Student dashboard', '/auth?mode=login&redirect=%2Fdashboard', 'Return to enrolled courses and practical work.'],
-          ['Leaderboard', '/auth?mode=login&redirect=%2Fleaderboard', 'View real course progress when available.'],
-        ],
-      },
-    ],
-    feature: {
-      eyebrow: 'Practical learning',
-      title: 'Guided work, clear boundaries',
-      description: 'Cyber Lab IN focuses on responsible practice and defensive reporting.',
-      href: '/labs',
-      linkLabel: 'How the labs work',
-    },
-  },
-  {
-    label: 'For Institutions',
-    columns: [
-      {
-        title: 'Academic programmes',
-        links: [
-          ['College partnerships', '/for-organisations#institutions', 'Discuss practical training for student cohorts.'],
-          ['Curriculum integration', '/for-organisations#institutions', 'Align guided learning with academic delivery.'],
-          ['Faculty enablement', '/for-organisations#institutions', 'Support teaching teams with structured materials.'],
-        ],
-      },
-      {
-        title: 'Delivery support',
-        links: [
-          ['Student training', '/for-organisations#institutions', 'Practical programmes for technical and non-technical learners.'],
-          ['Lab integration', '/for-organisations#institutions', 'Add guided lab workflows to existing teaching.'],
-          ['Contact the team', '/contact', 'Share your programme requirements.'],
-        ],
-      },
-    ],
-    feature: {
-      eyebrow: 'For educators',
-      title: 'Bring practical cybersecurity into the classroom',
-      description: 'Start with curriculum, cohort and delivery requirements rather than a generic package.',
-      href: '/for-organisations#institutions',
-      linkLabel: 'Explore institution support',
-    },
-  },
-  {
-    label: 'For Businesses',
-    columns: [
-      {
-        title: 'Team development',
-        links: [
-          ['Corporate training', '/for-organisations#businesses', 'Role-aware cybersecurity learning for teams.'],
-          ['Security awareness', '/for-organisations#businesses', 'Practical habits for wider business audiences.'],
-          ['Team upskilling', '/for-organisations#businesses', 'Build technical confidence around real workflows.'],
-        ],
-      },
-      {
-        title: 'Tailored delivery',
-        links: [
-          ['Custom programmes', '/for-organisations#businesses', 'Discuss outcomes, audience and delivery format.'],
-          ['Web security for developers', '/courses/cybersecurity/web-application-security', 'Introduce secure application thinking.'],
-          ['Contact the team', '/contact', 'Start a training conversation.'],
-        ],
-      },
-    ],
-    feature: {
-      eyebrow: 'For teams',
-      title: 'Training built around role and context',
-      description: 'Focus on relevant risks, practical decisions and measurable learning progress.',
-      href: '/for-organisations#businesses',
-      linkLabel: 'Explore business training',
-    },
-  },
-  {
-    label: 'Resources',
-    columns: [
-      {
-        title: 'Learn and reference',
-        links: [
-          ['Articles', '/blog', 'Beginner-friendly cybersecurity explanations.'],
-          ['Learning resources', '/resources', 'Browse guides by security topic.'],
-          ['Instructor profiles', '/instructors', 'Meet the educators behind the curriculum.'],
-        ],
-      },
-      {
-        title: 'Get help',
-        links: [
-          ['Frequently asked questions', '/faq', 'Answers about courses, labs and learning.'],
-          ['Contact', '/contact', 'Ask a course or partnership question.'],
-          ['Learner support', '/auth?mode=login&redirect=%2Fhelp', 'Access account and course support.'],
-        ],
-      },
-    ],
-    feature: {
-      eyebrow: 'Latest guide',
-      title: 'How to learn cybersecurity for beginners',
-      description: 'A direct route from foundational concepts to guided practice.',
-      href: '/blog/how-to-learn-cybersecurity-for-beginners',
-      linkLabel: 'Read the guide',
-    },
-  },
+const courseLinks = [
+  ['Cyber Security Essentials', '/courses/cybersecurity/cyber-security-essentials', 'Beginner course with guided labs and defensive reporting.'],
+  ['Introduction to Cyber Security', '/courses/cybersecurity/introduction-to-cyber-security', 'A four-week foundation in cyber safety and security thinking.'],
+  ['Course roadmap', '/courses#coming-next', 'See which specialist courses are being prepared.'],
 ]
 
-const searchLinks = [
-  ['Cyber Security Essentials', '/courses/cybersecurity/cyber-security-essentials', 'Course'],
-  ['Introduction to Cyber Security', '/courses/cybersecurity/introduction-to-cyber-security', 'Course'],
-  ['All cybersecurity courses', '/courses', 'Courses'],
-  ['Beginner cybersecurity path', '/learning-paths/beginner-cybersecurity', 'Learning path'],
-  ['SOC analyst path', '/learning-paths/soc-analyst', 'Learning path'],
-  ['Ethical hacking path', '/learning-paths/ethical-hacking', 'Learning path'],
-  ['Guided cyber labs', '/labs', 'Labs'],
-  ['Cybersecurity articles', '/blog', 'Resources'],
-  ['About Cyber Lab IN', '/about', 'Company'],
-  ['Arghya Sikdar', '/instructors/arghya-sikdar', 'Instructor'],
-  ['Contact Cyber Lab IN', '/contact', 'Contact'],
+const resourceLinks = [
+  ['Cybersecurity guides', '/blog', 'Published beginner guides reviewed by the course author.'],
+  ['Frequently asked questions', '/faq', 'Course format, prerequisites, labs and enrolment.'],
+  ['About Cyber Lab IN', '/about', 'Mission, teaching approach and organisation background.'],
+  ['Instructor profile', '/instructors/arghya-sikdar', 'Experience, credentials and authored learning.'],
 ]
 
-const footerGroups = [
-  {
-    title: 'Learn',
-    links: [['Courses', '/courses'], ['Learning paths', '/learning-paths'], ['Cyber labs', '/labs'], ['Articles', '/blog'], ['Resources', '/resources']],
-  },
-  {
-    title: 'Solutions',
-    links: [['For learners', '/learning-paths/beginner-cybersecurity'], ['For colleges', '/for-organisations#institutions'], ['For universities', '/for-organisations#institutions'], ['For businesses', '/for-organisations#businesses'], ['Custom training', '/contact']],
-  },
-  {
-    title: 'Company',
-    links: [['About', '/about'], ['Instructors', '/instructors'], ['Founder profile', '/instructors/arghya-sikdar'], ['Contact', '/contact'], ['Certificate verification', '/certificate-verification']],
-  },
-  {
-    title: 'Support',
-    links: [['FAQs', '/faq'], ['Learner login', '/login'], ['Student support', '/auth?mode=login&redirect=%2Fhelp'], ['Report an issue', '/auth?mode=login&redirect=%2Freport-bug'], ['Cookie settings', '/cookie-policy']],
-  },
-  {
-    title: 'Legal',
-    links: [['Privacy policy', '/privacy-policy'], ['Terms of use', '/terms'], ['Refund policy', '/refund-policy'], ['Cookie policy', '/cookie-policy'], ['Accessibility', '/accessibility']],
-  },
+const footerLinks = [
+  ['Learn', [['Courses', '/courses'], ['Labs', '/labs'], ['Learning Paths', '/learning-paths'], ['Blog', '/blog']]],
+  ['Cyber Lab IN', [['About', '/about'], ['Instructor', '/instructors/arghya-sikdar'], ['For Organisations', '/for-organisations'], ['Contact', '/contact']]],
+  ['Policies', [['Privacy', '/privacy-policy'], ['Terms', '/terms'], ['Refund Policy', '/refund-policy'], ['Accessibility', '/accessibility']]],
 ]
 
-function Icon({ name, className = '' }) {
-  return <span className={`material-symbols-outlined ${className}`} aria-hidden="true">{name}</span>
-}
-
-function SearchOverlay({ open, onClose }) {
-  const [query, setQuery] = useState('')
-  const inputRef = useRef(null)
-  const results = useMemo(() => {
-    const clean = query.trim().toLowerCase()
-    if (!clean) return searchLinks
-    return searchLinks.filter(([title, , type]) => `${title} ${type}`.toLowerCase().includes(clean))
-  }, [query])
-
-  useEffect(() => {
-    if (!open) return undefined
-    setQuery('')
-    const timer = window.setTimeout(() => inputRef.current?.focus(), 30)
-    const onKeyDown = event => {
-      if (event.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      window.clearTimeout(timer)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [open, onClose])
-
-  if (!open) return null
-
+function DesktopDropdown({ label, items, open, onToggle, onClose }) {
   return (
-    <div className="site-overlay" role="dialog" aria-modal="true" aria-labelledby="site-search-title">
-      <button type="button" className="site-overlay-backdrop" onClick={onClose} aria-label="Close search" />
-      <div className="site-search-panel">
-        <div className="site-search-header">
-          <div>
-            <p className="site-eyebrow">Search Cyber Lab IN</p>
-            <h2 id="site-search-title">Find a course, path or resource</h2>
-          </div>
-          <button type="button" className="site-icon-button" onClick={onClose} aria-label="Close search">
-            <Icon name="close" />
-          </button>
-        </div>
-        <label className="site-search-field">
-          <span className="sr-only">Search the website</span>
-          <Icon name="search" />
-          <input ref={inputRef} value={query} onChange={event => setQuery(event.target.value)} placeholder="Search courses, labs and resources" />
-        </label>
-        <div className="site-search-results" aria-live="polite">
-          {results.map(([title, href, type]) => (
-            <Link key={href} to={href} onClick={onClose} className="site-search-result">
-              <span><small>{type}</small>{title}</span>
-              <Icon name="arrow_forward" />
-            </Link>
-          ))}
-          {!results.length && <p className="site-empty-copy">No matching public pages. Try a broader term.</p>}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function MegaMenu({ item, open, onToggle, onClose }) {
-  const menuId = `mega-${item.label.toLowerCase().replace(/\s+/g, '-')}`
-  return (
-    <div className="site-mega-trigger">
-      <button type="button" onClick={onToggle} aria-expanded={open} aria-controls={menuId} className="site-nav-button">
-        {item.label}
-        <Icon name="expand_more" className={open ? 'is-open' : ''} />
+    <div className="site-nav-dropdown">
+      <button type="button" onClick={onToggle} aria-expanded={open} aria-haspopup="true">
+        {label}<SiteIcon name="expand_more" size={15} />
       </button>
       {open && (
-        <div id={menuId} className="site-mega-menu">
-          <div className="site-container site-mega-grid">
-            {item.columns.map(column => (
-              <section key={column.title}>
-                <h2>{column.title}</h2>
-                <div className="site-mega-links">
-                  {column.links.map(([title, href, description]) => (
-                    <Link key={`${title}-${href}`} to={href} onClick={onClose}>
-                      <strong>{title}</strong>
-                      <span>{description}</span>
-                    </Link>
-                  ))}
-                </div>
-              </section>
-            ))}
-            <aside className="site-mega-feature">
-              <p className="site-eyebrow">{item.feature.eyebrow}</p>
-              <h2>{item.feature.title}</h2>
-              <p>{item.feature.description}</p>
-              <Link to={item.feature.href} onClick={onClose} className="site-text-link">
-                {item.feature.linkLabel}<Icon name="arrow_forward" />
-              </Link>
-            </aside>
-          </div>
+        <div className="site-nav-popover" role="menu">
+          {items.map(([title, href, copy]) => (
+            <Link key={href} to={href} role="menuitem" onClick={onClose}>
+              <strong>{title}</strong><span>{copy}</span>
+            </Link>
+          ))}
         </div>
       )}
     </div>
   )
 }
 
-function MobileMenu({ open, onClose }) {
-  const [openSection, setOpenSection] = useState('')
-
-  useEffect(() => {
-    if (!open) setOpenSection('')
-  }, [open])
-
+function SearchDialog({ open, onClose }) {
+  const dialogRef = useRef(null)
+  const [query, setQuery] = useState('')
+  useFocusTrap(dialogRef, open, onClose)
   if (!open) return null
 
+  const options = [...courseLinks, ...resourceLinks, ['Guided cyber labs', '/labs', 'See what learners inspect, record and submit.']]
+  const matches = options.filter(([title, , copy]) => `${title} ${copy}`.toLowerCase().includes(query.toLowerCase()))
+
   return (
-    <div className="site-mobile-panel" id="mobile-navigation">
-      <nav aria-label="Mobile navigation">
-        {megaMenus.map(item => {
-          const expanded = openSection === item.label
-          return (
-            <div key={item.label} className="site-mobile-group">
-              <button type="button" onClick={() => setOpenSection(expanded ? '' : item.label)} aria-expanded={expanded}>
-                {item.label}<Icon name={expanded ? 'remove' : 'add'} />
-              </button>
-              {expanded && (
-                <div className="site-mobile-links">
-                  {item.columns.flatMap(column => column.links).map(([title, href]) => (
-                    <Link key={`${item.label}-${title}-${href}`} to={href} onClick={onClose}>{title}</Link>
-                  ))}
-                  <Link to={item.feature.href} onClick={onClose} className="site-mobile-feature-link">{item.feature.linkLabel}</Link>
-                </div>
-              )}
-            </div>
-          )
-        })}
-        <Link to="/about" onClick={onClose} className="site-mobile-direct">About</Link>
-        <Link to="/login" onClick={onClose} className="site-mobile-direct">Learner login</Link>
-        <Link to="/courses" onClick={onClose} className="site-button-primary site-mobile-cta">Explore courses</Link>
-      </nav>
+    <div className="site-search-overlay" role="presentation" onMouseDown={event => event.target === event.currentTarget && onClose()}>
+      <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="site-search-title" className="site-search-dialog">
+        <div className="site-search-heading">
+          <div><p className="site-eyebrow">Search</p><h2 id="site-search-title">Find courses and resources</h2></div>
+          <button type="button" onClick={onClose} className="site-icon-button" aria-label="Close search"><SiteIcon name="close" /></button>
+        </div>
+        <label className="site-search-input"><SiteIcon name="search" /><span className="sr-only">Search the website</span><input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Search courses, labs or guides" /></label>
+        <div className="site-search-results">
+          {matches.map(([title, href, copy]) => <Link key={href} to={href} onClick={onClose}><strong>{title}</strong><span>{copy}</span><SiteIcon name="arrow_forward" /></Link>)}
+          {!matches.length && <p>No matching public pages. Try “course”, “lab” or “phishing”.</p>}
+        </div>
+      </section>
     </div>
   )
 }
 
-function EnterpriseHeader({ announcement }) {
-  const [openMenu, setOpenMenu] = useState('')
+function MobileNavigation({ open, onClose }) {
+  const drawerRef = useRef(null)
+  const [expanded, setExpanded] = useState('')
+  useFocusTrap(drawerRef, open, onClose)
+
+  useEffect(() => {
+    if (!open) return undefined
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [open])
+
+  if (!open) return null
+  return (
+    <div className="site-mobile-backdrop" role="presentation" onMouseDown={event => event.target === event.currentTarget && onClose()}>
+      <aside ref={drawerRef} className="site-mobile-drawer" role="dialog" aria-modal="true" aria-label="Website navigation">
+        <div className="site-mobile-heading"><CLILogo variant="full" tone="light" size={142} /><button type="button" className="site-icon-button" onClick={onClose} aria-label="Close navigation"><SiteIcon name="close" /></button></div>
+        <nav aria-label="Mobile navigation">
+          <div className="site-mobile-group">
+            <button type="button" aria-expanded={expanded === 'courses'} onClick={() => setExpanded(value => value === 'courses' ? '' : 'courses')}>Courses<SiteIcon name={expanded === 'courses' ? 'expand_less' : 'expand_more'} /></button>
+            {expanded === 'courses' && <div>{courseLinks.map(([label, href]) => <Link key={href} to={href} onClick={onClose}>{label}</Link>)}</div>}
+          </div>
+          {primaryLinks.slice(1, 4).map(([label, href]) => <Link key={href} to={href} onClick={onClose}>{label}</Link>)}
+          <div className="site-mobile-group">
+            <button type="button" aria-expanded={expanded === 'resources'} onClick={() => setExpanded(value => value === 'resources' ? '' : 'resources')}>Resources<SiteIcon name={expanded === 'resources' ? 'expand_less' : 'expand_more'} /></button>
+            {expanded === 'resources' && <div>{resourceLinks.map(([label, href]) => <Link key={href} to={href} onClick={onClose}>{label}</Link>)}</div>}
+          </div>
+        </nav>
+        <div className="site-mobile-actions"><Link to="/auth?mode=login" onClick={onClose}>Log in</Link><Link to="/courses/cybersecurity/cyber-security-essentials" className="site-button-primary" onClick={onClose}>Start learning<SiteIcon name="arrow_forward" /></Link></div>
+      </aside>
+    </div>
+  )
+}
+
+function SiteHeader() {
+  const [openDropdown, setOpenDropdown] = useState('')
   const [mobileOpen, setMobileOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
   const location = useLocation()
 
   useEffect(() => {
-    setOpenMenu('')
-    setMobileOpen(false)
-    setSearchOpen(false)
-  }, [location.pathname, location.search])
+    const onScroll = () => setScrolled(window.scrollY > 12)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   useEffect(() => {
-    const close = event => {
-      if (event.key === 'Escape') {
-        setOpenMenu('')
-        setMobileOpen(false)
-      }
-    }
+    setOpenDropdown('')
+    setMobileOpen(false)
+    setSearchOpen(false)
+  }, [location.pathname])
+
+  useEffect(() => {
+    const close = event => event.key === 'Escape' && setOpenDropdown('')
     document.addEventListener('keydown', close)
     return () => document.removeEventListener('keydown', close)
   }, [])
 
   return (
     <>
-      {announcement && (
-        <div className="site-announcement">
-          <div className="site-container">
-            <p>{announcement.text}</p>
-            <Link to={announcement.href}>{announcement.linkLabel}<Icon name="arrow_forward" /></Link>
+      <header className={`site-header ${scrolled ? 'is-scrolled' : ''}`}>
+        <div className="site-container site-header-inner">
+          <Link to="/" className="site-brand-link" aria-label="Cyber Lab IN home"><CLILogo variant="full" tone="light" size={150} /></Link>
+          <nav className="site-desktop-nav" aria-label="Primary navigation">
+            <DesktopDropdown label="Courses" items={courseLinks} open={openDropdown === 'courses'} onToggle={() => setOpenDropdown(value => value === 'courses' ? '' : 'courses')} onClose={() => setOpenDropdown('')} />
+            <Link to="/labs">Labs</Link>
+            <Link to="/learning-paths">Learning Paths</Link>
+            <Link to="/for-organisations">For Organisations</Link>
+            <DesktopDropdown label="Resources" items={resourceLinks} open={openDropdown === 'resources'} onToggle={() => setOpenDropdown(value => value === 'resources' ? '' : 'resources')} onClose={() => setOpenDropdown('')} />
+          </nav>
+          <div className="site-header-actions">
+            <button type="button" className="site-search-button" onClick={() => setSearchOpen(true)} aria-label="Search website"><SiteIcon name="search" /></button>
+            <Link to="/auth?mode=login" className="site-login-link">Log in</Link>
+            <Link to="/courses/cybersecurity/cyber-security-essentials" className="site-button-primary">Start learning</Link>
+            <button type="button" className="site-mobile-toggle" onClick={() => setMobileOpen(true)} aria-label="Open navigation" aria-expanded={mobileOpen}><SiteIcon name="menu" size={22} /></button>
           </div>
-        </div>
-      )}
-      <header className="site-header">
-        <div className="site-utility-bar">
-          <div className="site-container">
-            <nav aria-label="Utility navigation">
-              {utilityLinks.map(([label, href]) => <Link key={href} to={href}>{label}</Link>)}
-            </nav>
-            <Link to="/auth?mode=login&redirect=%2Fdashboard" className="site-utility-login"><Icon name="account_circle" />Learner portal</Link>
-          </div>
-        </div>
-        <div className="site-main-nav-wrap">
-          <div className="site-container site-main-nav">
-            <Link to="/" className="site-logo-link" aria-label="Cyber Lab IN home">
-              <CLILogo variant="full" tone="light" size={150} />
-            </Link>
-            <nav className="site-desktop-nav" aria-label="Primary navigation">
-              {megaMenus.map(item => (
-                <MegaMenu
-                  key={item.label}
-                  item={item}
-                  open={openMenu === item.label}
-                  onToggle={() => setOpenMenu(current => current === item.label ? '' : item.label)}
-                  onClose={() => setOpenMenu('')}
-                />
-              ))}
-              <Link to="/about" className="site-nav-link">About</Link>
-            </nav>
-            <div className="site-nav-actions">
-              <button type="button" onClick={() => setSearchOpen(true)} className="site-icon-button" aria-label="Search Cyber Lab IN">
-                <Icon name="search" />
-              </button>
-              <Link to="/login" className="site-login-link">Login</Link>
-              <Link to="/courses" className="site-button-primary site-header-cta">Explore courses</Link>
-              <button
-                type="button"
-                className="site-mobile-toggle"
-                onClick={() => setMobileOpen(value => !value)}
-                aria-expanded={mobileOpen}
-                aria-controls="mobile-navigation"
-                aria-label={mobileOpen ? 'Close navigation' : 'Open navigation'}
-              >
-                <Icon name={mobileOpen ? 'close' : 'menu'} />
-              </button>
-            </div>
-          </div>
-          <MobileMenu open={mobileOpen} onClose={() => setMobileOpen(false)} />
         </div>
       </header>
-      <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <MobileNavigation open={mobileOpen} onClose={() => setMobileOpen(false)} />
     </>
   )
 }
 
-function EnterpriseFooter() {
+function SiteFooter() {
   return (
     <footer className="site-footer">
-      <div className="site-container">
-        <div className="site-footer-intro">
-          <div>
-            <CLILogo variant="full" tone="dark" size={168} />
-            <p>Practical cybersecurity education for learners, institutions and teams.</p>
-          </div>
-          <div>
-            <p className="site-eyebrow">Contact</p>
-            <a href="mailto:hello@cyberlabin.com">hello@cyberlabin.com</a>
-          </div>
+      <div className="site-container site-footer-main">
+        <div className="site-footer-brand">
+          <CLILogo variant="full" tone="dark" size={166} />
+          <p>Practical cybersecurity education for beginners, students and early-career professionals.</p>
+          <a href="mailto:hello@cyberlabin.com">hello@cyberlabin.com</a>
         </div>
-        <div className="site-footer-grid">
-          {footerGroups.map(group => (
-            <nav key={group.title} aria-label={`${group.title} links`}>
-              <h2>{group.title}</h2>
-              {group.links.map(([label, href]) => <Link key={`${label}-${href}`} to={href}>{label}</Link>)}
-            </nav>
-          ))}
-        </div>
-        <div className="site-footer-bottom">
-          <p>© {new Date().getFullYear()} Cyber Lab IN. All rights reserved.</p>
-          <p>Third-party product and company names are trademarks of their respective owners. Their use does not imply endorsement or partnership.</p>
+        <div className="site-footer-links">
+          {footerLinks.map(([title, links]) => <nav key={title} aria-label={`${title} links`}><h2>{title}</h2>{links.map(([label, href]) => <Link key={href} to={href}>{label}</Link>)}</nav>)}
         </div>
       </div>
+      <div className="site-container site-footer-bottom"><p>© {new Date().getFullYear()} Cyber Lab IN. All rights reserved.</p><p>Third-party trademarks belong to their respective owners. Their use does not imply endorsement.</p></div>
     </footer>
   )
 }
 
-export default function PublicSiteLayout({ children, announcement = null, chatbot = null }) {
+export default function PublicSiteLayout({ children, chatbot = null }) {
   useLayoutEffect(() => {
     const root = document.documentElement
     const wasDark = root.classList.contains('dark')
@@ -485,58 +193,17 @@ export default function PublicSiteLayout({ children, announcement = null, chatbo
     }
   }, [])
 
-  return (
-    <div className="site-root">
-      <a href="#main-content" className="site-skip-link">Skip to main content</a>
-      <EnterpriseHeader announcement={announcement} />
-      <main id="main-content">{children}</main>
-      <EnterpriseFooter />
-      {chatbot}
-    </div>
-  )
+  return <div className="site-root"><a href="#main-content" className="site-skip-link">Skip to main content</a><SiteHeader /><main id="main-content">{children}</main><SiteFooter />{chatbot}</div>
 }
 
 export function Breadcrumbs({ items }) {
-  return (
-    <nav className="site-breadcrumbs" aria-label="Breadcrumb">
-      <ol>
-        {items.map((item, index) => (
-          <li key={`${item.label}-${index}`}>
-            {item.href ? <Link to={item.href}>{item.label}</Link> : <span aria-current="page">{item.label}</span>}
-            {index < items.length - 1 && <Icon name="chevron_right" />}
-          </li>
-        ))}
-      </ol>
-    </nav>
-  )
+  return <nav className="site-breadcrumbs" aria-label="Breadcrumb"><div className="site-container"><ol>{items.map((item, index) => <li key={`${item.label}-${index}`}>{item.href ? <Link to={item.href}>{item.label}</Link> : <span aria-current="page">{item.label}</span>}{index < items.length - 1 && <SiteIcon name="arrow_forward" size={13} />}</li>)}</ol></div></nav>
 }
 
-export function PageIntro({ eyebrow, title, description, actions = null, children = null }) {
-  return (
-    <section className="site-page-intro">
-      <div className="site-container">
-        <div className="site-page-intro-copy">
-          {eyebrow && <p className="site-eyebrow">{eyebrow}</p>}
-          <h1>{title}</h1>
-          {description && <p>{description}</p>}
-          {actions && <div className="site-action-row">{actions}</div>}
-        </div>
-        {children}
-      </div>
-    </section>
-  )
+export function PageIntro({ eyebrow, title, description, actions, aside }) {
+  return <section className="page-intro"><div className="site-container page-intro-grid"><div><p className="site-eyebrow">{eyebrow}</p><h1>{title}</h1><p>{description}</p>{actions && <div className="site-action-row">{actions}</div>}</div>{aside}</div></section>
 }
 
-export function StatePanel({ type = 'loading', title, message, action = null }) {
-  const icon = type === 'error' ? 'error' : type === 'empty' ? 'inbox' : 'progress_activity'
-  return (
-    <div className={`site-state site-state-${type}`} role={type === 'error' ? 'alert' : 'status'}>
-      <Icon name={icon} />
-      <div>
-        <h2>{title}</h2>
-        {message && <p>{message}</p>}
-        {action}
-      </div>
-    </div>
-  )
+export function StatePanel({ type = 'loading', title, message, action }) {
+  return <section className={`site-state-panel is-${type}`} role={type === 'error' ? 'alert' : 'status'} aria-live="polite"><div className="site-state-marker" aria-hidden="true" /> <div><h2>{title}</h2>{message && <p>{message}</p>}{action}</div></section>
 }

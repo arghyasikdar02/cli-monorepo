@@ -79,6 +79,7 @@ function courseFromRow(row, extra = {}) {
     },
     instructorName: row.instructor_name,
     instructorTitle: row.instructor_title,
+    instructorId: row.instructor_id || null,
     status: row.status,
     price: row.price,
     mode: row.mode || 'Online',
@@ -196,6 +197,7 @@ export function updateUser(userId, updates) {
     name: 'name',
     username: 'username',
     email: 'email',
+    googleId: 'google_id',
     passwordHash: 'password_hash',
     status: 'status',
     lastLogin: 'last_login_at',
@@ -299,15 +301,16 @@ export function createCourse(input, actorId = null) {
     audience: JSON.stringify(input.audience || []),
     outcomes: JSON.stringify(input.outcomes || []),
     labs: JSON.stringify(input.labs || []),
+    instructorId: input.instructorId || null,
   }
   db.prepare(`
     INSERT INTO courses (
       id, slug, title, category, level, duration, description, overview, instructor_name, instructor_title,
-      status, price, mode, credential, prerequisites, brochure_url, category_slug, audience, outcomes, labs
+      status, price, mode, credential, prerequisites, brochure_url, category_slug, audience, outcomes, labs, instructor_id
     )
     VALUES (
       @id, @slug, @title, @category, @level, @duration, @description, @overview, @instructorName, @instructorTitle,
-      @status, @price, @mode, @credential, @prerequisites, @brochureUrl, @categorySlug, @audience, @outcomes, @labs
+      @status, @price, @mode, @credential, @prerequisites, @brochureUrl, @categorySlug, @audience, @outcomes, @labs, @instructorId
     )
   `).run(course)
   recordAudit('course.create', actorId, 'course', courseId, { title: course.title })
@@ -329,6 +332,7 @@ export function updateCourse(courseId, updates, actorId = null) {
     prerequisites: 'prerequisites',
     brochureUrl: 'brochure_url',
     categorySlug: 'category_slug',
+    instructorId: 'instructor_id',
   }
   const sets = []
   const params = { id: courseId }
@@ -410,7 +414,13 @@ export function getCourseById(courseId) {
   return courseFromRow(row)
 }
 
-export function hasActiveEnrollment(userId, courseId) {
+export function hasActiveEnrollment(userId, courseId, batchId = null) {
+  if (batchId) {
+    return Boolean(db.prepare(`
+      SELECT 1 FROM enrollments
+      WHERE user_id = ? AND course_id = ? AND batch_id = ? AND status = 'active'
+    `).get(userId, courseId, batchId))
+  }
   return Boolean(db.prepare(`
     SELECT 1 FROM enrollments
     WHERE user_id = ? AND course_id = ? AND status = 'active'
@@ -424,20 +434,20 @@ export function canReadCourse(user, courseId, allowedRoles = []) {
   return hasActiveEnrollment(user.id, courseId)
 }
 
-export function enrollUser(userId, courseId, source = 'self_service') {
+export function enrollUser(userId, courseId, source = 'self_service', batchId = null) {
   if (!findUserById(userId)) throw new Error('User not found')
   const course = getCourseById(courseId)
   if (!course || course.status !== 'published') throw new Error('Course not found')
   const existing = db.prepare('SELECT * FROM enrollments WHERE user_id = ? AND course_id = ?').get(userId, courseId)
   if (existing) {
-    db.prepare("UPDATE enrollments SET status = 'active', updated_at = datetime('now') WHERE id = ?").run(existing.id)
+    db.prepare("UPDATE enrollments SET status = 'active', batch_id = ?, updated_at = datetime('now') WHERE id = ?").run(batchId, existing.id)
     return getEnrollment(existing.id)
   }
   const enrollmentId = id('enr')
   db.prepare(`
-    INSERT INTO enrollments (id, user_id, course_id, source)
-    VALUES (?, ?, ?, ?)
-  `).run(enrollmentId, userId, courseId, source)
+    INSERT INTO enrollments (id, user_id, course_id, batch_id, source)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(enrollmentId, userId, courseId, batchId, source)
   const firstLesson = db.prepare(`
     SELECT id FROM lessons WHERE course_id = ? AND status = 'published' ORDER BY sort_order ASC LIMIT 1
   `).get(courseId)
@@ -447,8 +457,8 @@ export function enrollUser(userId, courseId, source = 'self_service') {
   return getEnrollment(enrollmentId)
 }
 
-export function addEnrollment({ userId, courseId, source = 'manual' }) {
-  return enrollUser(userId, courseId, source)
+export function addEnrollment({ userId, courseId, batchId = null, source = 'manual' }) {
+  return enrollUser(userId, courseId, source, batchId)
 }
 
 export function getEnrollment(enrollmentId) {
@@ -683,9 +693,9 @@ export function getInstructorDashboard(instructorId) {
       (SELECT count(*) FROM lessons l WHERE l.course_id = c.id AND l.status = 'published') AS lesson_count,
       (SELECT count(*) FROM course_materials cm WHERE cm.course_id = c.id) AS material_count
     FROM courses c
-    WHERE c.status = 'published'
+    WHERE c.status = 'published' AND c.instructor_id = ?
     ORDER BY c.created_at ASC
-  `).all().map(row => courseFromRow(row))
+  `).all(instructorId).map(row => courseFromRow(row))
   const courseIds = assignedCourses.map(course => course.id)
   const students = courseIds.length
     ? db.prepare(`
@@ -705,12 +715,43 @@ export function getInstructorDashboard(instructorId) {
       LIMIT 50
     `).all(...courseIds)
     : []
+  const attendance = courseIds.length
+    ? db.prepare(`
+      SELECT a.id, a.live_class_id AS liveClassId, a.user_id AS userId, a.event,
+        a.created_at AS createdAt, lc.course_id AS courseId
+      FROM live_class_attendance a
+      JOIN live_classes lc ON lc.id = a.live_class_id
+      WHERE lc.course_id IN (${courseIds.map(() => '?').join(',')})
+      ORDER BY a.created_at DESC
+      LIMIT 100
+    `).all(...courseIds)
+    : []
+  const labAttempts = courseIds.length
+    ? db.prepare(`
+      SELECT id, lab_id AS labId, course_id AS courseId, user_id AS userId, status, score,
+        started_at AS startedAt, submitted_at AS submittedAt
+      FROM lab_attempts
+      WHERE course_id IN (${courseIds.map(() => '?').join(',')})
+      ORDER BY started_at DESC
+      LIMIT 100
+    `).all(...courseIds)
+    : []
+  const quizResults = courseIds.length
+    ? db.prepare(`
+      SELECT id, quiz_id AS quizId, course_id AS courseId, user_id AS userId, score, submitted_at AS submittedAt
+      FROM quiz_attempts
+      WHERE course_id IN (${courseIds.map(() => '?').join(',')})
+      ORDER BY submitted_at DESC
+      LIMIT 100
+    `).all(...courseIds)
+    : []
   return {
     instructorId,
     assignedCourses,
     students,
-    attendance: [],
-    labAttempts: [],
+    attendance,
+    labAttempts,
+    quizResults,
     progress,
   }
 }
@@ -753,13 +794,15 @@ export function getSalesDashboard() {
 
 export function getOpsDashboard() {
   return {
-    labs: [],
-    labAttempts: [],
-    liveClassAttendance: [],
+    labs: db.prepare("SELECT * FROM labs WHERE status != 'archived' ORDER BY created_at DESC LIMIT 100").all().map(labFromRow),
+    labAttempts: db.prepare('SELECT id, lab_id AS labId, course_id AS courseId, user_id AS userId, status, score, started_at AS startedAt, submitted_at AS submittedAt FROM lab_attempts ORDER BY started_at DESC LIMIT 100').all(),
+    liveClassAttendance: db.prepare('SELECT id, live_class_id AS liveClassId, user_id AS userId, event, created_at AS createdAt FROM live_class_attendance ORDER BY created_at DESC LIMIT 100').all(),
     documentAccessLogs: listDocumentAccessLogs(100),
     systemHealth: {
       status: 'ok',
       store: 'sqlite',
+      labs: db.prepare("SELECT count(*) AS count FROM labs WHERE status != 'archived'").get().count,
+      activeAttempts: db.prepare("SELECT count(*) AS count FROM lab_attempts WHERE status = 'started'").get().count,
       generatedAt: new Date().toISOString(),
     },
   }
@@ -772,6 +815,8 @@ export function listUpcomingLiveClasses(userId) {
     JOIN enrollments e ON e.course_id = lc.course_id AND e.user_id = ? AND e.status = 'active'
     JOIN courses c ON c.id = lc.course_id
     WHERE lc.status = 'scheduled'
+      AND datetime(lc.scheduled_end) >= datetime('now')
+      AND (lc.batch_id IS NULL OR lc.batch_id = e.batch_id)
     ORDER BY lc.scheduled_start ASC
     LIMIT 10
   `).all(userId)
@@ -986,7 +1031,28 @@ export function getAdminAnalytics() {
     documentAccesses: one('SELECT count(*) AS count FROM document_access_logs'),
     leads: one('SELECT count(*) AS count FROM leads'),
     visitors: getVisitorStats(),
+    payments: one('SELECT count(*) AS count FROM payment_intents'),
+    liveAttendanceEvents: one('SELECT count(*) AS count FROM live_class_attendance'),
+    labAttempts: one('SELECT count(*) AS count FROM lab_attempts'),
+    aiMessages: one('SELECT count(*) AS count FROM ai_chat_messages'),
+    analyticsEvents: one('SELECT count(*) AS count FROM analytics_events'),
   }
+}
+
+export function recordAnalyticsEvent({ event, userId = null, visitorId = null, path = '', properties = {} }) {
+  const eventId = id('evt')
+  db.prepare(`
+    INSERT INTO analytics_events (id, event, user_id, visitor_id, path, properties)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(
+    eventId,
+    event,
+    userId || null,
+    visitorId || null,
+    String(path || '').slice(0, 300),
+    JSON.stringify(properties)
+  )
+  return { id: eventId, event }
 }
 
 export function recordAudit(action, actorId, entityType, entityId, metadata = {}) {
@@ -1084,7 +1150,7 @@ function leadFromRow(row) {
 }
 
 const VALID_LEAD_STAGES = ['new', 'contacted', 'converted', 'closed']
-const VALID_LEAD_SOURCES = ['landing_form', 'chatbot', 'course_popup', 'course_page', 'locked_prompt', 'website']
+const VALID_LEAD_SOURCES = ['landing_form', 'chatbot', 'course_popup', 'course_page', 'course_waitlist', 'locked_prompt', 'website']
 
 function normalizeLeadStage(value = 'new') {
   const normalized = String(value || 'new').trim().toLowerCase()
@@ -1108,12 +1174,15 @@ export function createLead({
 }) {
   const normalizedName = String(name || '').trim()
   if (normalizedName.length < 2) throw new Error('Name is required')
+  if (normalizedName.length > 100) throw new Error('Name must be 100 characters or fewer')
   const normalizedEmail = String(email || '').trim().toLowerCase()
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) throw new Error('Enter a valid email address')
+  if (normalizedEmail.length > 254) throw new Error('Email address is too long')
   const normalizedPhone = normalizePhone(phone)
   if (normalizedPhone.replace(/\D/g, '').length < 7) throw new Error('Enter a valid phone number')
   const safeMessage = String(message || '').trim()
   if (safeMessage.length < 5) throw new Error('Message is required')
+  if (safeMessage.length > 2000) throw new Error('Message must be 2000 characters or fewer')
   const safeSource = VALID_LEAD_SOURCES.includes(source) ? source : 'website'
   const recentDuplicate = db.prepare(`
     SELECT id
@@ -1351,4 +1420,308 @@ export function getPublishedBlogBySlug(slug) {
     SELECT * FROM blogs
     WHERE slug = ? AND status = 'published'
   `).get(slug))
+}
+
+export function ingestRagSource(data, actorId = null) {
+  if (!getCourseById(data.courseId)) throw new Error('Course not found')
+  const materialId = id('rag')
+  db.prepare(`
+    INSERT INTO course_materials (id, course_id, lesson_id, type, title, description, content, is_public, sort_order)
+    VALUES (?, ?, ?, 'text', ?, ?, ?, 0, ?)
+  `).run(
+    materialId,
+    data.courseId,
+    data.lessonId || null,
+    String(data.title).trim(),
+    'Course-specific knowledge source added through cliadm.',
+    String(data.content || '').slice(0, 100000),
+    Number(data.sortOrder || 999)
+  )
+  recordAudit('rag.ingest', actorId, 'course_material', materialId, { courseId: data.courseId })
+  return { source: { id: materialId, courseId: data.courseId, title: data.title, type: 'text', status: 'ready' } }
+}
+
+function videoFromRow(row) {
+  if (!row) return null
+  return { id: row.id, courseId: row.course_id, lessonId: row.lesson_id, title: row.title, provider: row.provider, embedId: row.embed_id, order: row.sort_order, status: row.status, createdAt: row.created_at }
+}
+
+function documentFromRow(row) {
+  if (!row) return null
+  return { id: row.id, courseId: row.course_id, lessonId: row.lesson_id, title: row.title, storageKey: row.storage_key, pageCount: row.page_count, status: row.status, createdAt: row.created_at }
+}
+
+function labFromRow(row) {
+  if (!row) return null
+  return { id: row.id, courseId: row.course_id, lessonId: row.lesson_id, title: row.title, description: row.description, points: Number(row.points || 0), hints: parseJson(row.hints, []), dockerReady: Boolean(row.docker_ready), unsafeCloudInfra: false, status: row.status, createdAt: row.created_at, updatedAt: row.updated_at }
+}
+
+function quizFromRow(row) {
+  if (!row) return null
+  const questions = db.prepare('SELECT * FROM quiz_questions WHERE quiz_id = ? ORDER BY sort_order ASC, rowid ASC').all(row.id).map(question => ({ id: question.id, prompt: question.prompt, choices: parseJson(question.choices, []), answer: question.answer }))
+  return { id: row.id, courseId: row.course_id, title: row.title, status: row.status, questions, createdAt: row.created_at }
+}
+
+function assignmentFromRow(row) {
+  if (!row) return null
+  return { id: row.id, courseId: row.course_id, title: row.title, description: row.description, status: row.status, dueAt: row.due_at, createdAt: row.created_at }
+}
+
+function certificateFromRow(row) {
+  if (!row) return null
+  return { id: row.id, userId: row.user_id, courseId: row.course_id, code: row.verification_code, issuedBy: row.issued_by, status: row.status, issuedAt: row.issued_at, userName: row.user_name, courseTitle: row.course_title }
+}
+
+export function getBatchById(batchId) {
+  const row = db.prepare('SELECT * FROM batches WHERE id = ?').get(batchId)
+  return row ? { id: row.id, courseId: row.course_id, name: row.name, status: row.status, startsAt: row.starts_at, endsAt: row.ends_at, createdAt: row.created_at } : null
+}
+
+export function hasBatchMembership(userId, courseId, batchId) {
+  return Boolean(db.prepare("SELECT 1 FROM enrollments WHERE user_id = ? AND course_id = ? AND batch_id = ? AND status = 'active'").get(userId, courseId, batchId))
+}
+
+export function isInstructorAssigned(userId, courseId) {
+  return Boolean(db.prepare('SELECT 1 FROM courses WHERE id = ? AND instructor_id = ?').get(courseId, userId))
+}
+
+export function listVideosByCourse(courseId) {
+  return db.prepare("SELECT * FROM course_videos WHERE course_id = ? AND status = 'active' ORDER BY sort_order ASC, created_at ASC").all(courseId).map(videoFromRow)
+}
+
+export function registerVideo(data, actorId) {
+  if (!getCourseById(data.courseId)) throw new Error('Course not found')
+  const videoId = id('vid')
+  db.prepare('INSERT INTO course_videos (id, course_id, lesson_id, title, provider, embed_id, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)').run(videoId, data.courseId, data.lessonId || null, String(data.title).trim(), String(data.provider).trim(), String(data.embedId).trim(), Number(data.order || 0))
+  recordAudit('video.register', actorId, 'video', videoId, { courseId: data.courseId, provider: data.provider })
+  return videoFromRow(db.prepare('SELECT * FROM course_videos WHERE id = ?').get(videoId))
+}
+
+export function listDocumentsByCourse(courseId) {
+  return db.prepare("SELECT * FROM protected_documents WHERE course_id = ? AND status = 'active' ORDER BY created_at ASC").all(courseId).map(documentFromRow)
+}
+
+export function getDocumentById(documentId) {
+  return documentFromRow(db.prepare('SELECT * FROM protected_documents WHERE id = ?').get(documentId))
+}
+
+export function registerDocument(data, actorId) {
+  if (!getCourseById(data.courseId)) throw new Error('Course not found')
+  const documentId = id('doc')
+  db.prepare('INSERT INTO protected_documents (id, course_id, lesson_id, title, storage_key, page_count) VALUES (?, ?, ?, ?, ?, ?)').run(documentId, data.courseId, data.lessonId || null, String(data.title).trim(), String(data.storageKey).trim(), data.pageCount ? Number(data.pageCount) : null)
+  recordAudit('document.register', actorId, 'document', documentId, { courseId: data.courseId, title: data.title })
+  return getDocumentById(documentId)
+}
+
+export function logDocumentAccess(documentId, userId, metadata = {}) {
+  const document = getDocumentById(documentId)
+  if (!document) return null
+  const eventId = id('docevt')
+  const safeMetadata = { requestId: metadata.requestId || null, userAgent: String(metadata.userAgent || '').slice(0, 300) }
+  db.prepare('INSERT INTO protected_document_events (id, document_id, course_id, user_id, page, event, metadata) VALUES (?, ?, ?, ?, ?, ?, ?)').run(eventId, documentId, document.courseId, userId, Number(metadata.page || 1), metadata.event || 'view', JSON.stringify(safeMetadata))
+  recordAudit('document.access', userId, 'document', documentId, { courseId: document.courseId, page: Number(metadata.page || 1) })
+  return { id: eventId, documentId, courseId: document.courseId, userId, page: Number(metadata.page || 1), createdAt: new Date().toISOString() }
+}
+
+export function listLabsByCourse(courseId) {
+  return db.prepare("SELECT * FROM labs WHERE course_id = ? AND status != 'archived' ORDER BY created_at ASC").all(courseId).map(labFromRow)
+}
+
+export function getLabById(labId) {
+  return labFromRow(db.prepare('SELECT * FROM labs WHERE id = ?').get(labId))
+}
+
+export function assignLabToCourse(labId, courseId, actorId) {
+  if (!getCourseById(courseId)) throw new Error('Course not found')
+  const result = db.prepare("UPDATE labs SET course_id = ?, updated_at = datetime('now') WHERE id = ?").run(courseId, labId)
+  if (!result.changes) return null
+  recordAudit('lab.assign_course', actorId, 'lab', labId, { courseId })
+  return getLabById(labId)
+}
+
+function hashLabFlag(value) {
+  return createHash('sha256').update(`${process.env.LAB_FLAG_SALT || 'local-lab-flag-salt'}:${String(value || '').trim().toUpperCase()}`).digest('hex')
+}
+
+export function createLab(data, actorId) {
+  if (!getCourseById(data.courseId)) throw new Error('Course not found')
+  const labId = id('lab')
+  db.prepare('INSERT INTO labs (id, course_id, lesson_id, title, description, points, hints, docker_ready, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(labId, data.courseId, data.lessonId || null, String(data.title).trim(), String(data.description || ''), Number(data.points || 0), JSON.stringify(Array.isArray(data.hints) ? data.hints : []), data.dockerReady === false ? 0 : 1, data.status || 'draft')
+  if (data.flag) db.prepare('INSERT INTO lab_flags (id, lab_id, flag_hash, points) VALUES (?, ?, ?, ?)').run(id('flag'), labId, hashLabFlag(data.flag), Number(data.points || 0))
+  recordAudit('lab.create', actorId, 'lab', labId, { courseId: data.courseId, title: data.title })
+  return getLabById(labId)
+}
+
+export function launchLab(labId, userId) {
+  const lab = getLabById(labId)
+  if (!lab) return null
+  const attemptId = id('labatt')
+  db.prepare('INSERT INTO lab_attempts (id, lab_id, course_id, user_id) VALUES (?, ?, ?, ?)').run(attemptId, labId, lab.courseId, userId)
+  recordAudit('lab.launch', userId, 'lab', labId, { attemptId })
+  return db.prepare('SELECT id, lab_id AS labId, course_id AS courseId, user_id AS userId, status, score, started_at AS startedAt, submitted_at AS submittedAt FROM lab_attempts WHERE id = ?').get(attemptId)
+}
+
+export function submitLabFlag(labId, userId, flag) {
+  const lab = getLabById(labId)
+  if (!lab) return null
+  const matched = db.prepare('SELECT points FROM lab_flags WHERE lab_id = ? AND flag_hash = ?').get(labId, hashLabFlag(flag))
+  const attemptId = id('labatt')
+  const status = matched ? 'passed' : 'failed'
+  const score = Number(matched?.points || 0)
+  db.prepare("INSERT INTO lab_attempts (id, lab_id, course_id, user_id, status, score, submitted_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))").run(attemptId, labId, lab.courseId, userId, status, score)
+  recordAudit('lab.submit_flag', userId, 'lab', labId, { passed: Boolean(matched), score })
+  return db.prepare('SELECT id, lab_id AS labId, course_id AS courseId, user_id AS userId, status, score, started_at AS startedAt, submitted_at AS submittedAt FROM lab_attempts WHERE id = ?').get(attemptId)
+}
+
+export function listLabAttempts(filter = {}) {
+  const clauses = []
+  const params = {}
+  for (const [key, column] of Object.entries({ courseId: 'course_id', userId: 'user_id', labId: 'lab_id' })) {
+    if (filter[key]) { clauses.push(`${column} = @${key}`); params[key] = filter[key] }
+  }
+  return db.prepare(`SELECT id, lab_id AS labId, course_id AS courseId, user_id AS userId, status, score, started_at AS startedAt, submitted_at AS submittedAt FROM lab_attempts ${clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''} ORDER BY started_at DESC`).all(params)
+}
+
+export function createQuiz(data, actorId) {
+  if (!getCourseById(data.courseId)) throw new Error('Course not found')
+  const quizId = id('quiz')
+  db.prepare('INSERT INTO quizzes (id, course_id, title, status) VALUES (?, ?, ?, ?)').run(quizId, data.courseId, String(data.title).trim(), data.status || 'draft')
+  for (const question of Array.isArray(data.questions) ? data.questions : []) addQuizQuestion(quizId, question, actorId)
+  recordAudit('quiz.create', actorId, 'quiz', quizId, { courseId: data.courseId, title: data.title })
+  return getQuizById(quizId)
+}
+
+export function addQuizQuestion(quizId, question, actorId) {
+  if (!db.prepare('SELECT 1 FROM quizzes WHERE id = ?').get(quizId)) return null
+  if (!Array.isArray(question.choices) || question.choices.length < 2 || !question.choices.includes(question.answer)) throw new Error('Question choices must include the answer')
+  const questionId = id('qq')
+  db.prepare('INSERT INTO quiz_questions (id, quiz_id, prompt, choices, answer, sort_order) VALUES (?, ?, ?, ?, ?, ?)').run(questionId, quizId, String(question.prompt).trim(), JSON.stringify(question.choices), String(question.answer), Number(question.order || 0))
+  recordAudit('quiz.add_question', actorId, 'quiz', quizId, { questionId })
+  return { id: questionId, prompt: question.prompt, choices: question.choices, answer: question.answer }
+}
+
+export function listQuizzesByCourse(courseId) {
+  return db.prepare('SELECT * FROM quizzes WHERE course_id = ? ORDER BY created_at ASC').all(courseId).map(quizFromRow)
+}
+
+export function getQuizById(quizId) {
+  return quizFromRow(db.prepare('SELECT * FROM quizzes WHERE id = ?').get(quizId))
+}
+
+export function submitQuizAttempt(quizId, userId, answers = {}) {
+  const quiz = getQuizById(quizId)
+  if (!quiz) return null
+  const correct = quiz.questions.filter(question => answers[question.id] === question.answer).length
+  const score = quiz.questions.length ? Math.round((correct / quiz.questions.length) * 100) : 0
+  const results = quiz.questions.map(question => ({
+    questionId: question.id,
+    prompt: question.prompt,
+    selectedAnswer: answers[question.id] ?? null,
+    correctAnswer: question.answer,
+    correct: answers[question.id] === question.answer,
+  }))
+  const attemptId = id('qatt')
+  db.prepare('INSERT INTO quiz_attempts (id, quiz_id, course_id, user_id, answers, score) VALUES (?, ?, ?, ?, ?, ?)').run(attemptId, quizId, quiz.courseId, userId, JSON.stringify(answers), score)
+  recordAudit('quiz.submit', userId, 'quiz', quizId, { score })
+  return { id: attemptId, quizId, courseId: quiz.courseId, userId, answers, results, score, submittedAt: new Date().toISOString() }
+}
+
+export function createAssignment(data, actorId) {
+  if (!getCourseById(data.courseId)) throw new Error('Course not found')
+  const assignmentId = id('asn')
+  db.prepare('INSERT INTO assignments (id, course_id, title, description, status, due_at) VALUES (?, ?, ?, ?, ?, ?)').run(assignmentId, data.courseId, String(data.title).trim(), String(data.description || ''), data.status || 'draft', data.dueAt || null)
+  recordAudit('assignment.create', actorId, 'assignment', assignmentId, { courseId: data.courseId })
+  return getAssignmentById(assignmentId)
+}
+
+export function getAssignmentById(assignmentId) {
+  return assignmentFromRow(db.prepare('SELECT * FROM assignments WHERE id = ?').get(assignmentId))
+}
+
+export function listAssignmentsByCourse(courseId) {
+  return db.prepare('SELECT * FROM assignments WHERE course_id = ? ORDER BY created_at ASC').all(courseId).map(assignmentFromRow)
+}
+
+export function submitAssignment(assignmentId, userId, content) {
+  const assignment = getAssignmentById(assignmentId)
+  if (!assignment) return null
+  const submissionId = id('sub')
+  db.prepare('INSERT INTO assignment_submissions (id, assignment_id, course_id, user_id, content) VALUES (?, ?, ?, ?, ?)').run(submissionId, assignmentId, assignment.courseId, userId, String(content).slice(0, 50000))
+  recordAudit('assignment.submit', userId, 'assignment', assignmentId, {})
+  return db.prepare('SELECT id, assignment_id AS assignmentId, course_id AS courseId, user_id AS userId, content, status, score, feedback, reviewed_by AS reviewedBy, submitted_at AS submittedAt, reviewed_at AS reviewedAt FROM assignment_submissions WHERE id = ?').get(submissionId)
+}
+
+export function reviewAssignment(submissionId, reviewerId, review) {
+  const result = db.prepare("UPDATE assignment_submissions SET status = 'reviewed', score = ?, feedback = ?, reviewed_by = ?, reviewed_at = datetime('now') WHERE id = ?").run(review.score === undefined ? null : Number(review.score), review.feedback || null, reviewerId, submissionId)
+  if (!result.changes) return null
+  recordAudit('assignment.review', reviewerId, 'submission', submissionId, { score: review.score })
+  return db.prepare('SELECT id, assignment_id AS assignmentId, course_id AS courseId, user_id AS userId, content, status, score, feedback, reviewed_by AS reviewedBy, submitted_at AS submittedAt, reviewed_at AS reviewedAt FROM assignment_submissions WHERE id = ?').get(submissionId)
+}
+
+export function getAssignmentSubmission(submissionId) {
+  return db.prepare('SELECT id, assignment_id AS assignmentId, course_id AS courseId, user_id AS userId, content, status, score, feedback, reviewed_by AS reviewedBy, submitted_at AS submittedAt, reviewed_at AS reviewedAt FROM assignment_submissions WHERE id = ?').get(submissionId)
+}
+
+export function getCourseProgress(userId, courseId) {
+  const row = db.prepare('SELECT * FROM user_progress WHERE user_id = ? AND course_id = ? AND lesson_id IS NULL ORDER BY updated_at DESC LIMIT 1').get(userId, courseId)
+  return row ? { id: row.id, userId: row.user_id, courseId: row.course_id, lessonProgress: row.lesson_progress, videoProgress: row.video_progress, documentProgress: row.document_progress, labProgress: row.lab_progress, quizProgress: row.quiz_progress, completionPercentage: row.completion_percentage, updatedAt: row.updated_at } : { id: null, userId, courseId, lessonProgress: 0, videoProgress: 0, documentProgress: 0, labProgress: 0, quizProgress: 0, completionPercentage: 0 }
+}
+
+export function updateCourseProgress(userId, courseId, updates) {
+  const current = getCourseProgress(userId, courseId)
+  const values = {}
+  for (const key of ['lessonProgress', 'videoProgress', 'documentProgress', 'labProgress', 'quizProgress']) values[key] = Math.max(0, Math.min(100, Number(updates[key] ?? current[key] ?? 0)))
+  const completion = Math.round(Object.values(values).reduce((sum, value) => sum + value, 0) / 5)
+  if (current.id) {
+    db.prepare("UPDATE user_progress SET lesson_progress = ?, video_progress = ?, document_progress = ?, lab_progress = ?, quiz_progress = ?, completion_percentage = ?, updated_at = datetime('now') WHERE id = ?").run(values.lessonProgress, values.videoProgress, values.documentProgress, values.labProgress, values.quizProgress, completion, current.id)
+  } else {
+    db.prepare('INSERT INTO user_progress (id, user_id, course_id, lesson_id, completion_percentage, lesson_progress, video_progress, document_progress, lab_progress, quiz_progress) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)').run(id('prg'), userId, courseId, completion, values.lessonProgress, values.videoProgress, values.documentProgress, values.labProgress, values.quizProgress)
+  }
+  recordAudit('progress.update', userId, 'course', courseId, { completionPercentage: completion })
+  return getCourseProgress(userId, courseId)
+}
+
+export function issueCertificate(data, actorId) {
+  if (!hasActiveEnrollment(data.userId, data.courseId)) throw new Error('Active enrollment required')
+  const certificateId = id('cert')
+  const code = data.code || `CLI-${randomUUID().replace(/-/g, '').slice(0, 16).toUpperCase()}`
+  db.prepare('INSERT INTO certificates (id, user_id, course_id, verification_code, issued_by) VALUES (?, ?, ?, ?, ?)').run(certificateId, data.userId, data.courseId, code, actorId || null)
+  recordAudit('certificate.issue', actorId, 'certificate', certificateId, { userId: data.userId, courseId: data.courseId })
+  return verifyCertificate(code)
+}
+
+export function verifyCertificate(code) {
+  return certificateFromRow(db.prepare("SELECT cert.*, u.name AS user_name, c.title AS course_title FROM certificates cert JOIN users u ON u.id = cert.user_id JOIN courses c ON c.id = cert.course_id WHERE cert.verification_code = ? AND cert.status = 'issued'").get(code))
+}
+
+export function listCertificates(filter = {}) {
+  const clauses = []
+  const params = {}
+  if (filter.userId) { clauses.push('cert.user_id = @userId'); params.userId = filter.userId }
+  if (filter.courseId) { clauses.push('cert.course_id = @courseId'); params.courseId = filter.courseId }
+  return db.prepare(`SELECT cert.*, u.name AS user_name, c.title AS course_title FROM certificates cert JOIN users u ON u.id = cert.user_id JOIN courses c ON c.id = cert.course_id ${clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''} ORDER BY cert.issued_at DESC`).all(params).map(certificateFromRow)
+}
+
+export function createPaymentOrder(data, actorId) {
+  const paymentId = id('pay')
+  db.prepare('INSERT INTO payment_intents (id, user_id, course_id, amount, currency, provider_order_id, status, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(paymentId, data.userId, data.courseId, Number(data.amount), data.currency || 'INR', data.providerOrderId, data.status || 'created', JSON.stringify(data.metadata || {}))
+  recordAudit('payment.create', actorId, 'payment', paymentId, { courseId: data.courseId, amount: Number(data.amount), providerOrderId: data.providerOrderId })
+  return db.prepare('SELECT id, user_id AS userId, course_id AS courseId, amount, currency, provider, provider_order_id AS providerOrderId, status, created_at AS createdAt FROM payment_intents WHERE id = ?').get(paymentId)
+}
+
+export function recordPaymentWebhook(eventId, payload) {
+  const existing = db.prepare('SELECT id FROM payment_events WHERE provider_event_id = ?').get(eventId)
+  if (existing) return { duplicate: true, eventId }
+  const eventType = String(payload?.event || 'received')
+  const paymentEntity = payload?.payload?.payment?.entity || {}
+  const processEvent = db.transaction(() => {
+    const paymentEventId = id('payevt')
+    db.prepare('INSERT INTO payment_events (id, provider_event_id, event_type, payload) VALUES (?, ?, ?, ?)').run(paymentEventId, eventId, eventType, JSON.stringify(payload || {}))
+    const intent = paymentEntity.order_id ? db.prepare('SELECT * FROM payment_intents WHERE provider_order_id = ?').get(paymentEntity.order_id) : null
+    if (intent) db.prepare("UPDATE payment_intents SET status = ?, updated_at = datetime('now') WHERE id = ?").run(eventType === 'payment.captured' ? 'paid' : eventType, intent.id)
+    if (eventType === 'payment.captured' && intent) enrollUser(intent.user_id, intent.course_id, 'razorpay')
+    recordAudit('payment.webhook', null, 'payment_event', paymentEventId, { eventId, eventType })
+    return { id: paymentEventId, providerEventId: eventId, eventType }
+  })
+  return { duplicate: false, payment: processEvent() }
 }

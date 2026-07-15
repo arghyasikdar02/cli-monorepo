@@ -286,12 +286,193 @@ erDiagram
   VISITOR_ANALYTICS ||--o{ COOKIE_CONSENTS : records
 ```
 
+## Persisted Learning And Assessment ERD
+
+```mermaid
+erDiagram
+  USERS {
+    string id PK
+    string email UK
+  }
+  COURSES {
+    string id PK
+    string instructor_id FK
+    string slug UK
+  }
+  LESSONS {
+    string id PK
+    string course_id FK
+  }
+  BATCHES {
+    string id PK
+    string course_id FK
+    string name
+    string status
+  }
+  COURSE_VIDEOS {
+    string id PK
+    string course_id FK
+    string lesson_id FK
+    string provider
+    string embed_id
+    string status
+  }
+  PROTECTED_DOCUMENTS {
+    string id PK
+    string course_id FK
+    string lesson_id FK
+    string storage_key
+    string status
+  }
+  PROTECTED_DOCUMENT_EVENTS {
+    string id PK
+    string document_id FK
+    string course_id FK
+    string user_id FK
+    string event
+    string metadata
+  }
+  LABS {
+    string id PK
+    string course_id FK
+    string lesson_id FK
+    integer points
+    string status
+  }
+  LAB_FLAGS {
+    string id PK
+    string lab_id FK
+    string flag_hash
+    integer points
+  }
+  LAB_ATTEMPTS {
+    string id PK
+    string lab_id FK
+    string course_id FK
+    string user_id FK
+    string status
+    integer score
+  }
+  QUIZZES {
+    string id PK
+    string course_id FK
+    string title
+    string status
+  }
+  QUIZ_QUESTIONS {
+    string id PK
+    string quiz_id FK
+    string prompt
+    string choices
+    string answer
+  }
+  QUIZ_ATTEMPTS {
+    string id PK
+    string quiz_id FK
+    string course_id FK
+    string user_id FK
+    string answers
+    integer score
+  }
+  ASSIGNMENTS {
+    string id PK
+    string course_id FK
+    string title
+    string status
+  }
+  ASSIGNMENT_SUBMISSIONS {
+    string id PK
+    string assignment_id FK
+    string course_id FK
+    string user_id FK
+    string status
+    integer score
+    string reviewed_by FK
+  }
+
+  USERS ||--o{ COURSES : instructs
+  COURSES ||--o{ BATCHES : groups
+  COURSES ||--o{ COURSE_VIDEOS : owns
+  LESSONS ||--o{ COURSE_VIDEOS : attaches
+  COURSES ||--o{ PROTECTED_DOCUMENTS : owns
+  LESSONS ||--o{ PROTECTED_DOCUMENTS : attaches
+  PROTECTED_DOCUMENTS ||--o{ PROTECTED_DOCUMENT_EVENTS : emits
+  USERS ||--o{ PROTECTED_DOCUMENT_EVENTS : triggers
+  COURSES ||--o{ LABS : owns
+  LESSONS ||--o{ LABS : attaches
+  LABS ||--o{ LAB_FLAGS : validates
+  LABS ||--o{ LAB_ATTEMPTS : receives
+  USERS ||--o{ LAB_ATTEMPTS : submits
+  COURSES ||--o{ QUIZZES : owns
+  QUIZZES ||--o{ QUIZ_QUESTIONS : contains
+  QUIZZES ||--o{ QUIZ_ATTEMPTS : receives
+  USERS ||--o{ QUIZ_ATTEMPTS : submits
+  COURSES ||--o{ ASSIGNMENTS : owns
+  ASSIGNMENTS ||--o{ ASSIGNMENT_SUBMISSIONS : receives
+  USERS ||--o{ ASSIGNMENT_SUBMISSIONS : submits
+  USERS ||--o{ ASSIGNMENT_SUBMISSIONS : reviews
+```
+
+## Certificates, Payments, And Funnel Events ERD
+
+```mermaid
+erDiagram
+  USERS {
+    string id PK
+    string email UK
+  }
+  COURSES {
+    string id PK
+    string slug UK
+  }
+  CERTIFICATES {
+    string id PK
+    string user_id FK
+    string course_id FK
+    string verification_code UK
+    string issued_by FK
+    string status
+  }
+  PAYMENT_INTENTS {
+    string id PK
+    string user_id FK
+    string course_id FK
+    integer amount
+    string currency
+    string provider_order_id UK
+    string status
+  }
+  PAYMENT_EVENTS {
+    string id PK
+    string provider_event_id UK
+    string event_type
+    string payload
+  }
+  ANALYTICS_EVENTS {
+    string id PK
+    string event
+    string user_id FK
+    string visitor_id
+    string path
+    string properties
+  }
+
+  USERS ||--o{ CERTIFICATES : receives
+  USERS ||--o{ CERTIFICATES : issues
+  COURSES ||--o{ CERTIFICATES : awards
+  USERS ||--o{ PAYMENT_INTENTS : creates
+  COURSES ||--o{ PAYMENT_INTENTS : purchases
+  USERS ||--o{ ANALYTICS_EVENTS : identifies
+```
+
 ## Constraints And Delete Behavior
 
 - `users.email`, `users.username`, `users.google_id`, `courses.slug`, `course_categories.slug`, `blogs.slug`, and `visitor_analytics.visitor_id` are unique.
 - `schema_migrations.name` is unique and tracks applied migration names.
 - `enrollments` has `UNIQUE(user_id, course_id)` to prevent duplicate course enrollment rows.
 - `user_progress` has `UNIQUE(user_id, course_id, lesson_id)` for one progress row per lesson scope.
+- `certificates.verification_code`, `payment_intents.provider_order_id`, and `payment_events.provider_event_id` are unique.
+- Batch, video, protected document, lab, quiz, assignment, certificate, and payment records are persisted by migration `008_persistent_learning_modules.sql`.
 - Course deletion cascades to modules, lessons, materials, enrollments, progress, live classes, document access logs, and AI sessions/messages.
 - Lesson deletion sets `course_materials.lesson_id` and `user_progress.lesson_id` to `NULL`.
 - User deletion cascades to enrollments, progress, document logs, AI chat data, and live attendance; it sets nullable owner/actor/instructor references to `NULL`.
@@ -304,7 +485,7 @@ erDiagram
 - The repository layer in `cyberscout-server/src/db/repositories.js` maps snake_case database rows to frontend-friendly camelCase objects.
 - Roles are stored as both `role` and JSON text `roles`; route guards read the parsed `roles` array.
 - Course category assignment is currently a logical slug relation from `courses.category_slug` to `course_categories.slug`; the SQLite migration does not enforce it with a foreign key.
-- `live_classes.batch_id` exists for future batch isolation, but the migrations do not currently create a `batches` table.
+- `live_classes.batch_id` and `enrollments.batch_id` are checked against the persisted `batches` table for batch-scoped access.
 - `cookie_consents.visitor_id` references `visitor_analytics(visitor_id)`, which is unique.
 
 ## Planned/Future Production Notes
@@ -312,4 +493,4 @@ erDiagram
 - Supabase Postgres is the planned production database, but the current implementation is still SQLite.
 - Row Level Security is not available in SQLite. Supabase migration should add deny-by-default RLS policies for users, enrollments, materials, leads, analytics, and staff dashboards.
 - Render free filesystem storage is not reliable for persistent SQLite production data. Use Supabase Postgres before real production traffic.
-- Future migrations should add explicit tables for batches, RAG source documents/chunks, labs/flags/attempts, quizzes/questions/attempts, assignments/submissions, payments, certificates, and Supabase Storage metadata if these features move beyond their current MVP route implementations.
+- RAG source/chunk storage and Supabase Storage metadata remain future production work. Learning modules, assessments, certificates, payments, and batch records are already persisted in SQLite.

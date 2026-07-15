@@ -9,12 +9,10 @@ const mainNav = [
   { to: '/ai-tutor', icon: 'smart_toy', label: 'AI Tutor' },
   { to: '/live-classes', icon: 'video_chat', label: 'Live Classes' },
   { to: '/leaderboard', icon: 'leaderboard', label: 'Leaderboard' },
-  { to: '/achievements', icon: 'military_tech', label: 'Achievements' },
 ]
 
 const utilityNav = [
   { to: '/downloads', icon: 'download', label: 'Downloads' },
-  { to: '/subscription', icon: 'workspace_premium', label: 'Subscription' },
   { to: '/notifications', icon: 'notifications', label: 'Notifications' },
   { to: '/settings', icon: 'settings', label: 'Settings' },
   { to: '/help', icon: 'help', label: 'Help Center' },
@@ -27,7 +25,7 @@ const linkClass = ({ isActive }) =>
       : 'text-slate-500 hover:bg-white hover:text-slate-900'
   }`
 
-export default function SideNav() {
+export default function SideNav({ mobileOpen = false, isMobile = false, onNavigate = () => {} }) {
   const { logout } = useAppStore()
   const navigate = useNavigate()
 
@@ -38,14 +36,14 @@ export default function SideNav() {
   }
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-60 border-r border-slate-200/80 bg-[#f8fafc]/95 backdrop-blur-xl flex flex-col py-6 z-50">
+    <aside className={`app-side-nav fixed left-0 top-0 h-screen w-60 border-r border-slate-200/80 bg-[#f8fafc]/95 backdrop-blur-xl flex flex-col py-6 z-50 ${mobileOpen ? 'is-mobile-open' : ''}`} aria-label="Learner navigation" aria-hidden={isMobile && !mobileOpen} inert={isMobile && !mobileOpen ? true : undefined}>
       <div className="px-5 mb-8">
         <CLILogo variant="full" tone="light" size={156} />
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 space-y-0.5">
         {mainNav.map(({ to, icon, label }) => (
-          <NavLink key={to} to={to} className={linkClass}>
+          <NavLink key={to} to={to} className={linkClass} onClick={onNavigate}>
             <span className="material-symbols-outlined text-[20px]">{icon}</span>
             <span>{label}</span>
           </NavLink>
@@ -56,7 +54,7 @@ export default function SideNav() {
         </div>
 
         {utilityNav.map(({ to, icon, label }) => (
-          <NavLink key={to} to={to} className={linkClass}>
+          <NavLink key={to} to={to} className={linkClass} onClick={onNavigate}>
             <span className="material-symbols-outlined text-[20px]">{icon}</span>
             <span>{label}</span>
           </NavLink>
@@ -64,7 +62,7 @@ export default function SideNav() {
       </nav>
 
       <div className="px-3 pt-4 border-t border-slate-200/80 space-y-0.5">
-        <NavLink to="/profile" className={linkClass}>
+        <NavLink to="/profile" className={linkClass} onClick={onNavigate}>
           <span className="material-symbols-outlined text-[20px]">account_circle</span>
           <span>Profile</span>
         </NavLink>

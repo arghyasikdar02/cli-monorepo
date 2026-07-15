@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import PublicSiteLayout, { Breadcrumbs, PageIntro, StatePanel } from '../../components/site/PublicSiteLayout'
 import { api } from '../../lib/api'
+import SiteIcon from '../../components/ui/SiteIcon'
 
 const categories = ['Beginner Cybersecurity', 'Ethical Hacking', 'Web Security', 'SOC & Defensive Security', 'Digital Forensics', 'Cloud Security', 'Career Guidance']
 
 function Icon({ name }) {
-  return <span className="material-symbols-outlined" aria-hidden="true">{name}</span>
+  return <SiteIcon name={name} />
 }
 
 function formatDate(value) {
@@ -35,9 +36,7 @@ export default function BlogListPage() {
   return (
     <PublicSiteLayout>
       <Breadcrumbs items={[{ label: 'Home', href: '/' }, { label: 'Resources', href: '/resources' }, { label: 'Articles' }]} />
-      <PageIntro eyebrow="Articles and guides" title="Cybersecurity resources for practical learners" description="Read clear, reviewed explanations of cybersecurity concepts and connect each topic to a relevant course, learning path or guided activity." actions={<><Link to="/courses" className="site-button-primary">Explore published courses<Icon name="arrow_forward" /></Link><Link to="/resources" className="site-text-link">Browse resource topics<Icon name="arrow_forward" /></Link></>}>
-        <aside className="info-callout"><p className="site-eyebrow">Editorial approach</p><p>Published resources show category, author and review information. Articles avoid unsupported outcomes and link to relevant practical learning.</p></aside>
-      </PageIntro>
+      <PageIntro eyebrow="Articles and guides" title="Cybersecurity resources for practical learners" description="Read clear, reviewed explanations of cybersecurity concepts and connect each topic to a relevant course, learning path or guided activity." actions={<><Link to="/courses" className="site-button-primary">Explore published courses<Icon name="arrow_forward" /></Link><Link to="/resources" className="site-text-link">Browse resource topics<Icon name="arrow_forward" /></Link></>} aside={<aside className="info-callout"><p className="site-eyebrow">Editorial approach</p><p>Published resources show category, author and review information. Articles avoid unsupported outcomes and link to relevant practical learning.</p></aside>} />
 
       <section className="blog-index-section">
         <div className="site-container">

@@ -11,6 +11,7 @@ import {
   recordAudit,
 } from '../db/repositories.js'
 import { requireFields } from '../lib/validation.js'
+import { aiLimiter } from '../middleware/security.js'
 
 const router = Router()
 const AI_USAGE_LIMIT = Number(process.env.AI_DAILY_LIMIT || 20)
@@ -83,7 +84,7 @@ router.get('/courses/:courseId/sessions', requireCourseAccess({ allowRoles: ['ad
   res.json({ sessions: listAiSessions(req.user.id, req.params.courseId), usage, limit: AI_USAGE_LIMIT })
 })
 
-router.post('/courses/:courseId/sessions', requireCourseAccess({ allowRoles: ['admin', 'super_admin', 'instructor', 'support'] }), (req, res) => {
+router.post('/courses/:courseId/sessions', aiLimiter, requireCourseAccess({ allowRoles: ['admin', 'super_admin', 'instructor', 'support'] }), (req, res) => {
   res.status(201).json({ session: createAiSession(req.user.id, req.params.courseId, req.body.title || 'Course chat') })
 })
 
@@ -91,7 +92,7 @@ router.get('/courses/:courseId/sessions/:sessionId/messages', requireCourseAcces
   res.json({ messages: listAiMessages(req.params.sessionId, req.user.id, req.params.courseId) })
 })
 
-router.post('/courses/:courseId/chat', requireCourseAccess({ allowRoles: ['admin', 'super_admin', 'instructor', 'support'] }), (req, res) => {
+router.post('/courses/:courseId/chat', aiLimiter, requireCourseAccess({ allowRoles: ['admin', 'super_admin', 'instructor', 'support'] }), (req, res) => {
   const error = requireFields(req.body, ['message'])
   if (error) return res.status(400).json({ error })
   const usage = countAuditActionsSince(req.user.id, 'ai.chat', req.params.courseId, startOfTodayIso())

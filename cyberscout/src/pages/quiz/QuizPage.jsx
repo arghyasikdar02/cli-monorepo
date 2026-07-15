@@ -1,133 +1,67 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import AppShell from '../../components/layout/AppShell'
 import QuizOption from '../../components/quiz/QuizOption'
 import QuizProgress from '../../components/quiz/QuizProgress'
-import { getQuizById } from '../../data/quizzes'
+import { api } from '../../lib/api'
 
 export default function QuizPage() {
   const { quizId } = useParams()
   const navigate = useNavigate()
-  const quiz = getQuizById(quizId)
-
-  const [qIdx, setQIdx] = useState(0)
-  const [selected, setSelected] = useState(null)
-  const [revealed, setRevealed] = useState(false)
-  const [answers, setAnswers] = useState([])
-  const [timeLeft, setTimeLeft] = useState(quiz?.timeLimit ?? 900)
+  const [quiz, setQuiz] = useState(null)
+  const [questionIndex, setQuestionIndex] = useState(0)
+  const [selected, setSelected] = useState('')
+  const [answers, setAnswers] = useState({})
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    if (timeLeft <= 0 || !quiz) return
-    const t = setInterval(() => setTimeLeft(s => s - 1), 1000)
-    return () => clearInterval(t)
-  }, [timeLeft, quiz])
+    let active = true
+    api.get(`/api/quizzes/${quizId}`)
+      .then(({ quiz: next }) => active && setQuiz(next))
+      .catch(err => active && setError(err.message || 'Quiz unavailable'))
+      .finally(() => active && setLoading(false))
+    return () => { active = false }
+  }, [quizId])
 
-  const submit = useCallback(() => {
-    if (selected === null || !quiz) return
-    setRevealed(true)
-    const isCorrect = selected === quiz.questions[qIdx].correctIndex
-    const newAnswers = [...answers, { questionIdx: qIdx, selectedIdx: selected, correct: isCorrect }]
-    setAnswers(newAnswers)
+  if (loading) return <AppShell focusMode><div className="flex h-96 items-center justify-center text-on-surface-variant" role="status">Loading quiz...</div></AppShell>
+  if (!quiz || error) return <AppShell focusMode><div className="mx-auto max-w-xl px-6 py-16 text-center"><h1 className="font-space-grotesk text-2xl font-black text-primary">Quiz unavailable</h1><p className="mt-2 text-on-surface-variant">{error || 'This quiz has not been published.'}</p><Link to="/learn/courses" className="mt-5 inline-flex text-sm font-bold text-secondary hover:underline">Return to courses</Link></div></AppShell>
 
-    setTimeout(() => {
-      if (qIdx + 1 < quiz.questions.length) {
-        setQIdx(i => i + 1)
-        setSelected(null)
-        setRevealed(false)
-      } else {
-        const score = Math.round((newAnswers.filter(a => a.correct).length / quiz.questions.length) * 100)
-        navigate(`/quiz/${quizId}/results`, { state: { answers: newAnswers, score, quiz } })
-      }
-    }, 1200)
-  }, [selected, quiz, qIdx, answers, navigate, quizId])
+  const question = quiz.questions[questionIndex]
+  if (!question) return <AppShell focusMode><div className="mx-auto max-w-xl px-6 py-16 text-center"><h1 className="font-space-grotesk text-2xl font-black text-primary">No questions published</h1><p className="mt-2 text-on-surface-variant">The instructor has not added questions to this quiz.</p></div></AppShell>
 
-  if (!quiz) return (
-    <AppShell focusMode>
-      <div className="flex items-center justify-center h-96 text-on-surface-variant">Quiz not found</div>
-    </AppShell>
-  )
-
-  const question = quiz.questions[qIdx]
-  const LABELS = ['A', 'B', 'C', 'D']
-
-  const getOptionState = (i) => {
-    if (!revealed) return i === selected ? 'selected' : 'default'
-    if (i === question.correctIndex) return 'correct'
-    if (i === selected && selected !== question.correctIndex) return 'wrong'
-    return 'default'
+  const continueQuiz = async () => {
+    if (!selected || submitting) return
+    const nextAnswers = { ...answers, [question.id]: selected }
+    setAnswers(nextAnswers)
+    if (questionIndex + 1 < quiz.questions.length) {
+      setQuestionIndex(index => index + 1)
+      setSelected('')
+      return
+    }
+    setSubmitting(true)
+    setError('')
+    try {
+      const { attempt } = await api.post(`/api/quizzes/${quiz.id}/attempts`, { answers: nextAnswers })
+      navigate(`/quiz/${quiz.id}/results`, { state: { quiz, attempt } })
+    } catch (err) {
+      setError(err.message || 'Quiz submission failed')
+      setSubmitting(false)
+    }
   }
 
   return (
     <AppShell focusMode>
-      {/* Quiz top bar */}
-      <div className="sticky top-0 z-40 h-14 bg-white/90 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-6">
-        <div className="flex items-center gap-3">
-          <Link to={`/learn/courses/${quiz.courseId}`} className="text-slate-500 hover:text-primary transition-colors">
-            <span className="material-symbols-outlined text-[20px]">close</span>
-          </Link>
-          <div className="h-5 w-px bg-slate-200" />
-          <h1 className="font-space-grotesk text-sm font-semibold text-on-surface">Quiz: {quiz.title}</h1>
-        </div>
-        <span className="font-space-grotesk text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden sm:block">
-          {quiz.level}
-        </span>
-      </div>
-
       <main className="max-w-2xl mx-auto px-6 py-10">
-        <QuizProgress current={qIdx + 1} total={quiz.questions.length} timeLeft={timeLeft} />
-
-        <div className="space-y-5">
-          {/* Question card */}
-          <div className="bg-white rounded-xl p-7 border border-slate-200 shadow-card">
-            <h2 className="font-space-grotesk text-lg font-semibold text-primary mb-6 leading-snug">
-              {question.text}
-            </h2>
-            <div className="space-y-3">
-              {question.options.map((opt, i) => (
-                <QuizOption
-                  key={i}
-                  label={LABELS[i]}
-                  text={opt}
-                  state={getOptionState(i)}
-                  onClick={() => !revealed && setSelected(i)}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Pro tip */}
-          {revealed && (
-            <div className="bg-primary-container rounded-xl p-5 flex gap-4 border border-white/10">
-              <div className="w-9 h-9 rounded-lg bg-secondary/20 flex items-center justify-center flex-shrink-0">
-                <span className="material-symbols-outlined text-secondary text-[20px]">lightbulb</span>
-              </div>
-              <div>
-                <p className="font-space-grotesk text-[10px] font-bold text-secondary uppercase tracking-widest mb-1">PRO TIP</p>
-                <p className="text-sm text-on-primary-container leading-relaxed">{question.tip}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Submit */}
-          <div className="flex flex-col items-center gap-4 pt-4">
-            <button
-              onClick={submit}
-              disabled={selected === null || revealed}
-              className="px-10 py-3.5 bg-primary text-white font-space-grotesk font-bold rounded-full shadow-lg shadow-primary/20 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] transition-all flex items-center gap-2"
-            >
-              Submit Answer
-              <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-            </button>
-            <div className="flex gap-6">
-              {[['flag', 'Report Issue'], ['bookmark', 'Save Question']].map(([icon, label]) => (
-                <button key={label} className="text-slate-400 hover:text-primary font-space-grotesk text-[11px] font-bold flex items-center gap-1.5 transition-colors">
-                  <span className="material-symbols-outlined text-[18px]">{icon}</span>
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
+        <div className="mb-7 flex items-center justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-widest text-slate-500">Course quiz</p><h1 className="mt-1 font-space-grotesk text-xl font-bold text-primary">{quiz.title}</h1></div><Link to={`/learn/courses/${quiz.courseId}`} className="text-sm font-bold text-secondary hover:underline">Exit quiz</Link></div>
+        <QuizProgress current={questionIndex + 1} total={quiz.questions.length} />
+        <section className="mt-6 border border-slate-200 bg-white p-7 shadow-card" aria-labelledby="quiz-question">
+          <h2 id="quiz-question" className="mb-6 font-space-grotesk text-lg font-semibold leading-snug text-primary">{question.prompt}</h2>
+          <div className="space-y-3">{question.choices.map((choice, index) => <QuizOption key={choice} label={String.fromCharCode(65 + index)} text={choice} state={choice === selected ? 'selected' : 'default'} onClick={() => setSelected(choice)} />)}</div>
+        </section>
+        {error && <div className="mt-4 border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">{error}</div>}
+        <div className="mt-6 flex justify-end"><button type="button" onClick={continueQuiz} disabled={!selected || submitting} className="min-h-11 rounded-lg bg-primary px-6 font-space-grotesk text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">{submitting ? 'Saving attempt...' : questionIndex + 1 === quiz.questions.length ? 'Submit quiz' : 'Next question'}</button></div>
       </main>
     </AppShell>
   )

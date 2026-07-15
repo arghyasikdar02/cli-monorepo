@@ -1,10 +1,11 @@
 import { Router } from 'express'
-import { requireAuth, requireCourseAccess, requireRole } from '../middleware/access.js'
+import { requireAuth, requireCourseAccess, requireCourseManager, requireRole } from '../middleware/access.js'
 import {
   createLiveClass,
   getLiveClassById,
   getViewerCount,
   hasActiveEnrollment,
+  isInstructorAssigned,
   listAttendance,
   listLiveClassesByCourse,
   listUpcomingLiveClassesForUser,
@@ -12,27 +13,22 @@ import {
   updateLiveClass,
   userHasRole,
 } from '../db/repositories.js'
+import { canJoinLiveClass } from '../services/authorization.js'
 import { requireFields } from '../lib/validation.js'
 
 const router = Router()
 const managerRoles = ['admin', 'super_admin', 'instructor', 'ops', 'lab_creator', 'support']
+const monitorRoles = ['admin', 'super_admin', 'ops', 'lab_creator', 'support']
 
 function canAccessLiveClass(user, liveClass) {
   if (!liveClass) return false
-  if (userHasRole(user, managerRoles)) return true
-  return hasActiveEnrollment(user.id, liveClass.courseId)
+  if (userHasRole(user, monitorRoles)) return true
+  if (isInstructorAssigned(user.id, liveClass.courseId)) return true
+  return hasActiveEnrollment(user.id, liveClass.courseId, liveClass.batchId || null)
 }
 
 function joinDecision(user, liveClass, at = new Date()) {
-  if (!user) return { allowed: false, reason: 'auth_required' }
-  if (!canAccessLiveClass(user, liveClass)) return { allowed: false, reason: 'active_enrollment_required' }
-  if (userHasRole(user, managerRoles)) return { allowed: true, reason: 'staff_monitoring' }
-  const start = new Date(liveClass.scheduledStart)
-  const end = new Date(liveClass.scheduledEnd)
-  const opens = new Date(start.getTime() - 15 * 60 * 1000)
-  if (at < opens) return { allowed: false, reason: 'outside_join_window_early' }
-  if (at > end) return { allowed: false, reason: 'outside_join_window_late' }
-  return { allowed: true, reason: 'join_window_open' }
+  return canJoinLiveClass(user, liveClass, at)
 }
 
 function publicLiveClass(liveClass, includeJoin = false) {
@@ -48,7 +44,7 @@ function deny(res, decision) {
 
 router.use(requireAuth)
 
-router.post('/', requireRole(...managerRoles), (req, res) => {
+router.post('/', requireRole(...managerRoles), requireCourseManager, (req, res) => {
   const error = requireFields(req.body, ['courseId', 'title', 'scheduledStart', 'scheduledEnd'])
   if (error) return res.status(400).json({ error })
   const liveClass = createLiveClass(req.body, req.user.id)
@@ -72,7 +68,7 @@ router.get('/student/upcoming', (req, res) => {
   })) })
 })
 
-router.get('/course/:courseId', requireCourseAccess({ allowRoles: managerRoles }), (req, res) => {
+router.get('/course/:courseId', requireCourseAccess({ allowRoles: monitorRoles }), (req, res) => {
   const includeJoin = userHasRole(req.user, managerRoles)
   res.json({ liveClasses: listLiveClassesByCourse(req.params.courseId).map(item => publicLiveClass(item, includeJoin)) })
 })

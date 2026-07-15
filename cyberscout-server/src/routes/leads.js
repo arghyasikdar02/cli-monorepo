@@ -1,19 +1,32 @@
 import { Router } from 'express'
+import { createHash } from 'node:crypto'
 import { requireAuth, requireRole } from '../middleware/access.js'
 import { addLeadNote, createFollowUp, createLead, listFollowUps, listLeads, updateLead } from '../db/repositories.js'
 import { requireFields } from '../lib/validation.js'
+import { leadLimiter } from '../middleware/security.js'
 
 const router = Router()
 const crmRoles = ['admin', 'super_admin', 'marketing', 'sales', 'support']
 
-router.post('/', (req, res) => {
+function ipHash(value) {
+  return createHash('sha256')
+    .update(`${process.env.VISITOR_HASH_SALT || 'local-development-salt'}:${value || ''}`)
+    .digest('hex')
+}
+
+router.post('/', leadLimiter, (req, res) => {
+  if (req.body?.website) return res.status(202).json({ accepted: true })
+  const startedAt = Number(req.body?.startedAt || 0)
+  if (startedAt && Date.now() - startedAt < 900) {
+    return res.status(400).json({ error: 'Please review the form before sending it.' })
+  }
   const error = requireFields(req.body, ['name', 'phone', 'email', 'message'])
   if (error) return res.status(400).json({ error })
   try {
     const lead = createLead({
       ...req.body,
       visitorId: req.cookies?.cli_visitor_id || req.body.visitorId,
-      ipAddress: req.ip,
+      ipAddress: ipHash(req.ip),
       userAgent: req.headers['user-agent'],
     })
     res.status(201).json({ lead })

@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../../lib/api'
+import { useFocusTrap } from '../../hooks/useFocusTrap'
 
 const STORAGE_KEY = 'cli_cookie_consent'
 const defaultConsent = { necessary: true, analytics: false, marketing: false }
@@ -17,6 +18,9 @@ export default function CookieConsent() {
   const [consent, setConsent] = useState(readConsent)
   const [open, setOpen] = useState(!readConsent())
   const [draft, setDraft] = useState(readConsent() || defaultConsent)
+  const panelRef = useRef(null)
+
+  useFocusTrap(panelRef, open)
 
   useEffect(() => {
     const current = consent || defaultConsent
@@ -49,7 +53,7 @@ export default function CookieConsent() {
   }
 
   return (
-    <div className="cookie-consent-panel" role="dialog" aria-labelledby="cookie-consent-title">
+    <div className="cookie-consent-panel" role="dialog" aria-modal="true" aria-labelledby="cookie-consent-title" ref={panelRef}>
       <div className="cookie-consent-grid">
         <div>
           <h2 id="cookie-consent-title">Cookie preferences</h2>

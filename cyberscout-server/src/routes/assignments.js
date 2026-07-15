@@ -1,26 +1,35 @@
 import { Router } from 'express'
-import { requireAuth, requireCourseAccess, requireRole } from '../middleware/access.js'
-import { userHasRole } from '../db/repositories.js'
-import { createAssignment, getAssignmentById, hasActiveEnrollment, listAssignmentsByCourse, reviewAssignment, submitAssignment } from '../store/platformStore.js'
+import { requireAuth, requireCourseAccess, requireCourseManager, requireRole } from '../middleware/access.js'
+import { createAssignment, getAssignmentById, getAssignmentSubmission, hasActiveEnrollment, isInstructorAssigned, listAssignmentsByCourse, reviewAssignment, submitAssignment, userHasRole } from '../db/repositories.js'
+import { assertDecision, canManageCourse } from '../services/authorization.js'
 import { requireFields } from '../lib/validation.js'
 
 const router = Router()
-const assignmentRoles = ['admin', 'super_admin', 'instructor', 'support']
+const assignmentReadRoles = ['admin', 'super_admin', 'support']
+const assignmentRoles = [...assignmentReadRoles, 'instructor']
 
 function canAccessAssignment(user, assignment) {
   if (!assignment) return false
-  return userHasRole(user, assignmentRoles) || hasActiveEnrollment(user.id, assignment.courseId)
+  return userHasRole(user, assignmentReadRoles) || isInstructorAssigned(user.id, assignment.courseId) || hasActiveEnrollment(user.id, assignment.courseId)
+}
+
+function requireSubmissionManager(req, res, next) {
+  const submission = getAssignmentSubmission(req.params.submissionId)
+  if (!submission) return res.status(404).json({ error: 'Submission not found' })
+  const decision = canManageCourse(req.user, submission.courseId)
+  if (assertDecision(decision, res)) return
+  return next()
 }
 
 router.use(requireAuth)
 
-router.post('/', requireRole(...assignmentRoles), (req, res) => {
+router.post('/', requireRole(...assignmentRoles), requireCourseManager, (req, res) => {
   const error = requireFields(req.body, ['courseId', 'title'])
   if (error) return res.status(400).json({ error })
   res.status(201).json({ assignment: createAssignment(req.body, req.user.id) })
 })
 
-router.get('/course/:courseId', requireCourseAccess({ allowRoles: assignmentRoles }), (req, res) => {
+router.get('/course/:courseId', requireCourseAccess({ allowRoles: assignmentReadRoles }), (req, res) => {
   res.json({ assignments: listAssignmentsByCourse(req.params.courseId) })
 })
 
@@ -33,7 +42,7 @@ router.post('/:assignmentId/submissions', (req, res) => {
   res.status(201).json({ submission: submitAssignment(assignment.id, req.user.id, req.body.content) })
 })
 
-router.patch('/submissions/:submissionId/review', requireRole(...assignmentRoles), (req, res) => {
+router.patch('/submissions/:submissionId/review', requireRole(...assignmentRoles), requireSubmissionManager, (req, res) => {
   const submission = reviewAssignment(req.params.submissionId, req.user.id, req.body)
   if (!submission) return res.status(404).json({ error: 'Submission not found' })
   res.json({ submission })

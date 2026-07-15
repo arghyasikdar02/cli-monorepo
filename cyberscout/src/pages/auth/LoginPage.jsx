@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore'
-import { api } from '../../lib/api'
+import { api, API_BASE } from '../../lib/api'
 import AuthFrame, { GoogleMark } from '../../components/site/AuthFrame'
+import SiteIcon from '../../components/ui/SiteIcon'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const authErrors = {
   oauth_failed: 'Google sign-in failed. Please try again.',
+  oauth_state: 'Google sign-in could not be verified. Please start again from this page.',
   oauth_unconfigured: 'Google sign-in is not configured for this environment. Use email access or add Google OAuth credentials.',
 }
 
@@ -23,7 +24,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(authErrors[searchParams.get('error')] ?? '')
   const [googleEnabled, setGoogleEnabled] = useState(false)
-  const { loginWithToken } = useAppStore()
+  const { setSession } = useAppStore()
   const navigate = useNavigate()
   const redirectTarget = safeRedirect(searchParams.get('redirect'))
   const signupHref = `/auth?mode=signup${redirectTarget ? `&redirect=${encodeURIComponent(redirectTarget)}` : ''}`
@@ -34,7 +35,7 @@ export default function LoginPage() {
       return
     }
     const query = redirectTarget ? `?redirect=${encodeURIComponent(redirectTarget)}` : ''
-    window.location.href = `${API_URL}/api/auth/google${query}`
+    window.location.href = `${API_BASE}/api/auth/google${query}`
   }
 
   useEffect(() => {
@@ -57,8 +58,8 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
     try {
-      const { token, user, redirectTo } = await api.login(email, password)
-      loginWithToken(token, user)
+      const { user, redirectTo } = await api.login(email, password)
+      setSession(user)
       navigate(redirectTarget || redirectTo || '/dashboard')
     } catch (err) {
       setError(err.message || 'Login failed')
@@ -70,12 +71,12 @@ export default function LoginPage() {
   return (
     <AuthFrame eyebrow="Learner portal" title="Continue your cybersecurity learning" description="Log in to access enrolled courses, guided labs, protected materials and recorded progress." footer={<><span>New to Cyber Lab IN?</span><Link to={signupHref}>Create an account</Link><Link to="/">Back to website</Link></>}>
       <div className="auth-form-heading"><p className="site-eyebrow">Login</p><h2>Access your account</h2><p>Use your email and password, or continue with Google when it is configured.</p></div>
-      {error && <div className="auth-alert" role="alert"><span className="material-symbols-outlined" aria-hidden="true">error</span><span>{error}</span></div>}
+      {error && <div className="auth-alert" role="alert"><SiteIcon name="error" /><span>{error}</span></div>}
       <button type="button" onClick={handleGoogleAuth} className="auth-google-button"><GoogleMark />Sign in with Google</button>
       <div className="auth-divider"><span>or use email</span></div>
       <form onSubmit={handleSubmit} className="auth-form-fields">
         <label><span>Email address</span><input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" placeholder="name@example.com" /></label>
-        <label><span>Password</span><div className="auth-password-field"><input type={showPw ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required autoComplete="current-password" /><button type="button" onClick={() => setShowPw(value => !value)} aria-label={showPw ? 'Hide password' : 'Show password'}><span className="material-symbols-outlined" aria-hidden="true">{showPw ? 'visibility_off' : 'visibility'}</span></button></div></label>
+        <label><span>Password</span><div className="auth-password-field"><input type={showPw ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required autoComplete="current-password" /><button type="button" onClick={() => setShowPw(value => !value)} aria-label={showPw ? 'Hide password' : 'Show password'}><SiteIcon name={showPw ? 'visibility_off' : 'visibility'} /></button></div></label>
         <button type="submit" disabled={loading} className="auth-submit-button">{loading ? 'Logging in...' : 'Log in'}</button>
       </form>
       <p className="auth-support-note">Need account help? <Link to="/contact">Contact Cyber Lab IN</Link>.</p>

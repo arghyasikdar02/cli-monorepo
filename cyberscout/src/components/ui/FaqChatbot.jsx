@@ -1,5 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import LeadCaptureForm from './LeadCaptureForm'
+import SiteIcon from './SiteIcon'
+import { useFocusTrap } from '../../hooks/useFocusTrap'
 
 const options = [
   ['fees', 'Course fees', 'Cyber Security Essentials is currently listed from the course database. The fee can change by cohort, and the course page always shows the current configured amount.'],
@@ -22,6 +24,9 @@ export default function FaqChatbot() {
   const [messages, setMessages] = useState([{ role: 'assistant', text: 'How can I help you or guide you today?' }])
   const [showLead, setShowLead] = useState(false)
   const [text, setText] = useState('')
+  const panelRef = useRef(null)
+
+  useFocusTrap(panelRef, open, () => setOpen(false))
 
   const visibleOptions = useMemo(() => [...options, ['callback', 'Talk to counsellor', 'Share your details and the Cyber Lab IN team will follow up.']], [])
 
@@ -49,12 +54,13 @@ export default function FaqChatbot() {
         aria-expanded={open}
         aria-controls="faq-chatbot-panel"
       >
-        <span className="material-symbols-outlined">{open ? 'close' : 'forum'}</span>
+        <SiteIcon name={open ? 'close' : 'forum'} />
       </button>
       {open && (
-        <section className="faq-chatbot-panel" id="faq-chatbot-panel" aria-label="Cyber Lab IN FAQ assistant">
+        <section className="faq-chatbot-panel" id="faq-chatbot-panel" role="dialog" aria-modal="true" aria-labelledby="faq-chatbot-title" ref={panelRef}>
           <header>
-            <p>Cyber Lab IN FAQ assistant</p>
+            <p id="faq-chatbot-title">Cyber Lab IN FAQ assistant</p>
+            <button type="button" onClick={() => setOpen(false)} aria-label="Close FAQ assistant"><SiteIcon name="close" /></button>
           </header>
           <div className="faq-chatbot-messages" aria-live="polite">
             {messages.map((message, index) => (
@@ -92,7 +98,7 @@ export default function FaqChatbot() {
                 onChange={event => setText(event.target.value)}
                 placeholder="Type a course question"
               />
-              <button type="submit" aria-label="Send question"><span className="material-symbols-outlined" aria-hidden="true">send</span></button>
+              <button type="submit" aria-label="Send question"><SiteIcon name="send" /></button>
             </form>
           </div>
         </section>

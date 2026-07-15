@@ -1,23 +1,46 @@
-const BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+export const API_BASE = (import.meta.env.VITE_API_URL || (import.meta.env.PROD ? window.location.origin : 'http://localhost:3001')).replace(/\/+$/, '')
+let csrfToken = ''
 
-function getToken() {
-  return localStorage.getItem('cyberlab_token')
+function isUnsafeMethod(method) {
+  return !['GET', 'HEAD', 'OPTIONS'].includes(method)
 }
 
-async function request(path, options = {}) {
-  const token = getToken()
-  const res = await fetch(`${BASE}${path}`, {
+async function loadCsrfToken() {
+  const res = await fetch(`${API_BASE}/api/auth/csrf`, {
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error('Could not establish a secure request session')
+  const body = await res.json()
+  csrfToken = body.csrfToken || ''
+  return csrfToken
+}
+
+async function request(path, options = {}, allowCsrfRetry = true) {
+  const method = String(options.method || 'GET').toUpperCase()
+  if (isUnsafeMethod(method) && !csrfToken) await loadCsrfToken()
+  const hasBody = options.body !== undefined && options.body !== null
+  const res = await fetch(`${API_BASE}${path}`, {
     credentials: 'include',
     headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      Accept: 'application/json',
+      ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
+      ...(isUnsafeMethod(method) && csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
       ...options.headers,
     },
     ...options,
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(err.error || 'Request failed')
+    if (res.status === 403 && err.error === 'CSRF validation failed' && allowCsrfRetry) {
+      csrfToken = ''
+      await loadCsrfToken()
+      return request(path, options, false)
+    }
+    const error = new Error(err.error || 'Request failed')
+    error.status = res.status
+    error.requestId = err.requestId
+    throw error
   }
   return res.json()
 }
@@ -54,4 +77,5 @@ export const api = {
   trackVisitor: (consent = {}) => request('/api/visitors/track', { method: 'POST', body: JSON.stringify(consent) }),
   saveCookieConsent: (consent) => request('/api/visitors/consent', { method: 'POST', body: JSON.stringify(consent) }),
   visitorStats: () => request('/api/visitors/stats'),
+  trackEvent: (event, properties = {}) => request('/api/analytics/events', { method: 'POST', body: JSON.stringify({ event, path: window.location.pathname, properties }) }),
 }

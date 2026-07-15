@@ -1,23 +1,40 @@
 # Cyber Lab IN
 
-The active application uses the original Vite frontend and Express backend architecture. Core learning and growth flows are backed by a durable database: signup, login, course catalog, enrollment, student dashboard, course materials, lead capture, blog content, visitor analytics, protected lesson reading, and course-bound AI chat.
+Cyber Lab IN is a practical cybersecurity education platform built as the restored legacy Vite/React frontend and Express API. The active application has not been replaced by a monorepo.
 
-## Active Folders
-- `cyberscout/`: Vite + React frontend.
-- `cyberscout-server/`: Express auth/API backend.
+## Active applications
 
-The failed monorepo migration is archived at:
+- `cyberscout/`: public website, authentication, learner UI and role dashboards.
+- `cyberscout-server/`: Express API, authorization, SQLite repositories, migrations and CLI administration.
+- `supabase/`: reviewed Postgres/RLS migration starter only; it is not the active database adapter.
 
-```text
-archived/failed-monorepo-migration/
-```
+The archived migration copies remain local and are ignored by Git. Active scripts do not reference them.
 
-## Install
+## Local setup
+
+Requirements: Node.js 22.13 or newer and npm 10 or newer.
+
 ```bash
+cp cyberscout-server/.env.example cyberscout-server/.env
+cp cyberscout/.env.example cyberscout/.env
 npm run install:all
+npm run dev
 ```
 
-The install command installs both apps and runs the backend database setup. To run database commands directly:
+The website opens at `http://localhost:5173`; the API opens at `http://localhost:3001`.
+
+Run the applications separately when debugging:
+
+```bash
+npm run dev:backend
+npm run dev:frontend
+```
+
+The root scripts stop an existing process on ports 3001, 5173 or 5174 before starting, which avoids the common `EADDRINUSE` failure.
+
+## Database
+
+Local SQLite data is stored in `cyberscout-server/data/cyberlab.sqlite` and ignored by Git.
 
 ```bash
 npm run db:migrate
@@ -25,221 +42,82 @@ npm run db:seed
 npm run db:setup
 ```
 
-By default the local database is stored at:
+Migrations are additive and recorded in `schema_migrations`. Migration `008_persistent_learning_modules.sql` replaces the former in-memory learning store with persistent batches, videos, protected documents, labs, quizzes, assignments, progress, certificates and payment records.
 
-```text
-cyberscout-server/data/cyberlab.sqlite
-```
+## Authentication
 
-Override it with `DATABASE_URL` in `cyberscout-server/.env`.
+- Login: `/login` or `/auth?mode=login`
+- Signup: `/signup` or `/auth?mode=signup`
+- Role logins: `/admin/login`, `/instructor/login`, `/marketing/login`, `/ops/login`
+- Google callback: `/api/auth/google/callback`
 
-## Run Locally
-Run both frontend and backend from the root:
+Sessions use a signed JWT in the HTTP-only `cli_session` cookie. The frontend does not store credentials in `localStorage`, `sessionStorage` or URL parameters. State-changing cookie requests use a CSRF token. Password changes rotate the user token version so old sessions stop working.
+
+## Public routes
+
+The homepage loads directly at `/`. Key routes include `/courses`, `/courses/cybersecurity/cyber-security-essentials`, `/labs`, `/learning-paths`, `/for-organisations`, `/resources`, `/blog`, `/about`, `/instructors/arghya-sikdar` and `/contact`.
+
+The production build pre-renders 41 public route shells with unique metadata, canonical URLs, social previews and accurate structured data. `sitemap.xml` and `robots.txt` are included.
+
+## Verification
 
 ```bash
-npm run dev
-```
-
-Or run each side separately:
-
-```bash
-npm run dev:backend
-npm run dev:frontend
-```
-
-Frontend:
-
-```text
-http://localhost:5173
-```
-
-Backend:
-
-```text
-http://localhost:3001
-```
-
-## Public Landing Page
-The domain root `/` renders the platform-level Cyber Lab IN homepage directly. The old generic welcome route redirects back to `/`.
-
-The public experience uses the shared enterprise design system, accessible mega menus, mobile accordion navigation, editorial page layouts and structured footer documented in:
-
-```text
-CISCO_INSPIRED_REDESIGN_AUDIT.md
-PUBLIC_DESIGN_SYSTEM.md
-CISCO_INSPIRED_REDESIGN_IMPLEMENTATION.md
-```
-
-Primary homepage positioning:
-
-```text
-Online Cybersecurity Courses with Hands-On Labs
-```
-
-The dedicated Cyber Security Essentials course page remains at:
-
-```text
-/courses/cybersecurity/cyber-security-essentials
-```
-
-Clean public course routes:
-
-```text
-/
-/courses
-/courses/cybersecurity
-/courses/cybersecurity/cyber-security-essentials
-/courses/cybersecurity/web-application-security
-/courses/cybersecurity/soc-analyst-foundations
-/courses/cybersecurity/ethical-hacking-foundations
-/learning-paths
-/learning-paths/beginner-cybersecurity
-/learning-paths/ethical-hacking
-/learning-paths/soc-analyst
-/learning-paths/network-cloud-security
-/learning-paths/digital-forensics
-/labs
-/labs/:labSlug
-/resources
-/blog
-/blog/:slug
-/about
-/instructors
-/instructors/arghya-sikdar
-/contact
-/for-organisations
-/for-institutions
-/for-businesses
-/faq
-/accessibility
-/privacy-policy
-/terms
-/refund-policy
-/cookie-policy
-/certificate-verification
-```
-
-Authenticated LMS course routes:
-
-```text
-/learn/courses
-/learn/courses/:id
-```
-
-Frontend landing-page environment variables:
-
-```text
-VITE_SITE_URL=https://cyberlabin.com
-VITE_CSE_COURSE_FEE=0
-```
-
-Homepage SEO/AEO implementation notes:
-
-```text
-SEO_AEO_HOMEPAGE_IMPLEMENTATION.md
-LANDING_PAGE_CONTENT_MAP.md
-TECHNICAL_SEO_CHECKLIST.md
-```
-
-## Build
-```bash
+npm run lint
+npm test
 npm run build
+npm run verify
+npm run smoke
 ```
 
-## Test
+The backend integration suite covers signup, cookie sessions, CSRF, roles, dashboards, visitor and lead persistence, Course A/Course B isolation, protected documents, labs, quizzes, certificates, live-class time and batch rules, course-specific tutor boundaries and CLI mutation safety.
+
+## CLI administration
+
 ```bash
-npm run test
+npm run cliadm -- system health --json
+npm run cliadm -- analytics summary --json
+npm run cliadm -- audit search --json
 ```
 
-## Auth
-- Login page: `cyberscout/src/pages/auth/LoginPage.jsx`
-- Signup page: `cyberscout/src/pages/auth/SignUpPage.jsx`
-- OAuth callback page: `cyberscout/src/pages/auth/OAuthCallbackPage.jsx`
-- Backend auth routes: `cyberscout-server/src/routes/auth.js`
+Mutation commands require `--admin-token`; destructive commands also require `--dry-run` or `--confirm YES`. See `npm run cliadm -- --help` and `docs/architecture/API_ROUTES_DOCUMENTATION.md`.
 
-New users are stored in the database and passwords are hashed with bcrypt. Role-specific login pages use the same backend auth system:
+Development seeding creates local test identities only when `NODE_ENV` is not `production`. Production startup seeds public catalogue content but never creates predictable role accounts. Bootstrap the first production administrator from a protected Render shell with a strong password and `cliadm`, then rotate the shell variables:
 
-```text
-/login
-/admin/login
-/instructor/login
-/marketing/login
-/ops/login
+```bash
+read -s CLIADM_NEW_PASSWORD
+read -s CLIADM_TOKEN
+npm run cliadm -- user create --email admin@your-domain.example --name "Platform Administrator" --password "$CLIADM_NEW_PASSWORD" --role super_admin --admin-token "$CLIADM_TOKEN" --json
+unset CLIADM_NEW_PASSWORD CLIADM_TOKEN
 ```
 
-## Core API
-```text
-POST /api/auth/register
-POST /api/auth/login
-GET  /api/auth/me
-POST /api/auth/logout
-POST /api/auth/change-password
-GET  /api/courses/public
-GET  /api/courses/public/:courseId
-GET  /api/courses/public/slug/:categorySlug/:courseSlug
-GET  /api/courses/:courseId
-POST /api/courses/:courseId/enroll
-GET  /api/courses/:courseId/materials
-GET  /api/courses/my
-POST /api/leads
-GET  /api/leads
-PATCH /api/leads/:leadId
-GET  /api/blogs
-GET  /api/blogs/:slug
-POST /api/visitors/track
-POST /api/visitors/consent
-GET  /api/visitors/stats
-GET  /api/dashboards/student
-GET  /api/dashboards/admin
-GET  /api/dashboards/marketing
-POST /api/ai/courses/:courseId/chat
-```
+## Deployment
 
-Private lessons and materials require an authenticated user with active course enrollment or staff access.
+### Vercel frontend
 
-Auth tokens are returned for the existing frontend guard and also stored in an HTTP-only `cli_session` cookie by the backend. Password changes rotate `token_version` so older JWTs fail closed.
+- Root directory: `cyberscout`
+- Install command: `npm ci`
+- Build command: `npm run build`
+- Output directory: `dist`
+- Leave `VITE_API_URL` unset so `/api` uses the first-party Vercel proxy.
 
-## Lead, Blog, and Visitor Systems
-- Landing-page leads use source `landing_form`.
-- FAQ assistant leads use source `chatbot`.
-- Course popup leads use source `course_popup`.
-- Marketing and admin dashboards read leads and visitor counts from the database.
-- Blog listing and detail pages read from the `blogs` table seeded by the backend migration.
-- Visitor analytics use a privacy-conscious visitor ID cookie and an IP hash, not raw IP storage in the visitor table.
+### Render backend
 
-## Environment
-Frontend env example:
+- Root directory: `cyberscout-server`
+- Build command: `npm ci`
+- Start command: `npm start`
+- Health endpoint: `/api/health`
 
-```text
-cyberscout/.env.example
-```
+Use `render.yaml` as a safe starter and configure every secret from `.env.example`. Google OAuth must authorize `https://cyberlabin.com/api/auth/google/callback`.
 
-Backend env example:
+SQLite on Render free is ephemeral. It is acceptable for deployment testing, not durable production. Complete the repository migration to Supabase Postgres before accepting paid enrolments or relying on production records. See `docs/deployment/README.md` and `REMAINING_WORK.md`.
 
-```text
-cyberscout-server/.env.example
-```
+## Documentation
 
-Do not commit real `.env` files.
-
-## Local Verification Checklist
-- `/` opens the Cyber Lab IN landing page directly.
-- `/courses`, `/courses/cybersecurity`, and `/courses/cybersecurity/cyber-security-essentials` open public course pages.
-- `/blog` and all seeded blog detail routes open from database-backed content.
-- Create a new account from `/signup`.
-- Confirm the user exists in `cyberscout-server/data/cyberlab.sqlite`.
-- Log in from `/login`.
-- Open `/learn/courses` and confirm authenticated courses load from the database.
-- Enroll in a course.
-- Confirm `/dashboard` shows only enrolled courses.
-- Open the enrolled course and confirm private materials are visible.
-- Log in as a different non-enrolled user and confirm private materials return `403`.
-- Submit the landing lead form and confirm it appears in `/marketing/dashboard`.
-- Open the FAQ assistant, request a callback, and confirm source `chatbot`.
-- Change password from `/settings?tab=security` and confirm the old password no longer works.
-- Confirm `/leaderboard` shows real progress data only or an empty state.
-
-## Deployment Notes
-- Frontend can deploy to Vercel using `cyberscout/` as the app root and `npm run build`.
-- Backend can deploy to Render/Fly/Railway or any Node host that supports persistent storage or a managed database.
-- Supabase/Postgres deployment should use the SQL in `supabase/` as the production database starting point. Keep service keys on the backend only.
+- `IMPLEMENTATION_SUMMARY.md`: delivered changes and decisions.
+- `SECURITY_NOTES.md`: session, CSRF, rate-limit and deployment controls.
+- `CONTENT_NEEDED.md`: verified human content still required.
+- `REMAINING_WORK.md`: work blocked by missing assets, credentials or durable database hosting.
+- `docs/architecture/`: APIs, database, roles and course isolation.
+- `docs/diagrams/`: Mermaid ERD, DFD and component diagrams.
+- `docs/product/`: public-site and SEO implementation history.
+- `docs/deployment/`: deployment and local test notes.

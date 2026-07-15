@@ -14,6 +14,12 @@ const quickActions = [
   { icon: 'account_circle', label: 'My Profile', desc: 'Manage your account.', to: '/profile', dark: false },
 ]
 
+function formatDateTime(value) {
+  if (!value) return 'Current session'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? 'Current session' : new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
+}
+
 export default function DashboardPage() {
   const { user } = useAppStore()
   const [dashboard, setDashboard] = useState(null)
@@ -50,14 +56,14 @@ export default function DashboardPage() {
       <div className="max-w-[1280px] mx-auto px-8 py-8 space-y-8">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <h2 className="font-space-grotesk text-3xl font-black text-primary">
+            <h1 className="font-space-grotesk text-3xl font-black text-primary">
               Welcome, {user?.name ?? 'Learner'}
-            </h2>
+            </h1>
             <p className="text-on-surface-variant mt-1">Your courses, progress, and resources are loaded from your account.</p>
           </div>
           <div className="text-left md:text-right">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Last Login</p>
-            <p className="text-sm font-medium text-slate-700">{user?.lastLogin || 'Current session'}</p>
+            <p className="text-sm font-medium text-slate-700">{formatDateTime(user?.lastLogin)}</p>
           </div>
         </div>
 
@@ -80,8 +86,8 @@ export default function DashboardPage() {
 
             {activeCourse ? (
               <section className="bg-white rounded-xl border border-slate-200 shadow-card overflow-hidden">
-                <div className="relative h-48 bg-gradient-to-br from-primary-container to-secondary">
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent p-6 flex flex-col justify-end">
+                <div className="relative h-48 bg-primary-container">
+                  <div className="absolute inset-0 bg-slate-900/35 p-6 flex flex-col justify-end">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                       <div>
                         <span className="bg-violet-500 text-white text-[10px] font-bold px-2 py-1 rounded uppercase tracking-widest mb-2 inline-block">
@@ -161,7 +167,7 @@ export default function DashboardPage() {
                     <article key={liveClass.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-card">
                       <p className="font-space-grotesk font-bold text-primary">{liveClass.title}</p>
                       <p className="mt-1 text-sm text-slate-500">{liveClass.course_title}</p>
-                      <p className="mt-3 text-xs font-bold uppercase tracking-widest text-violet-600">{liveClass.scheduled_start}</p>
+                      <time className="mt-3 block text-xs font-bold uppercase tracking-widest text-violet-600" dateTime={liveClass.scheduled_start}>{formatDateTime(liveClass.scheduled_start)}</time>
                     </article>
                   ))}
                 </div>

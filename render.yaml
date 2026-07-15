@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: cyberlabin-api
+    runtime: node
+    rootDir: cyberscout-server
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: FRONTEND_URL
+        value: https://cyberlabin.com
+      - key: BACKEND_URL
+        value: https://cyberlabin.onrender.com
+      - key: CORS_ORIGINS
+        value: https://cyberlabin.com,https://www.cyberlabin.com
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: COOKIE_SAME_SITE
+        value: lax
+      - key: DATABASE_URL
+        value: file:./data/cyberlab.sqlite
+      - key: JWT_SECRET
+        sync: false
+      - key: VISITOR_HASH_SALT
+        sync: false
+      - key: LAB_FLAG_SALT
+        sync: false
+      - key: CLIADM_ADMIN_TOKEN
+        sync: false

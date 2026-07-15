@@ -1,26 +1,26 @@
 import { Router } from 'express'
-import { requireAuth, requireCourseAccess, requireRole } from '../middleware/access.js'
-import { userHasRole } from '../db/repositories.js'
-import { assignLabToCourse, createLab, getLabById, hasActiveEnrollment, launchLab, listLabAttempts, listLabsByCourse, submitLabFlag, updateCourseProgress } from '../store/platformStore.js'
+import { requireAuth, requireCourseAccess, requireCourseManager, requireRole } from '../middleware/access.js'
+import { assignLabToCourse, createLab, getLabById, hasActiveEnrollment, isInstructorAssigned, launchLab, listLabAttempts, listLabsByCourse, submitLabFlag, updateCourseProgress, userHasRole } from '../db/repositories.js'
 import { requireFields } from '../lib/validation.js'
 
 const router = Router()
-const labRoles = ['admin', 'super_admin', 'instructor', 'ops', 'lab_creator', 'support']
+const labReadRoles = ['admin', 'super_admin', 'ops', 'lab_creator', 'support']
+const labRoles = [...labReadRoles, 'instructor']
 
 function canAccessLab(user, lab) {
   if (!lab) return false
-  return userHasRole(user, labRoles) || hasActiveEnrollment(user.id, lab.courseId)
+  return userHasRole(user, labReadRoles) || isInstructorAssigned(user.id, lab.courseId) || hasActiveEnrollment(user.id, lab.courseId)
 }
 
 router.use(requireAuth)
 
-router.post('/', requireRole(...labRoles), (req, res) => {
+router.post('/', requireRole(...labRoles), requireCourseManager, (req, res) => {
   const error = requireFields(req.body, ['courseId', 'title'])
   if (error) return res.status(400).json({ error })
   res.status(201).json({ lab: createLab(req.body, req.user.id) })
 })
 
-router.post('/:labId/assign', requireRole(...labRoles), (req, res) => {
+router.post('/:labId/assign', requireRole(...labRoles), requireCourseManager, (req, res) => {
   const error = requireFields(req.body, ['courseId'])
   if (error) return res.status(400).json({ error })
   const lab = assignLabToCourse(req.params.labId, req.body.courseId, req.user.id)
@@ -28,7 +28,7 @@ router.post('/:labId/assign', requireRole(...labRoles), (req, res) => {
   res.json({ lab })
 })
 
-router.get('/course/:courseId', requireCourseAccess({ allowRoles: labRoles }), (req, res) => {
+router.get('/course/:courseId', requireCourseAccess({ allowRoles: labReadRoles }), (req, res) => {
   res.json({ labs: listLabsByCourse(req.params.courseId).map(({ flag, ...safe }) => safe) })
 })
 

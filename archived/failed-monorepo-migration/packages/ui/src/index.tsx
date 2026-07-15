@@ -1,5 +1,0 @@
-import * as React from 'react';
-export function Shell({ children }: { children: React.ReactNode }) { return <main className="min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-50">{children}</main>; }
-export function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) { return <section className={'rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 ' + className}>{children}</section>; }
-export function Metric({ label, value, help }: { label: string; value: string | number; help?: string }) { return <Card><p className="text-sm text-slate-500 dark:text-slate-400">{label}</p><p className="mt-2 text-3xl font-semibold">{value}</p>{help ? <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{help}</p> : null}</Card>; }
-export function EmptyState({ title, body }: { title: string; body: string }) { return <Card className="text-center"><h2 className="text-lg font-semibold">{title}</h2><p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{body}</p></Card>; }

@@ -18,11 +18,11 @@ function insertCourse(course) {
   db.prepare(`
     INSERT INTO courses (
       id, slug, title, category, level, duration, description, overview, instructor_name, instructor_title,
-      status, price, mode, credential, prerequisites, brochure_url, category_slug, audience, outcomes, labs
+      status, price, mode, credential, prerequisites, brochure_url, category_slug, audience, outcomes, labs, instructor_id
     )
     VALUES (
       @id, @slug, @title, @category, @level, @duration, @description, @overview, @instructorName, @instructorTitle,
-      @status, @price, @mode, @credential, @prerequisites, @brochureUrl, @categorySlug, @audience, @outcomes, @labs
+      @status, @price, @mode, @credential, @prerequisites, @brochureUrl, @categorySlug, @audience, @outcomes, @labs, @instructorId
     )
     ON CONFLICT(id) DO UPDATE SET
       title = excluded.title,
@@ -54,6 +54,7 @@ function insertCourse(course) {
     audience: JSON.stringify(course.audience || []),
     outcomes: JSON.stringify(course.outcomes || []),
     labs: JSON.stringify(course.labs || []),
+    instructorId: course.instructorId || null,
   })
 }
 
@@ -331,10 +332,15 @@ const materials = [
   },
 ]
 
-function baselineSeedIsReady() {
+function catalogSeedIsReady() {
   const courseCount = db.prepare("SELECT count(*) AS count FROM courses WHERE id IN ('c001', 'c002')").get().count
   const materialCount = db.prepare("SELECT count(*) AS count FROM course_materials WHERE id IN ('mat001_public', 'mat002_public')").get().count
+  return courseCount === 2 && materialCount === 2
+}
+
+function developmentSeedIsReady() {
   const liveClassCount = db.prepare("SELECT count(*) AS count FROM live_classes WHERE id = 'live_c001_01'").get().count
+  const instructorAssignmentCount = db.prepare("SELECT count(*) AS count FROM courses WHERE id = 'c002' AND instructor_id IS NOT NULL").get().count
   const userCount = db.prepare(`
     SELECT count(*) AS count
     FROM users
@@ -347,12 +353,20 @@ function baselineSeedIsReady() {
       'ops@cyberlabin.com'
     )
   `).get().count
-  return courseCount === 2 && materialCount === 2 && liveClassCount === 1 && userCount === 6
+  return liveClassCount === 1 && userCount === 6 && instructorAssignmentCount === 1
 }
 
-export async function seedBaselineData({ force = false, log = true } = {}) {
-  if (!force && baselineSeedIsReady()) {
-    if (log) console.log('Baseline seed data already ready.')
+export async function seedBaselineData({
+  force = false,
+  log = true,
+  includeTestUsers = process.env.NODE_ENV !== 'production',
+} = {}) {
+  const allowTestUsers = includeTestUsers && process.env.NODE_ENV !== 'production'
+  const catalogReady = catalogSeedIsReady()
+  const developmentReady = !allowTestUsers || developmentSeedIsReady()
+
+  if (!force && catalogReady && developmentReady) {
+    if (log) console.log(allowTestUsers ? 'Development seed data already ready.' : 'Public catalogue already ready.')
     return { seeded: false }
   }
 
@@ -361,12 +375,19 @@ export async function seedBaselineData({ force = false, log = true } = {}) {
   for (const lesson of lessons) insertLesson(lesson)
   for (const material of materials) insertMaterial(material)
 
+  if (!allowTestUsers) {
+    if (log) console.log('Public catalogue ready. Test identities were not created.')
+    return { seeded: true, testUsersSeeded: false }
+  }
+
   const student = await ensureUser({ name: 'Student Learner', email: 'student@cyberlabin.com', role: 'student', roles: ['student'] })
   const neel = await ensureUser({ name: 'Neel Cyber Lab Learner', email: 'neel0409@gmail.com', role: 'student', roles: ['student'] })
   await ensureUser({ name: 'Cyber Lab Admin', email: 'admin@cyberlabin.com', role: 'admin', roles: ['admin'] })
-  await ensureUser({ name: 'Cyber Lab Instructor', email: 'instructor@cyberlabin.com', role: 'instructor', roles: ['instructor'] })
+  const instructor = await ensureUser({ name: 'Cyber Lab Instructor', email: 'instructor@cyberlabin.com', role: 'instructor', roles: ['instructor'] })
   await ensureUser({ name: 'Cyber Lab Marketing', email: 'marketing@cyberlabin.com', role: 'marketing', roles: ['marketing'] })
   await ensureUser({ name: 'Cyber Lab Ops', email: 'ops@cyberlabin.com', role: 'ops', roles: ['ops'] })
+
+  db.prepare("UPDATE courses SET instructor_id = ? WHERE instructor_name = 'Arghya Sikdar'").run(instructor.id)
 
   if (getCourseById('c001')) enrollUser(student.id, 'c001', 'seed')
   if (getCourseById('c002')) enrollUser(neel.id, 'c002', 'seed')
@@ -377,8 +398,8 @@ export async function seedBaselineData({ force = false, log = true } = {}) {
     ON CONFLICT(id) DO NOTHING
   `).run()
 
-  if (log) console.log('Seed data ready.')
-  return { seeded: true }
+  if (log) console.log('Development seed data ready.')
+  return { seeded: true, testUsersSeeded: true }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {

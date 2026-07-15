@@ -243,6 +243,159 @@ erDiagram
     string updated_at
   }
 
+  ANALYTICS_EVENTS {
+    string id PK
+    string event
+    string user_id FK
+    string visitor_id
+    string path
+    string properties
+    string created_at
+  }
+
+  BATCHES {
+    string id PK
+    string course_id FK
+    string name
+    string status
+    string starts_at
+    string ends_at
+  }
+
+  COURSE_VIDEOS {
+    string id PK
+    string course_id FK
+    string lesson_id FK
+    string title
+    string provider
+    string embed_id
+    integer sort_order
+    string status
+  }
+
+  PROTECTED_DOCUMENTS {
+    string id PK
+    string course_id FK
+    string lesson_id FK
+    string title
+    string storage_key
+    integer page_count
+    string status
+  }
+
+  PROTECTED_DOCUMENT_EVENTS {
+    string id PK
+    string document_id FK
+    string course_id FK
+    string user_id FK
+    integer page
+    string event
+    string metadata
+  }
+
+  LABS {
+    string id PK
+    string course_id FK
+    string lesson_id FK
+    string title
+    string description
+    integer points
+    string hints
+    integer docker_ready
+    string status
+  }
+
+  LAB_FLAGS {
+    string id PK
+    string lab_id FK
+    string flag_hash
+    integer points
+  }
+
+  LAB_ATTEMPTS {
+    string id PK
+    string lab_id FK
+    string course_id FK
+    string user_id FK
+    string status
+    integer score
+    string started_at
+    string submitted_at
+  }
+
+  QUIZZES {
+    string id PK
+    string course_id FK
+    string title
+    string status
+  }
+
+  QUIZ_QUESTIONS {
+    string id PK
+    string quiz_id FK
+    string prompt
+    string choices
+    string answer
+    integer sort_order
+  }
+
+  QUIZ_ATTEMPTS {
+    string id PK
+    string quiz_id FK
+    string course_id FK
+    string user_id FK
+    string answers
+    integer score
+  }
+
+  ASSIGNMENTS {
+    string id PK
+    string course_id FK
+    string title
+    string description
+    string status
+    string due_at
+  }
+
+  ASSIGNMENT_SUBMISSIONS {
+    string id PK
+    string assignment_id FK
+    string course_id FK
+    string user_id FK
+    string content
+    string status
+    integer score
+    string reviewed_by FK
+  }
+
+  CERTIFICATES {
+    string id PK
+    string user_id FK
+    string course_id FK
+    string verification_code UK
+    string issued_by FK
+    string status
+  }
+
+  PAYMENT_INTENTS {
+    string id PK
+    string user_id FK
+    string course_id FK
+    integer amount
+    string currency
+    string provider
+    string provider_order_id UK
+    string status
+  }
+
+  PAYMENT_EVENTS {
+    string id PK
+    string provider_event_id UK
+    string event_type
+    string payload
+    string processed_at
+  }
+
   USERS ||--o{ ENROLLMENTS : enrolls
   COURSES ||--o{ ENROLLMENTS : accepts
   COURSES ||--o{ COURSE_MODULES : contains
@@ -273,3 +426,33 @@ erDiagram
   LEADS ||--o{ FOLLOW_UPS : schedules
   USERS ||--o{ FOLLOW_UPS : owns
   VISITOR_ANALYTICS ||--o{ COOKIE_CONSENTS : records
+  USERS ||--o{ ANALYTICS_EVENTS : identifies
+  COURSES ||--o{ BATCHES : groups
+  COURSES ||--o{ COURSE_VIDEOS : owns
+  LESSONS ||--o{ COURSE_VIDEOS : attaches
+  COURSES ||--o{ PROTECTED_DOCUMENTS : owns
+  LESSONS ||--o{ PROTECTED_DOCUMENTS : attaches
+  PROTECTED_DOCUMENTS ||--o{ PROTECTED_DOCUMENT_EVENTS : emits
+  COURSES ||--o{ PROTECTED_DOCUMENT_EVENTS : scopes
+  USERS ||--o{ PROTECTED_DOCUMENT_EVENTS : triggers
+  COURSES ||--o{ LABS : owns
+  LESSONS ||--o{ LABS : attaches
+  LABS ||--o{ LAB_FLAGS : validates
+  LABS ||--o{ LAB_ATTEMPTS : receives
+  COURSES ||--o{ LAB_ATTEMPTS : scopes
+  USERS ||--o{ LAB_ATTEMPTS : submits
+  COURSES ||--o{ QUIZZES : owns
+  QUIZZES ||--o{ QUIZ_QUESTIONS : contains
+  QUIZZES ||--o{ QUIZ_ATTEMPTS : receives
+  COURSES ||--o{ QUIZ_ATTEMPTS : scopes
+  USERS ||--o{ QUIZ_ATTEMPTS : submits
+  COURSES ||--o{ ASSIGNMENTS : owns
+  ASSIGNMENTS ||--o{ ASSIGNMENT_SUBMISSIONS : receives
+  COURSES ||--o{ ASSIGNMENT_SUBMISSIONS : scopes
+  USERS ||--o{ ASSIGNMENT_SUBMISSIONS : submits
+  USERS ||--o{ ASSIGNMENT_SUBMISSIONS : reviews
+  USERS ||--o{ CERTIFICATES : receives
+  COURSES ||--o{ CERTIFICATES : awards
+  USERS ||--o{ CERTIFICATES : issues
+  USERS ||--o{ PAYMENT_INTENTS : creates
+  COURSES ||--o{ PAYMENT_INTENTS : purchases

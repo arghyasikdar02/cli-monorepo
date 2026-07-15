@@ -1,78 +1,24 @@
-import { useParams, useLocation, Link } from 'react-router-dom'
+import { useLocation, useParams, Link } from 'react-router-dom'
 import AppShell from '../../components/layout/AppShell'
-import { getQuizById } from '../../data/quizzes'
-
-const LABELS = ['A', 'B', 'C', 'D']
 
 export default function QuizResultsPage() {
   const { quizId } = useParams()
   const { state } = useLocation()
-  const quiz = state?.quiz ?? getQuizById(quizId)
-  const answers = state?.answers ?? []
-  const score = state?.score ?? 0
+  const quiz = state?.quiz
+  const attempt = state?.attempt
 
-  const passed = score >= 70
-  const correct = answers.filter(a => a.correct).length
+  if (!quiz || !attempt) return <AppShell focusMode><main className="mx-auto max-w-xl px-6 py-16 text-center"><h1 className="font-space-grotesk text-2xl font-black text-primary">Quiz result not available</h1><p className="mt-2 text-on-surface-variant">Complete the quiz to create a saved result.</p><Link to={`/quiz/${quizId}`} className="mt-5 inline-flex text-sm font-bold text-secondary hover:underline">Open quiz</Link></main></AppShell>
+
+  const passed = attempt.score >= 70
+  const correct = attempt.results.filter(result => result.correct).length
 
   return (
     <AppShell focusMode>
-      <div className="max-w-2xl mx-auto px-6 py-12">
-        {/* Score hero */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-card p-8 text-center mb-6">
-          <div className={`w-28 h-28 rounded-full flex items-center justify-center mx-auto mb-5 ${passed ? 'bg-green-50 border-4 border-green-400' : 'bg-red-50 border-4 border-red-400'}`}>
-            <span className={`font-space-grotesk text-3xl font-black ${passed ? 'text-green-600' : 'text-red-600'}`}>{score}%</span>
-          </div>
-          <h1 className="font-space-grotesk text-2xl font-black text-primary mb-2">
-            {passed ? 'Excellent Work!' : 'Keep Practicing!'}
-          </h1>
-          <p className="text-on-surface-variant mb-5">
-            You answered <span className="font-bold text-on-surface">{correct} of {quiz?.questions?.length ?? answers.length}</span> questions correctly.
-          </p>
-          <div className="inline-flex items-center gap-2 bg-secondary/10 text-secondary px-4 py-2 rounded-full">
-            <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>military_tech</span>
-            <span className="font-space-grotesk text-sm font-bold">+{Math.round(score * 1.2)} XP Earned</span>
-          </div>
-        </div>
-
-        {/* Answer review */}
-        {quiz && answers.length > 0 && (
-          <div className="space-y-3 mb-8">
-            <h2 className="font-space-grotesk font-bold text-primary mb-4">Answer Review</h2>
-            {quiz.questions.map((q, i) => {
-              const ans = answers[i]
-              if (!ans) return null
-              return (
-                <div key={q.id} className={`bg-white rounded-xl border p-5 ${ans.correct ? 'border-green-200' : 'border-red-200'}`}>
-                  <div className="flex items-start gap-3 mb-3">
-                    <span className={`material-symbols-outlined text-[20px] flex-shrink-0 mt-0.5 ${ans.correct ? 'text-green-500' : 'text-error'}`}
-                      style={{ fontVariationSettings: "'FILL' 1" }}>
-                      {ans.correct ? 'check_circle' : 'cancel'}
-                    </span>
-                    <p className="text-sm font-semibold text-on-surface">{q.text}</p>
-                  </div>
-                  <div className="ml-8 space-y-1 text-xs text-on-surface-variant">
-                    <p>Your answer: <span className={ans.correct ? 'text-green-600 font-bold' : 'text-error font-bold'}>{LABELS[ans.selectedIdx]}. {q.options[ans.selectedIdx]}</span></p>
-                    {!ans.correct && <p>Correct: <span className="text-green-600 font-bold">{LABELS[q.correctIndex]}. {q.options[q.correctIndex]}</span></p>}
-                    <p className="text-slate-400 mt-1 italic">{q.tip}</p>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-
-        {/* CTAs */}
-        <div className="flex gap-3">
-          <Link to={`/quiz/${quizId}`}
-            className="flex-1 text-center py-3 border-2 border-slate-200 text-slate-700 font-space-grotesk font-bold text-sm rounded-xl hover:border-primary hover:text-primary transition-colors">
-            Retake Quiz
-          </Link>
-          <Link to={`/learn/courses/${quiz?.courseId}`}
-            className="flex-1 text-center py-3 bg-primary text-white font-space-grotesk font-bold text-sm rounded-xl hover:opacity-90 transition-opacity">
-            Back to Course
-          </Link>
-        </div>
-      </div>
+      <main className="max-w-2xl mx-auto px-6 py-12">
+        <section className="border border-slate-200 bg-white p-8 text-center shadow-card"><p className="text-xs font-bold uppercase tracking-widest text-slate-500">Saved quiz attempt</p><h1 className="mt-2 font-space-grotesk text-2xl font-black text-primary">{passed ? 'Quiz completed' : 'Review and try again'}</h1><p className="mt-3 text-on-surface-variant">You answered <strong className="text-on-surface">{correct} of {attempt.results.length}</strong> questions correctly.</p><p className="mt-5 font-space-grotesk text-4xl font-black text-secondary">{attempt.score}%</p></section>
+        <section className="mt-6 space-y-3" aria-labelledby="answer-review"><h2 id="answer-review" className="font-space-grotesk font-bold text-primary">Answer review</h2>{attempt.results.map(result => <article key={result.questionId} className={`border bg-white p-5 ${result.correct ? 'border-green-200' : 'border-red-200'}`}><h3 className="text-sm font-semibold text-on-surface">{result.prompt}</h3><p className="mt-2 text-sm text-slate-600">Your answer: <strong>{result.selectedAnswer || 'No answer'}</strong></p>{!result.correct && <p className="mt-1 text-sm text-slate-600">Correct answer: <strong>{result.correctAnswer}</strong></p>}</article>)}</section>
+        <div className="mt-7 flex flex-col gap-3 sm:flex-row"><Link to={`/quiz/${quizId}`} className="flex-1 rounded-lg border border-slate-300 px-5 py-3 text-center text-sm font-bold text-slate-700">Retake quiz</Link><Link to={`/learn/courses/${quiz.courseId}`} className="flex-1 rounded-lg bg-primary px-5 py-3 text-center text-sm font-bold text-white">Back to course</Link></div>
+      </main>
     </AppShell>
   )
 }

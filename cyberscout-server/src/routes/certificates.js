@@ -1,6 +1,6 @@
 import { Router } from 'express'
-import { requireAuth, requireCourseAccess, requireRole } from '../middleware/access.js'
-import { issueCertificate, listCertificates, verifyCertificate } from '../store/platformStore.js'
+import { requireAuth, requireCourseAccess, requireCourseManager, requireRole } from '../middleware/access.js'
+import { issueCertificate, listCertificates, verifyCertificate } from '../db/repositories.js'
 import { requireFields } from '../lib/validation.js'
 
 const router = Router()
@@ -13,13 +13,13 @@ router.get('/verify/:code', (req, res) => {
 
 router.use(requireAuth)
 
-router.post('/', requireRole('admin', 'super_admin', 'instructor'), (req, res) => {
+router.post('/', requireRole('admin', 'super_admin', 'instructor'), requireCourseManager, (req, res) => {
   const error = requireFields(req.body, ['userId', 'courseId'])
   if (error) return res.status(400).json({ error })
   res.status(201).json({ certificate: issueCertificate(req.body, req.user.id) })
 })
 
-router.get('/course/:courseId', requireCourseAccess({ allowRoles: ['admin', 'super_admin', 'instructor', 'support'] }), (req, res) => {
+router.get('/course/:courseId', requireCourseAccess({ allowRoles: ['admin', 'super_admin', 'support'] }), (req, res) => {
   const userId = req.query.userId || req.user.id
   res.json({ certificates: listCertificates({ userId, courseId: req.params.courseId }) })
 })

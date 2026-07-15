@@ -20,6 +20,8 @@
     "cliadm": "node cyberscout-server/src/cli/cliadm.js",
     "test": "npm run test --prefix cyberscout-server",
     "build": "npm run build --prefix cyberscout",
-    "lint": "npm run lint --prefix cyberscout"
+    "lint": "npm run lint --prefix cyberscout",
+    "verify": "npm run lint && npm test && npm run build",
+    "smoke": "bash scripts/smoke-test.sh"
   }
 }

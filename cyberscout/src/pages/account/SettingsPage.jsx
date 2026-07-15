@@ -96,7 +96,7 @@ function AccountTab({ user }) {
 }
 
 function SecurityTab() {
-  const { user, loginWithToken } = useAppStore()
+  const { user, setSession } = useAppStore()
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -112,14 +112,14 @@ function SecurityTab() {
       setError('New passwords do not match.')
       return
     }
-    if (newPassword.length < 8 || !/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/\d/.test(newPassword)) {
-      setError('Use at least 8 characters with uppercase, lowercase, and a number.')
+    if (newPassword.length < 12) {
+      setError('Use at least 12 characters. A short passphrase is acceptable.')
       return
     }
     setLoading(true)
     try {
       const result = await api.changePassword(currentPassword, newPassword)
-      loginWithToken(result.token, result.user)
+      setSession(result.user)
       setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')

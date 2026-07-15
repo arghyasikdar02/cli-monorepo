@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import 'dotenv/config'
 import bcrypt from 'bcrypt'
+import fs from 'node:fs/promises'
+import path from 'node:path'
 import {
   addEnrollment,
   assignLabToCourse,
@@ -10,14 +12,18 @@ import {
   createLiveClass,
   getAdminAnalytics,
   getAuditLogs,
-  getSalesAnalytics,
+  getSalesDashboard,
   ingestRagSource,
   issueCertificate,
-  leads,
   listLeads,
+  listUsers,
+  publishCourse,
   recordAudit,
-} from '../store/platformStore.js'
-import { createUser, listUsers, suspendUser } from '../store/users.js'
+  suspendUser,
+  createUser,
+} from '../db/repositories.js'
+import { databasePath, db } from '../db/index.js'
+import { validatePassword } from '../lib/validation.js'
 
 const args = process.argv.slice(2)
 
@@ -103,27 +109,31 @@ async function run() {
   }
 
   if (command === 'system health') {
-    print({ ok: true, service: 'cliadm', store: 'in-memory-dev', timestamp: new Date().toISOString() }, options)
+    const checks = db.prepare('SELECT count(*) AS users FROM users').get()
+    print({ ok: true, service: 'cliadm', database: 'sqlite', databasePath: databasePath(), users: checks.users, timestamp: new Date().toISOString() }, options)
     return
   }
 
   if (command === 'analytics summary') {
-    print({ admin: getAdminAnalytics(), sales: getSalesAnalytics() }, options)
+    print({ admin: getAdminAnalytics(), sales: getSalesDashboard().analytics }, options)
     return
   }
 
   if (command === 'audit search') {
-    print({ auditLogs: getAuditLogs({ action: options.action }).slice(0, Number(options.limit || 50)) }, options)
+    const logs = getAuditLogs(Number(options.limit || 50))
+    print({ auditLogs: options.action ? logs.filter(log => log.action.includes(options.action)) : logs }, options)
     return
   }
 
   if (command === 'user create') {
     requireFields(options, ['email', 'name', 'password'])
+    const passwordError = validatePassword(options.password)
+    if (passwordError) throw new Error(passwordError)
     const safety = requireSafeMutation(options, command)
     if (safety.dryRun) return print({ ...safety, user: { email: options.email, name: options.name, role: options.role || 'student' } }, options)
-    const passwordHash = await bcrypt.hash(options.password, 10)
+    const passwordHash = await bcrypt.hash(options.password, Number(process.env.BCRYPT_COST || 12))
     const user = createUser({ email: options.email, name: options.name, passwordHash, role: options.role || 'student', roles: [options.role || 'student'] })
-    recordAudit('cliadm.user.create', 'cliadm', 'user', user.id, { email: user.email, role: user.role })
+    recordAudit('cliadm.user.create', null, 'user', user.id, { email: user.email, role: user.role, source: 'cliadm' })
     print({ user }, options)
     return
   }
@@ -134,7 +144,7 @@ async function run() {
     if (safety.dryRun) return print({ ...safety, userId: options.userId }, options)
     const user = suspendUser(options.userId)
     if (!user) throw new Error('User not found')
-    recordAudit('cliadm.user.suspend', 'cliadm', 'user', user.id, {})
+    recordAudit('cliadm.user.suspend', null, 'user', user.id, { source: 'cliadm' })
     print({ user }, options)
     return
   }
@@ -143,7 +153,7 @@ async function run() {
     requireFields(options, ['title'])
     const safety = requireSafeMutation(options, command)
     if (safety.dryRun) return print({ ...safety, course: { title: options.title } }, options)
-    print({ course: createCourse({ title: options.title, description: options.description || '', instructorId: options.instructorId || null }, 'cliadm') }, options)
+    print({ course: createCourse({ title: options.title, description: options.description || '', instructorId: options.instructorId || null }, null) }, options)
     return
   }
 
@@ -151,8 +161,7 @@ async function run() {
     requireFields(options, ['courseId'])
     const safety = requireSafeMutation(options, command)
     if (safety.dryRun) return print({ ...safety, courseId: options.courseId }, options)
-    const { publishCourse } = await import('../store/platformStore.js')
-    print({ course: publishCourse(options.courseId, 'cliadm') }, options)
+    print({ course: publishCourse(options.courseId, null) }, options)
     return
   }
 
@@ -160,7 +169,9 @@ async function run() {
     requireFields(options, ['userId', 'courseId'])
     const safety = requireSafeMutation(options, command)
     if (safety.dryRun) return print({ ...safety, enrollment: { userId: options.userId, courseId: options.courseId, batchId: options.batchId || null } }, options)
-    print({ enrollment: addEnrollment({ userId: options.userId, courseId: options.courseId, batchId: options.batchId || null }, 'cliadm') }, options)
+    const enrollment = addEnrollment({ userId: options.userId, courseId: options.courseId, batchId: options.batchId || null, source: 'cliadm' })
+    recordAudit('cliadm.enrollment.add', null, 'enrollment', enrollment.id, { userId: options.userId, courseId: options.courseId, source: 'cliadm' })
+    print({ enrollment }, options)
     return
   }
 
@@ -168,7 +179,7 @@ async function run() {
     requireFields(options, ['courseId', 'instructorId', 'title', 'scheduledStart', 'scheduledEnd'])
     const safety = requireSafeMutation(options, command)
     if (safety.dryRun) return print({ ...safety, liveClass: options }, options)
-    print({ liveClass: createLiveClass({ courseId: options.courseId, instructorId: options.instructorId, title: options.title, scheduledStart: options.scheduledStart, scheduledEnd: options.scheduledEnd, batchId: options.batchId || null }, 'cliadm') }, options)
+    print({ liveClass: createLiveClass({ courseId: options.courseId, instructorId: options.instructorId, title: options.title, scheduledStart: options.scheduledStart, scheduledEnd: options.scheduledEnd, batchId: options.batchId || null }, null) }, options)
     return
   }
 
@@ -176,7 +187,7 @@ async function run() {
     requireFields(options, ['labId', 'courseId'])
     const safety = requireSafeMutation(options, command)
     if (safety.dryRun) return print({ ...safety, labId: options.labId, courseId: options.courseId }, options)
-    print({ lab: assignLabToCourse(options.labId, options.courseId, 'cliadm') }, options)
+    print({ lab: assignLabToCourse(options.labId, options.courseId, null) }, options)
     return
   }
 
@@ -184,7 +195,7 @@ async function run() {
     requireFields(options, ['courseId', 'title'])
     const safety = requireSafeMutation(options, command)
     if (safety.dryRun) return print({ ...safety, lab: { courseId: options.courseId, title: options.title } }, options)
-    print({ lab: createLab({ courseId: options.courseId, lessonId: options.lessonId || null, title: options.title, description: options.description || '', flag: options.flag || null }, 'cliadm') }, options)
+    print({ lab: createLab({ courseId: options.courseId, lessonId: options.lessonId || null, title: options.title, description: options.description || '', flag: options.flag || null }, null) }, options)
     return
   }
 
@@ -192,7 +203,7 @@ async function run() {
     requireFields(options, ['userId', 'courseId'])
     const safety = requireSafeMutation(options, command)
     if (safety.dryRun) return print({ ...safety, certificate: { userId: options.userId, courseId: options.courseId } }, options)
-    print({ certificate: issueCertificate({ userId: options.userId, courseId: options.courseId }, 'cliadm') }, options)
+    print({ certificate: issueCertificate({ userId: options.userId, courseId: options.courseId }, null) }, options)
     return
   }
 
@@ -206,7 +217,7 @@ async function run() {
     requireFields(options, ['leadId', 'dueAt'])
     const safety = requireSafeMutation(options, command)
     if (safety.dryRun) return print({ ...safety, followUp: { leadId: options.leadId, dueAt: options.dueAt } }, options)
-    const followUp = createFollowUp(options.leadId, 'cliadm', options.dueAt, options.note || '')
+    const followUp = createFollowUp(options.leadId, null, options.dueAt, options.note || '')
     if (!followUp) throw new Error('Lead not found')
     print({ followUp }, options)
     return
@@ -214,12 +225,19 @@ async function run() {
 
   if (command === 'backups create') {
     const safety = requireSafeMutation(options, command, true)
-    print({ ...safety, backup: { status: safety.dryRun ? 'planned' : 'created', store: 'in-memory-dev', records: { leads: leads.length, users: listUsers().length } } }, options)
+    if (safety.dryRun) return print({ ...safety, backup: { status: 'planned', database: databasePath() } }, options)
+    const backupDirectory = path.resolve(path.dirname(databasePath()), 'backups')
+    await fs.mkdir(backupDirectory, { recursive: true })
+    const backupPath = path.join(backupDirectory, `cyberlabin-${new Date().toISOString().replace(/[:.]/g, '-')}.sqlite`)
+    await db.backup(backupPath)
+    recordAudit('cliadm.backup.create', null, 'database_backup', backupPath, { source: 'cliadm' })
+    print({ backup: { status: 'created', path: backupPath } }, options)
     return
   }
 
   if (command === 'migrations status') {
-    print({ migrations: { supabaseSchema: 'supabase/schema.sql', rlsPolicies: 'supabase/rls-policies.sql', applied: false, adapter: 'in-memory-dev' } }, options)
+    const migrations = db.prepare('SELECT name, applied_at AS appliedAt FROM schema_migrations ORDER BY name').all()
+    print({ adapter: 'sqlite', databasePath: databasePath(), migrations }, options)
     return
   }
 
@@ -227,7 +245,7 @@ async function run() {
     requireFields(options, ['courseId', 'title', 'content'])
     const safety = requireSafeMutation(options, command)
     if (safety.dryRun) return print({ ...safety, rag: { courseId: options.courseId, title: options.title } }, options)
-    print({ rag: ingestRagSource({ courseId: options.courseId, title: options.title, content: options.content }, 'cliadm') }, options)
+    print({ rag: ingestRagSource({ courseId: options.courseId, title: options.title, content: options.content }, null) }, options)
     return
   }
 

@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import PublicSiteLayout from '../../components/site/PublicSiteLayout'
+import SiteIcon from '../../components/ui/SiteIcon'
 
 export default function NotFoundPage() {
   useEffect(() => {
@@ -16,7 +17,7 @@ export default function NotFoundPage() {
           <p>The address may have changed, or the page may no longer be available. Use the links below to continue.</p>
           <div className="site-action-row">
             <Link to="/" className="site-button-primary">Return to the homepage</Link>
-            <Link to="/courses" className="site-text-link">Browse courses<span className="material-symbols-outlined" aria-hidden="true">arrow_forward</span></Link>
+            <Link to="/courses" className="site-text-link">Browse courses<SiteIcon name="arrow_forward" /></Link>
           </div>
         </div>
       </section>

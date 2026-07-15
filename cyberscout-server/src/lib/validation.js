@@ -9,3 +9,11 @@ export function pick(body, fields) {
     return acc
   }, {})
 }
+
+export function validatePassword(password) {
+  const value = String(password || '')
+  if (value.length < 12) return 'Use at least 12 characters. A short passphrase is acceptable.'
+  if (value.length > 128) return 'Password must be 128 characters or fewer.'
+  if (/^(password|password123|12345678|qwerty|letmein)$/i.test(value)) return 'Choose a less common password.'
+  return ''
+}

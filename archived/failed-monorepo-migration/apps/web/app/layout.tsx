@@ -1,4 +1,0 @@
-import './globals.css'; import type { ReactNode } from 'react'; import type { Metadata } from 'next';
-export const metadata: Metadata = { title: 'Cyber Lab IN', description: 'Cyber Lab IN is a practical cybersecurity education platform for hands-on labs, live learning, protected course content, and course-specific AI support.' };
-const themeScript = `(()=>{try{const s=localStorage.getItem('theme');const d=s||((matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light');document.documentElement.dataset.theme=d;if(d==='dark')document.documentElement.classList.add('dark')}catch(e){}})()`;
-export default function RootLayout({children}:{children:ReactNode}){return <html lang="en" suppressHydrationWarning><head><script dangerouslySetInnerHTML={{__html:themeScript}} /></head><body>{children}</body></html>}

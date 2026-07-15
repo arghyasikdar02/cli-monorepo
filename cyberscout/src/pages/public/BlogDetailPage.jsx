@@ -3,11 +3,12 @@ import { Link, useParams } from 'react-router-dom'
 import PublicSiteLayout, { Breadcrumbs, StatePanel } from '../../components/site/PublicSiteLayout'
 import { api } from '../../lib/api'
 import { serializeJsonLd } from '../../lib/structuredData'
+import SiteIcon from '../../components/ui/SiteIcon'
 
 const siteUrl = (import.meta.env.VITE_SITE_URL || 'https://cyberlabin.com').replace(/\/+$/, '')
 
 function Icon({ name }) {
-  return <span className="material-symbols-outlined" aria-hidden="true">{name}</span>
+  return <SiteIcon name={name} />
 }
 
 function formatDate(value) {

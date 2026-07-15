@@ -9,7 +9,6 @@ const navItems = [
   { to: '/ai-tutor', icon: 'smart_toy', label: 'AI Tutor' },
   { to: '/live-classes', icon: 'video_chat', label: 'Live Classes' },
   { to: '/leaderboard', icon: 'leaderboard', label: 'Leaderboard' },
-  { to: '/achievements', icon: 'military_tech', label: 'Achievements' },
 ]
 
 const linkClass = ({ isActive }) =>

@@ -2,6 +2,7 @@ import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
 import cookieParser from 'cookie-parser'
+import helmet from 'helmet'
 import passport from 'passport'
 import authRouter, { setupPassport } from './routes/auth.js'
 import aiRouter from './routes/ai.js'
@@ -27,16 +28,46 @@ import visitorsRouter from './routes/visitors.js'
 import videosRouter from './routes/videos.js'
 import webhooksRouter from './routes/webhooks.js'
 import { seedBaselineData } from './db/seed.js'
+import { validateEnvironment } from './lib/environment.js'
+import { apiLimiter, csrfProtection, requestContext } from './middleware/security.js'
 
 const PORT = process.env.PORT || 3001
-const corsOrigins = (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || 'http://localhost:5173')
+const configuredCorsOrigins = (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || 'http://localhost:5173')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean)
+const localPreviewOrigins = process.env.NODE_ENV === 'production'
+  ? []
+  : ['http://localhost:4173', 'http://127.0.0.1:4173']
+const corsOrigins = [...new Set([...configuredCorsOrigins, ...localPreviewOrigins])]
 
 export function createApp() {
+  validateEnvironment()
   const app = express()
   app.set('trust proxy', 1)
+  app.disable('x-powered-by')
+  app.use(requestContext)
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'none'"],
+        baseUri: ["'none'"],
+        frameAncestors: ["'none'"],
+        formAction: ["'none'"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    frameguard: { action: 'deny' },
+    referrerPolicy: { policy: 'no-referrer' },
+    strictTransportSecurity: process.env.NODE_ENV === 'production'
+      ? { maxAge: 31536000, includeSubDomains: true, preload: true }
+      : false,
+  }))
+  app.use((_req, res, next) => {
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()')
+    next()
+  })
   app.use(cors({
     origin: (origin, cb) => {
       if (!origin || corsOrigins.includes(origin)) return cb(null, true)
@@ -44,8 +75,16 @@ export function createApp() {
     },
     credentials: true,
   }))
-  app.use(express.json())
+  app.use(express.json({
+    limit: process.env.JSON_BODY_LIMIT || '256kb',
+    strict: true,
+    verify: (req, _res, buffer) => {
+      if (req.path.includes('/webhooks/razorpay')) req.rawBody = Buffer.from(buffer)
+    },
+  }))
   app.use(cookieParser())
+  app.use(csrfProtection)
+  app.use('/api', apiLimiter)
   app.use((req, res, next) => {
     if (req.path.startsWith('/api/courses/public') || req.path.startsWith('/api/blogs')) {
       res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600')
@@ -80,9 +119,12 @@ export function createApp() {
   app.use('/api/webhooks', webhooksRouter)
   app.use('/api/audit', auditRouter)
   app.use('/api/dashboards', dashboardsRouter)
-  app.use((err, _req, res, _next) => {
-    console.error(err)
-    res.status(500).json({ error: 'Internal server error' })
+  app.use('/api', (_req, res) => res.status(404).json({ error: 'API route not found' }))
+  app.use((err, req, res, _next) => {
+    const summary = { requestId: req.requestId, method: req.method, path: req.path, message: err.message }
+    if (process.env.NODE_ENV === 'production') console.error(summary)
+    else console.error(err)
+    res.status(err.status || 500).json({ error: 'Internal server error', requestId: req.requestId })
   })
   return app
 }

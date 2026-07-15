@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import PublicSiteLayout, { Breadcrumbs, PageIntro, StatePanel } from '../../components/site/PublicSiteLayout'
 import { api } from '../../lib/api'
+import SiteIcon from '../../components/ui/SiteIcon'
+import { plannedCourses } from '../../content/publicCatalog'
 
 function Icon({ name }) {
-  return <span className="material-symbols-outlined" aria-hidden="true">{name}</span>
+  return <SiteIcon name={name} />
 }
 
 function courseUrl(course) {
@@ -57,12 +59,11 @@ export default function PublicCoursesPage() {
             <Link to="/contact" className="site-text-link">Ask about a course<Icon name="arrow_forward" /></Link>
           </>
         }
-      >
-        <aside className="catalog-intro-note">
+        aside={<aside className="catalog-intro-note">
           <p className="site-eyebrow">How access works</p>
           <p>Published details are open to everyone. Lessons, materials and progress remain available only to authenticated learners with the relevant course enrolment.</p>
-        </aside>
-      </PageIntro>
+        </aside>}
+      />
 
       <section className="catalog-section">
         <div className="site-container">
@@ -98,6 +99,27 @@ export default function PublicCoursesPage() {
           )}
         </div>
       </section>
+
+      {!categorySlug && (
+        <section className="catalog-roadmap-section">
+          <div className="site-container">
+            <div className="catalog-heading">
+              <div><p className="site-eyebrow">Course roadmap</p><h2>Coming next</h2></div>
+              <p>These courses are planned and are not open for enrolment. Join a waitlist to ask about scope or future availability.</p>
+            </div>
+            <div className="catalog-roadmap-list">
+              {Object.entries(plannedCourses).map(([slug, course]) => (
+                <article key={slug}>
+                  <div><span>Planned</span><small>{course.level}</small></div>
+                  <h3><Link to={`/courses/cybersecurity/${slug}`}>{course.title}</Link></h3>
+                  <p>{course.summary}</p>
+                  <Link to={`/courses/cybersecurity/${slug}`} className="site-text-link">View planned scope<Icon name="arrow_forward" /></Link>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="catalog-guidance">
         <div className="site-container">
