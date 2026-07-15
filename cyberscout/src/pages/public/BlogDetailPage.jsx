@@ -1,15 +1,20 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import CLILogo from '../../components/CLILogo'
+import PublicSiteLayout, { Breadcrumbs, StatePanel } from '../../components/site/PublicSiteLayout'
 import { api } from '../../lib/api'
+import { serializeJsonLd } from '../../lib/structuredData'
 
 const siteUrl = (import.meta.env.VITE_SITE_URL || 'https://cyberlabin.com').replace(/\/+$/, '')
 
+function Icon({ name }) {
+  return <span className="material-symbols-outlined" aria-hidden="true">{name}</span>
+}
+
 function formatDate(value) {
-  if (!value) return 'Date pending'
+  if (!value) return 'Not specified'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
-  return new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }).format(date)
+  return new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }).format(date)
 }
 
 export default function BlogDetailPage() {
@@ -20,11 +25,11 @@ export default function BlogDetailPage() {
 
   useEffect(() => {
     api.blog(slug)
-      .then(({ blog }) => {
-        setBlog(blog)
+      .then(({ blog: result }) => {
+        setBlog(result)
         setError('')
       })
-      .catch(err => setError(err.message || 'Unable to load blog post'))
+      .catch(err => setError(err.message || 'Unable to load this resource'))
       .finally(() => setLoading(false))
   }, [slug])
 
@@ -38,81 +43,56 @@ export default function BlogDetailPage() {
       document.head.appendChild(meta)
     }
     meta.setAttribute('content', blog.metaDescription || blog.excerpt)
-  }, [blog])
-
-  const schema = useMemo(() => {
-    if (!blog) return null
-    return {
-      '@context': 'https://schema.org',
-      '@type': 'BlogPosting',
-      headline: blog.title,
-      description: blog.excerpt,
-      url: `${siteUrl}/blog/${blog.slug}`,
-      articleSection: blog.category,
-      datePublished: blog.publishedAt || blog.createdAt,
-      dateModified: blog.lastReviewedAt || blog.updatedAt,
-      author: {
-        '@type': 'Person',
-        name: blog.authorName || 'Arghya Sikdar',
-        url: `${siteUrl}/instructors/arghya-sikdar`,
-      },
-      publisher: { '@type': 'Organization', name: 'Cyber Lab IN', url: siteUrl },
+    let canonical = document.head.querySelector('link[rel="canonical"]')
+    if (!canonical) {
+      canonical = document.createElement('link')
+      canonical.setAttribute('rel', 'canonical')
+      document.head.appendChild(canonical)
     }
+    canonical.setAttribute('href', `${siteUrl}/blog/${blog.slug}`)
   }, [blog])
 
-  if (loading) return <div className="min-h-screen bg-white p-8 text-slate-600">Loading blog...</div>
-  if (error || !blog) return <div className="min-h-screen bg-white p-8 text-red-700">{error || 'Blog not found'}</div>
+  const schema = useMemo(() => blog ? {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: blog.title,
+    description: blog.excerpt,
+    url: `${siteUrl}/blog/${blog.slug}`,
+    articleSection: blog.category,
+    datePublished: blog.publishedAt || blog.createdAt,
+    dateModified: blog.lastReviewedAt || blog.updatedAt,
+    author: { '@type': 'Person', name: blog.authorName || 'Arghya Sikdar', url: `${siteUrl}/instructors/arghya-sikdar` },
+    publisher: { '@type': 'EducationalOrganization', name: 'Cyber Lab IN', url: siteUrl },
+  } : null, [blog])
+
+  if (loading) return <PublicSiteLayout><StatePanel title="Loading the published guide" /></PublicSiteLayout>
+  if (error || !blog) return <PublicSiteLayout><StatePanel type="error" title="Resource not found" message={error || 'This article is not currently published.'} action={<Link to="/blog" className="site-text-link">Browse published resources<Icon name="arrow_forward" /></Link>} /></PublicSiteLayout>
 
   return (
-    <div className="min-h-screen bg-white text-slate-950">
-      {schema && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }} />}
-      <header className="border-b border-slate-200 bg-white/85 backdrop-blur">
-        <nav className="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 sm:px-8 lg:px-10">
-          <Link to="/"><CLILogo variant="full" tone="light" size={150} /></Link>
-          <div className="flex items-center gap-4 text-sm font-bold text-slate-700">
-            <Link to="/courses" className="hover:text-slate-950">Courses</Link>
-            <Link to="/blog" className="hover:text-slate-950">Blog</Link>
-            <Link to="/login" className="rounded-lg bg-slate-950 px-4 py-2.5 text-white">Login</Link>
+    <PublicSiteLayout>
+      {schema && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(schema) }} />}
+      <Breadcrumbs items={[{ label: 'Home', href: '/' }, { label: 'Resources', href: '/resources' }, { label: 'Articles', href: '/blog' }, { label: blog.title }]} />
+      <article className="article-page">
+        <header className="article-header">
+          <div className="site-container article-header-grid">
+            <div>
+              <p className="site-eyebrow">{blog.category || 'Cybersecurity guide'}</p>
+              <h1>{blog.title}</h1>
+              <p>{blog.excerpt}</p>
+            </div>
+            <dl>
+              <div><dt>Author</dt><dd><Link to="/instructors/arghya-sikdar">{blog.authorName || 'Arghya Sikdar'}</Link></dd></div>
+              <div><dt>Published</dt><dd>{formatDate(blog.publishedAt || blog.createdAt)}</dd></div>
+              <div><dt>Last reviewed</dt><dd>{formatDate(blog.lastReviewedAt || blog.updatedAt)}</dd></div>
+            </dl>
           </div>
-        </nav>
-      </header>
-      <main className="mx-auto max-w-3xl px-5 py-12 sm:px-8">
-        <Link to="/blog" className="text-sm font-bold text-sky-700 hover:text-sky-900">Back to blog</Link>
-        <h1 className="mt-6 font-space-grotesk text-4xl font-black tracking-tight sm:text-6xl">{blog.title}</h1>
-        <p className="mt-5 text-lg leading-8 text-slate-600">{blog.excerpt}</p>
-        <div className="mt-6 flex flex-wrap gap-x-5 gap-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-600">
-          <Link to={`/blog?category=${encodeURIComponent(blog.category || 'Beginner Cybersecurity')}`} className="text-sky-700 hover:text-sky-900">
-            {blog.category || 'Cybersecurity Guide'}
-          </Link>
-          <Link to="/instructors/arghya-sikdar" className="text-slate-700 hover:text-sky-800">
-            By {blog.authorName || 'Arghya Sikdar'}
-          </Link>
-          <span>Published {formatDate(blog.publishedAt || blog.createdAt)}</span>
-          <span>Last reviewed {formatDate(blog.lastReviewedAt || blog.updatedAt)}</span>
+        </header>
+        <div className="site-container article-body-grid">
+          <aside><p className="site-eyebrow">Related learning</p><Link to="/courses/cybersecurity/cyber-security-essentials">Cyber Security Essentials</Link><Link to="/learning-paths/beginner-cybersecurity">Beginner learning path</Link><Link to="/instructors/arghya-sikdar">Author profile</Link></aside>
+          <div className="article-body">{blog.body.split('\n\n').map((paragraph, index) => <p key={`${index}-${paragraph.slice(0, 20)}`}>{paragraph}</p>)}</div>
         </div>
-        <article className="mt-10 space-y-6 text-base leading-8 text-slate-700">
-          {blog.body.split('\n\n').map(paragraph => (
-            <p key={paragraph}>{paragraph}</p>
-          ))}
-        </article>
-        <section className="mt-12 grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-6 sm:grid-cols-3">
-          <div className="sm:col-span-3">
-            <h2 className="font-space-grotesk text-xl font-black">Learn by doing</h2>
-            <p className="mt-2 text-sm leading-7 text-slate-600">
-              Build practical confidence with guided labs, phishing analysis, web security basics, learning paths and defensive reporting.
-            </p>
-          </div>
-          <Link to="/courses/cybersecurity/cyber-security-essentials" className="rounded-xl bg-slate-950 px-4 py-3 text-center text-sm font-bold text-white">
-            Explore Cyber Security Essentials
-          </Link>
-          <Link to="/learning-paths/beginner-cybersecurity" className="rounded-xl border border-slate-300 px-4 py-3 text-center text-sm font-bold text-slate-800">
-            Beginner Cybersecurity Path
-          </Link>
-          <Link to="/instructors/arghya-sikdar" className="rounded-xl border border-slate-300 px-4 py-3 text-center text-sm font-bold text-slate-800">
-            Author profile
-          </Link>
-        </section>
-      </main>
-    </div>
+        <footer className="article-next-step"><div className="site-container"><div><p className="site-eyebrow">Apply the concept</p><h2>Continue from explanation to guided practice</h2><p>Use the beginner course and learning path to connect this topic to structured, responsible security work.</p></div><div className="site-action-row"><Link to="/courses/cybersecurity/cyber-security-essentials" className="site-button-primary">Explore Cyber Security Essentials<Icon name="arrow_forward" /></Link><Link to="/blog" className="site-text-link">Read another guide<Icon name="arrow_forward" /></Link></div></div></footer>
+      </article>
+    </PublicSiteLayout>
   )
 }

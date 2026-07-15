@@ -41,7 +41,7 @@ export default function CookieConsent() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed bottom-4 left-4 z-[70] rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-lg focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-white/10 dark:bg-slate-900 dark:text-slate-100"
+        className="cookie-settings-button"
       >
         Cookie settings
       </button>
@@ -49,51 +49,50 @@ export default function CookieConsent() {
   }
 
   return (
-    <div className="fixed inset-x-3 bottom-3 z-[80] mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-4 text-slate-950 shadow-[0_24px_90px_rgba(15,23,42,0.22)] dark:border-white/10 dark:bg-slate-900 dark:text-white sm:p-5">
-      <div className="grid gap-4 md:grid-cols-[1fr_auto]">
+    <div className="cookie-consent-panel" role="dialog" aria-labelledby="cookie-consent-title">
+      <div className="cookie-consent-grid">
         <div>
-          <h2 className="font-space-grotesk text-base font-bold">Cookie preferences</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
+          <h2 id="cookie-consent-title">Cookie preferences</h2>
+          <p>
             Necessary cookies keep login, security, and visitor counting working. Analytics and marketing cookies are optional and only used if you opt in.
           </p>
-          <div className="mt-4 grid gap-2 sm:grid-cols-3">
+          <div className="cookie-consent-options">
             {[
               ['necessary', 'Necessary', true],
               ['analytics', 'Analytics', false],
               ['marketing', 'Marketing', false],
             ].map(([key, label, locked]) => (
-              <label key={key} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold dark:border-white/10 dark:bg-white/5">
+              <label key={key}>
                 <span>{label}</span>
                 <input
                   type="checkbox"
                   checked={Boolean(draft[key])}
                   disabled={locked}
                   onChange={event => setDraft(value => ({ ...value, [key]: event.target.checked }))}
-                  className="h-4 w-4 accent-sky-600"
                 />
               </label>
             ))}
           </div>
         </div>
-        <div className="flex flex-col gap-2 sm:min-w-44">
+        <div className="cookie-consent-actions">
           <button
             type="button"
             onClick={() => save({ necessary: true, analytics: true, marketing: true })}
-            className="rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-bold text-white dark:bg-white dark:text-slate-950"
+            className="is-primary"
           >
             Accept all
           </button>
           <button
             type="button"
             onClick={() => save(draft)}
-            className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-800 dark:border-white/10 dark:text-white"
+            className="is-secondary"
           >
             Save choices
           </button>
           <button
             type="button"
             onClick={() => save(defaultConsent)}
-            className="rounded-lg px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/5"
+            className="is-text"
           >
             Necessary only
           </button>

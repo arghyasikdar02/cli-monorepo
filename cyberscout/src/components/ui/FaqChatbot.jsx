@@ -44,26 +44,22 @@ export default function FaqChatbot() {
       <button
         type="button"
         onClick={() => setOpen(value => !value)}
-        className="fixed bottom-4 right-4 z-[70] inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-950 text-white shadow-[0_18px_60px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:bg-white dark:text-slate-950"
+        className="faq-chatbot-toggle"
         aria-label="Open course FAQ assistant"
+        aria-expanded={open}
+        aria-controls="faq-chatbot-panel"
       >
         <span className="material-symbols-outlined">{open ? 'close' : 'forum'}</span>
       </button>
       {open && (
-        <section className="fixed bottom-24 right-3 z-[70] w-[calc(100vw-1.5rem)] max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-950 shadow-[0_24px_90px_rgba(15,23,42,0.24)] dark:border-white/10 dark:bg-slate-900 dark:text-white sm:right-4">
-          <header className="border-b border-slate-200 p-4 dark:border-white/10">
-            <p className="font-space-grotesk text-sm font-bold">Cyber Lab IN FAQ Assistant</p>
+        <section className="faq-chatbot-panel" id="faq-chatbot-panel" aria-label="Cyber Lab IN FAQ assistant">
+          <header>
+            <p>Cyber Lab IN FAQ assistant</p>
           </header>
-          <div className="max-h-[58vh] space-y-3 overflow-y-auto p-4">
+          <div className="faq-chatbot-messages" aria-live="polite">
             {messages.map((message, index) => (
-              <div key={`${message.role}-${index}`} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <p className={`max-w-[86%] rounded-2xl px-3 py-2 text-sm leading-6 ${
-                  message.role === 'user'
-                    ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950'
-                    : 'bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200'
-                }`}>
-                  {message.text}
-                </p>
+              <div key={`${message.role}-${index}`} className={`faq-chatbot-message is-${message.role}`}>
+                <p>{message.text}</p>
               </div>
             ))}
             {showLead && (
@@ -76,29 +72,27 @@ export default function FaqChatbot() {
               />
             )}
           </div>
-          <div className="border-t border-slate-200 p-4 dark:border-white/10">
-            <div className="mb-3 flex flex-wrap gap-2">
+          <div className="faq-chatbot-controls">
+            <div className="faq-chatbot-options">
               {visibleOptions.map(([, label, answer]) => (
                 <button
                   key={label}
                   type="button"
                   onClick={() => ask(label, answer)}
-                  className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:border-sky-300 hover:text-sky-700 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/5"
                 >
                   {label}
                 </button>
               ))}
             </div>
-            <form onSubmit={submitText} className="flex gap-2">
+            <form onSubmit={submitText} className="faq-chatbot-input">
+              <label className="sr-only" htmlFor="faq-chatbot-question">Type a course question</label>
               <input
+                id="faq-chatbot-question"
                 value={text}
                 onChange={event => setText(event.target.value)}
-                className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-300 dark:border-white/10 dark:bg-white/5"
                 placeholder="Type a course question"
               />
-              <button type="submit" className="rounded-lg bg-slate-950 px-3 py-2 text-sm font-bold text-white dark:bg-white dark:text-slate-950">
-                Send
-              </button>
+              <button type="submit" aria-label="Send question"><span className="material-symbols-outlined" aria-hidden="true">send</span></button>
             </form>
           </div>
         </section>

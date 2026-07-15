@@ -62,6 +62,14 @@ http://localhost:3001
 ## Public Landing Page
 The domain root `/` renders the platform-level Cyber Lab IN homepage directly. The old generic welcome route redirects back to `/`.
 
+The public experience uses the shared enterprise design system, accessible mega menus, mobile accordion navigation, editorial page layouts and structured footer documented in:
+
+```text
+CISCO_INSPIRED_REDESIGN_AUDIT.md
+PUBLIC_DESIGN_SYSTEM.md
+CISCO_INSPIRED_REDESIGN_IMPLEMENTATION.md
+```
+
 Primary homepage positioning:
 
 ```text
@@ -91,6 +99,7 @@ Clean public course routes:
 /learning-paths/network-cloud-security
 /learning-paths/digital-forensics
 /labs
+/labs/:labSlug
 /resources
 /blog
 /blog/:slug
@@ -98,6 +107,11 @@ Clean public course routes:
 /instructors
 /instructors/arghya-sikdar
 /contact
+/for-organisations
+/for-institutions
+/for-businesses
+/faq
+/accessibility
 /privacy-policy
 /terms
 /refund-policy

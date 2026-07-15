@@ -1,75 +1,78 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import ProtectedRoute from './components/layout/ProtectedRoute'
 import RoleProtectedRoute from './components/layout/RoleProtectedRoute'
 import CookieConsent from './components/ui/CookieConsent'
 
 // Auth
-import SplashPage from './pages/auth/SplashPage'
 import WelcomePage from './pages/auth/WelcomePage'
-import LoginPage from './pages/auth/LoginPage'
-import RoleLoginPage from './pages/auth/RoleLoginPage'
-import SignUpPage from './pages/auth/SignUpPage'
-import AuthPage from './pages/auth/AuthPage'
-import GettingStartedPage from './pages/auth/GettingStartedPage'
-import OAuthCallbackPage from './pages/auth/OAuthCallbackPage'
+const SplashPage = lazy(() => import('./pages/auth/SplashPage'))
+const LoginPage = lazy(() => import('./pages/auth/LoginPage'))
+const RoleLoginPage = lazy(() => import('./pages/auth/RoleLoginPage'))
+const SignUpPage = lazy(() => import('./pages/auth/SignUpPage'))
+const AuthPage = lazy(() => import('./pages/auth/AuthPage'))
+const GettingStartedPage = lazy(() => import('./pages/auth/GettingStartedPage'))
+const OAuthCallbackPage = lazy(() => import('./pages/auth/OAuthCallbackPage'))
 
 // Core
-import DashboardPage from './pages/dashboard/DashboardPage'
-import AdminDashboardPage from './pages/admin/AdminDashboardPage'
-import InstructorDashboardPage from './pages/instructor/InstructorDashboardPage'
-import MarketingDashboardPage from './pages/marketing/MarketingDashboardPage'
-import OpsDashboardPage from './pages/ops/OpsDashboardPage'
-import CourseCatalogPage from './pages/courses/CourseCatalogPage'
-import CourseDetailPage from './pages/courses/CourseDetailPage'
-import LessonReaderPage from './pages/courses/LessonReaderPage'
-import QuizPage from './pages/quiz/QuizPage'
-import QuizResultsPage from './pages/quiz/QuizResultsPage'
-import PublicCoursesPage from './pages/public/PublicCoursesPage'
-import PublicCoursePage from './pages/public/PublicCoursePage'
-import BlogListPage from './pages/public/BlogListPage'
-import BlogDetailPage from './pages/public/BlogDetailPage'
-import AboutPage from './pages/public/AboutPage'
-import {
-  CertificateVerificationPage,
-  ContactPage,
-  CookiePolicyPage,
-  ForOrganisationsPage,
-  InstructorProfilePage,
-  InstructorsPage,
-  LabsPage,
-  LearningPathDetailPage,
-  LearningPathsPage,
-  PlannedCoursePage,
-  ResourcesPage,
-} from './pages/public/PlatformInfoPages'
+const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'))
+const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage'))
+const InstructorDashboardPage = lazy(() => import('./pages/instructor/InstructorDashboardPage'))
+const MarketingDashboardPage = lazy(() => import('./pages/marketing/MarketingDashboardPage'))
+const OpsDashboardPage = lazy(() => import('./pages/ops/OpsDashboardPage'))
+const CourseCatalogPage = lazy(() => import('./pages/courses/CourseCatalogPage'))
+const CourseDetailPage = lazy(() => import('./pages/courses/CourseDetailPage'))
+const LessonReaderPage = lazy(() => import('./pages/courses/LessonReaderPage'))
+const QuizPage = lazy(() => import('./pages/quiz/QuizPage'))
+const QuizResultsPage = lazy(() => import('./pages/quiz/QuizResultsPage'))
+const PublicCoursesPage = lazy(() => import('./pages/public/PublicCoursesPage'))
+const PublicCoursePage = lazy(() => import('./pages/public/PublicCoursePage'))
+const BlogListPage = lazy(() => import('./pages/public/BlogListPage'))
+const BlogDetailPage = lazy(() => import('./pages/public/BlogDetailPage'))
+const AboutPage = lazy(() => import('./pages/public/AboutPage'))
+const NotFoundPage = lazy(() => import('./pages/public/NotFoundPage'))
+const AccessibilityPage = lazy(() => import('./pages/public/PlatformInfoPages').then(module => ({ default: module.AccessibilityPage })))
+const CertificateVerificationPage = lazy(() => import('./pages/public/PlatformInfoPages').then(module => ({ default: module.CertificateVerificationPage })))
+const ContactPage = lazy(() => import('./pages/public/PlatformInfoPages').then(module => ({ default: module.ContactPage })))
+const CookiePolicyPage = lazy(() => import('./pages/public/PlatformInfoPages').then(module => ({ default: module.CookiePolicyPage })))
+const FaqPage = lazy(() => import('./pages/public/PlatformInfoPages').then(module => ({ default: module.FaqPage })))
+const ForOrganisationsPage = lazy(() => import('./pages/public/PlatformInfoPages').then(module => ({ default: module.ForOrganisationsPage })))
+const InstructorProfilePage = lazy(() => import('./pages/public/PlatformInfoPages').then(module => ({ default: module.InstructorProfilePage })))
+const InstructorsPage = lazy(() => import('./pages/public/PlatformInfoPages').then(module => ({ default: module.InstructorsPage })))
+const LabDetailPage = lazy(() => import('./pages/public/PlatformInfoPages').then(module => ({ default: module.LabDetailPage })))
+const LabsPage = lazy(() => import('./pages/public/PlatformInfoPages').then(module => ({ default: module.LabsPage })))
+const LearningPathDetailPage = lazy(() => import('./pages/public/PlatformInfoPages').then(module => ({ default: module.LearningPathDetailPage })))
+const LearningPathsPage = lazy(() => import('./pages/public/PlatformInfoPages').then(module => ({ default: module.LearningPathsPage })))
+const PlannedCoursePage = lazy(() => import('./pages/public/PlatformInfoPages').then(module => ({ default: module.PlannedCoursePage })))
+const ResourcesPage = lazy(() => import('./pages/public/PlatformInfoPages').then(module => ({ default: module.ResourcesPage })))
 
 // Learning
-import AITutorPage from './pages/ai-tutor/AITutorPage'
-import LiveClassListPage from './pages/live-classes/LiveClassListPage'
-import LiveClassDetailPage from './pages/live-classes/LiveClassDetailPage'
-import LiveClassSessionPage from './pages/live-classes/LiveClassSessionPage'
+const AITutorPage = lazy(() => import('./pages/ai-tutor/AITutorPage'))
+const LiveClassListPage = lazy(() => import('./pages/live-classes/LiveClassListPage'))
+const LiveClassDetailPage = lazy(() => import('./pages/live-classes/LiveClassDetailPage'))
+const LiveClassSessionPage = lazy(() => import('./pages/live-classes/LiveClassSessionPage'))
 
 // Gamification
-import LeaderboardPage from './pages/gamification/LeaderboardPage'
-import AchievementsPage from './pages/gamification/AchievementsPage'
+const LeaderboardPage = lazy(() => import('./pages/gamification/LeaderboardPage'))
+const AchievementsPage = lazy(() => import('./pages/gamification/AchievementsPage'))
 
 // Account
-import ProfilePage from './pages/account/ProfilePage'
-import SettingsPage from './pages/account/SettingsPage'
-import NotificationsPage from './pages/account/NotificationsPage'
-import DownloadsPage from './pages/account/DownloadsPage'
+const ProfilePage = lazy(() => import('./pages/account/ProfilePage'))
+const SettingsPage = lazy(() => import('./pages/account/SettingsPage'))
+const NotificationsPage = lazy(() => import('./pages/account/NotificationsPage'))
+const DownloadsPage = lazy(() => import('./pages/account/DownloadsPage'))
 
 // Subscription
-import SubscriptionPage from './pages/subscription/SubscriptionPage'
-import BillingHistoryPage from './pages/subscription/BillingHistoryPage'
+const SubscriptionPage = lazy(() => import('./pages/subscription/SubscriptionPage'))
+const BillingHistoryPage = lazy(() => import('./pages/subscription/BillingHistoryPage'))
 
 // Support
-import HelpCenterPage from './pages/support/HelpCenterPage'
-import AccountSecurityHelpPage from './pages/support/AccountSecurityHelpPage'
-import ReportBugPage from './pages/support/ReportBugPage'
-import PrivacyPolicyPage from './pages/support/PrivacyPolicyPage'
-import TermsOfServicePage from './pages/support/TermsOfServicePage'
-import RefundPolicyPage from './pages/support/RefundPolicyPage'
+const HelpCenterPage = lazy(() => import('./pages/support/HelpCenterPage'))
+const AccountSecurityHelpPage = lazy(() => import('./pages/support/AccountSecurityHelpPage'))
+const ReportBugPage = lazy(() => import('./pages/support/ReportBugPage'))
+const PrivacyPolicyPage = lazy(() => import('./pages/support/PrivacyPolicyPage'))
+const TermsOfServicePage = lazy(() => import('./pages/support/TermsOfServicePage'))
+const RefundPolicyPage = lazy(() => import('./pages/support/RefundPolicyPage'))
 
 const P = ({ children }) => <ProtectedRoute>{children}</ProtectedRoute>
 const RoleP = ({ children, roles, loginPath }) => (
@@ -85,9 +88,10 @@ const roleRoutes = {
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <CookieConsent />
-      <Routes>
+      <Suspense fallback={<div className="route-loading" role="status"><span className="material-symbols-outlined" aria-hidden="true">progress_activity</span><span>Loading Cyber Lab IN</span></div>}>
+        <Routes>
         {/* Public */}
         <Route path="/" element={<WelcomePage />} />
         <Route path="/splash" element={<SplashPage />} />
@@ -105,11 +109,15 @@ export default function App() {
         <Route path="/learning-paths/network-cloud-security" element={<LearningPathDetailPage slug="network-cloud-security" />} />
         <Route path="/learning-paths/digital-forensics" element={<LearningPathDetailPage slug="digital-forensics" />} />
         <Route path="/labs" element={<LabsPage />} />
+        <Route path="/labs/:labSlug" element={<LabDetailPage />} />
         <Route path="/resources" element={<ResourcesPage />} />
+        <Route path="/faq" element={<FaqPage />} />
         <Route path="/instructors" element={<InstructorsPage />} />
         <Route path="/instructors/arghya-sikdar" element={<InstructorProfilePage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/for-organisations" element={<ForOrganisationsPage />} />
+        <Route path="/for-institutions" element={<Navigate to="/for-organisations#institutions" replace />} />
+        <Route path="/for-businesses" element={<Navigate to="/for-organisations#businesses" replace />} />
         <Route path="/blog" element={<BlogListPage />} />
         <Route path="/blog/:slug" element={<BlogDetailPage />} />
         <Route path="/about" element={<AboutPage />} />
@@ -141,6 +149,7 @@ export default function App() {
         <Route path="/refund-policy" element={<RefundPolicyPage />} />
         <Route path="/cookie-policy" element={<CookiePolicyPage />} />
         <Route path="/certificate-verification" element={<CertificateVerificationPage />} />
+        <Route path="/accessibility" element={<AccessibilityPage />} />
 
         {/* Protected — Core */}
         <Route path="/dashboard" element={<P><DashboardPage /></P>} />
@@ -185,8 +194,9 @@ export default function App() {
         <Route path="/report-bug" element={<P><ReportBugPage /></P>} />
 
         {/* Fallback */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+        <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   )
 }

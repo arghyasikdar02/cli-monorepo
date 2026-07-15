@@ -1,5 +1,4 @@
-import { Link } from 'react-router-dom'
-import AppShell from '../../components/layout/AppShell'
+import PublicLegalPage from '../../components/site/PublicLegalPage'
 
 const SECTIONS = [
   { title: 'Information We Collect', content: 'We collect information you provide directly (name, email, payment info) and automatically (usage data, device info, cookies). We use this to operate the platform, personalize your experience, and improve our services.' },
@@ -14,23 +13,6 @@ const SECTIONS = [
 
 export default function PrivacyPolicyPage() {
   return (
-    <AppShell>
-      <div className="max-w-[760px] mx-auto px-8 py-8">
-        <h1 className="font-space-grotesk text-2xl font-black text-primary mb-1">Privacy Policy</h1>
-        <p className="text-on-surface-variant text-sm mb-8">Last updated: June 10, 2026</p>
-        <div className="space-y-7">
-          {SECTIONS.map(s => (
-            <div key={s.title}>
-              <h2 className="font-space-grotesk font-bold text-on-surface mb-2">{s.title}</h2>
-              <p className="text-on-surface-variant text-sm leading-relaxed">{s.content}</p>
-            </div>
-          ))}
-        </div>
-        <div className="mt-8 pt-6 border-t border-slate-200 flex gap-4 text-sm">
-          <Link to="/terms" className="text-secondary hover:underline font-space-grotesk">Terms of Service</Link>
-          <Link to="/refund-policy" className="text-secondary hover:underline font-space-grotesk">Refund Policy</Link>
-        </div>
-      </div>
-    </AppShell>
+    <PublicLegalPage title="Privacy policy" description="How Cyber Lab IN collects, uses, protects and retains personal information across the public website and learning platform." updated="Last updated: 10 June 2026" sections={SECTIONS} />
   )
 }

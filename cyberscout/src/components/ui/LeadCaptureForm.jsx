@@ -50,70 +50,28 @@ export default function LeadCaptureForm({
   return (
     <form
       onSubmit={submit}
-      className={`rounded-2xl border p-5 ${
-        dark
-          ? 'border-white/10 bg-white/5 text-white'
-          : 'border-slate-200 bg-white text-slate-950 shadow-sm'
-      }`}
+      className={`lead-form ${compact ? 'lead-form-compact' : ''}`}
+      data-theme={dark ? 'dark' : 'light'}
     >
-      <h3 className="font-space-grotesk text-lg font-bold">{title}</h3>
-      <p className={`mt-1 text-sm ${dark ? 'text-slate-300' : 'text-slate-500'}`}>
+      <h3>{title}</h3>
+      <p className="lead-form-intro">
         Share your details and we will help you choose the right starting point.
       </p>
-      <div className={`mt-4 grid gap-3 ${compact ? '' : 'sm:grid-cols-2'}`}>
-        <input
-          value={form.name}
-          onChange={event => setForm(value => ({ ...value, name: event.target.value }))}
-          className={`rounded-lg border px-3 py-2.5 text-sm outline-none transition focus:ring-2 focus:ring-sky-300 ${
-            dark ? 'border-white/10 bg-white/10 placeholder:text-slate-400' : 'border-slate-200 bg-slate-50 placeholder:text-slate-400'
-          }`}
-          placeholder="Name"
-          required
-          autoComplete="name"
-        />
-        <input
-          value={form.phone}
-          onChange={event => setForm(value => ({ ...value, phone: event.target.value }))}
-          className={`rounded-lg border px-3 py-2.5 text-sm outline-none transition focus:ring-2 focus:ring-sky-300 ${
-            dark ? 'border-white/10 bg-white/10 placeholder:text-slate-400' : 'border-slate-200 bg-slate-50 placeholder:text-slate-400'
-          }`}
-          placeholder="Phone number"
-          type="tel"
-          required
-          autoComplete="tel"
-        />
-        <input
-          value={form.email}
-          onChange={event => setForm(value => ({ ...value, email: event.target.value }))}
-          className={`rounded-lg border px-3 py-2.5 text-sm outline-none transition focus:ring-2 focus:ring-sky-300 ${
-            dark ? 'border-white/10 bg-white/10 placeholder:text-slate-400' : 'border-slate-200 bg-slate-50 placeholder:text-slate-400'
-          }`}
-          placeholder="Email"
-          type="email"
-          required
-          autoComplete="email"
-        />
-        <textarea
-          value={form.message}
-          onChange={event => setForm(value => ({ ...value, message: event.target.value }))}
-          className={`min-h-24 rounded-lg border px-3 py-2.5 text-sm outline-none transition focus:ring-2 focus:ring-sky-300 ${compact ? '' : 'sm:col-span-2'} ${
-            dark ? 'border-white/10 bg-white/10 placeholder:text-slate-400' : 'border-slate-200 bg-slate-50 placeholder:text-slate-400'
-          }`}
-          placeholder="Message"
-          required
-        />
+      <div className="lead-form-fields">
+        <label><span>Name</span><input value={form.name} onChange={event => setForm(value => ({ ...value, name: event.target.value }))} required autoComplete="name" /></label>
+        <label><span>Phone number</span><input value={form.phone} onChange={event => setForm(value => ({ ...value, phone: event.target.value }))} type="tel" required autoComplete="tel" inputMode="tel" /></label>
+        <label><span>Email address</span><input value={form.email} onChange={event => setForm(value => ({ ...value, email: event.target.value }))} type="email" required autoComplete="email" /></label>
+        <label className="lead-form-message"><span>How can we help?</span><textarea value={form.message} onChange={event => setForm(value => ({ ...value, message: event.target.value }))} required /></label>
       </div>
       <button
         type="submit"
         disabled={loading}
-        className={`mt-3 w-full rounded-lg px-4 py-2.5 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60 ${
-          dark ? 'bg-white text-slate-950 hover:bg-slate-100' : 'bg-slate-950 text-white hover:bg-slate-800'
-        }`}
+        className="lead-form-submit"
       >
         {loading ? 'Sending...' : 'Request guidance'}
       </button>
-      {status && <p className="mt-3 text-sm font-semibold text-emerald-500">{status}</p>}
-      {error && <p className="mt-3 text-sm font-semibold text-red-500">{error}</p>}
+      {status && <p className="lead-form-status" role="status">{status}</p>}
+      {error && <p className="lead-form-error" role="alert">{error}</p>}
     </form>
   )
 }

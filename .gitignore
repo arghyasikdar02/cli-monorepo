@@ -15,3 +15,14 @@ yarn-error.log*
 !**/.env.example
 *.local
 .DS_Store
+node_modules/
+dist/
+build/
+.next/
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
+coverage/
+.vercel/

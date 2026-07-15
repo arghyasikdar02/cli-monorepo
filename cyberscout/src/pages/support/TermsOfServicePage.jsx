@@ -1,5 +1,4 @@
-import { Link } from 'react-router-dom'
-import AppShell from '../../components/layout/AppShell'
+import PublicLegalPage from '../../components/site/PublicLegalPage'
 
 const SECTIONS = [
   { title: 'Acceptance of Terms', content: 'By accessing or using Cyber Lab IN, you agree to be bound by these Terms of Service. If you disagree with any part of these terms, you may not access the service.' },
@@ -14,23 +13,6 @@ const SECTIONS = [
 
 export default function TermsOfServicePage() {
   return (
-    <AppShell>
-      <div className="max-w-[760px] mx-auto px-8 py-8">
-        <h1 className="font-space-grotesk text-2xl font-black text-primary mb-1">Terms of Service</h1>
-        <p className="text-on-surface-variant text-sm mb-8">Last updated: June 10, 2026</p>
-        <div className="space-y-7">
-          {SECTIONS.map(s => (
-            <div key={s.title}>
-              <h2 className="font-space-grotesk font-bold text-on-surface mb-2">{s.title}</h2>
-              <p className="text-on-surface-variant text-sm leading-relaxed">{s.content}</p>
-            </div>
-          ))}
-        </div>
-        <div className="mt-8 pt-6 border-t border-slate-200 flex gap-4 text-sm">
-          <Link to="/privacy-policy" className="text-secondary hover:underline font-space-grotesk">Privacy Policy</Link>
-          <Link to="/refund-policy" className="text-secondary hover:underline font-space-grotesk">Refund Policy</Link>
-        </div>
-      </div>
-    </AppShell>
+    <PublicLegalPage title="Terms of service" description="The terms that govern account access, educational use, payments, content and acceptable behaviour on Cyber Lab IN." updated="Last updated: 10 June 2026" sections={SECTIONS} />
   )
 }
