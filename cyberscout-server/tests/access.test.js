@@ -1,29 +1,14 @@
 import { describe, it, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import fs from 'node:fs'
-import path from 'node:path'
 
 process.env.NODE_ENV = 'test'
-process.env.DATABASE_URL = 'file:./data/test.sqlite'
+process.env.DATABASE_URL ||= process.env.TEST_DATABASE_URL || 'postgresql://postgres:postgres@127.0.0.1:55432/cyberlabin_test'
+process.env.DATABASE_SSL ||= 'disable'
 process.env.JWT_SECRET = 'test_secret_at_least_32_chars_1234567890'
 process.env.CLIADM_ADMIN_TOKEN = 'test_admin_token'
 process.env.BCRYPT_COST = '4'
-
-const testDb = path.resolve('data/test.sqlite')
-
-for (const file of [testDb, `${testDb}-wal`, `${testDb}-shm`]) {
-  if (fs.existsSync(file)) fs.rmSync(file)
-}
-
-for (const command of ['src/db/migrate.js', 'src/db/seed.js']) {
-  const result = spawnSync(process.execPath, [command], {
-    cwd: process.cwd(),
-    env: process.env,
-    encoding: 'utf8',
-  })
-  assert.equal(result.status, 0, result.stderr || result.stdout)
-}
+process.env.SEED_DEVELOPMENT_USERS = '1'
 
 let server
 let baseUrl
@@ -81,42 +66,15 @@ describe('Cyber Lab IN database-backed LMS flow', () => {
   let opsToken
   let neelToken
 
-  it('never creates predictable development identities in production mode', () => {
-    const productionSeedDb = path.resolve('data/production-seed-test.sqlite')
-    for (const file of [productionSeedDb, `${productionSeedDb}-wal`, `${productionSeedDb}-shm`]) {
-      if (fs.existsSync(file)) fs.rmSync(file)
-    }
-    const script = `
-      import { seedBaselineData } from './src/db/seed.js';
-      import { db } from './src/db/index.js';
-      await seedBaselineData({ force: true, log: false });
-      console.log(JSON.stringify({
-        users: db.prepare('SELECT count(*) AS count FROM users').get().count,
-        courses: db.prepare('SELECT count(*) AS count FROM courses').get().count
-      }));
-      db.close();
-    `
-    const result = spawnSync(process.execPath, ['--input-type=module', '--eval', script], {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        NODE_ENV: 'production',
-        DATABASE_URL: 'file:./data/production-seed-test.sqlite',
-      },
-      encoding: 'utf8',
-    })
-    assert.equal(result.status, 0, result.stderr || result.stdout)
-    const summary = JSON.parse(result.stdout.trim().split('\n').at(-1))
-    assert.equal(summary.users, 0)
-    assert.equal(summary.courses, 2)
-    for (const file of [productionSeedDb, `${productionSeedDb}-wal`, `${productionSeedDb}-shm`]) {
-      if (fs.existsSync(file)) fs.rmSync(file)
-    }
-  })
-
   before(async () => {
+    const { resetTestDatabase } = await import('../src/db/reset-test.js')
+    const { runPendingMigrations } = await import('../src/db/migrate.js')
+    const { seedBaselineData } = await import('../src/db/seed.js')
+    await resetTestDatabase()
+    await runPendingMigrations()
+    await seedBaselineData({ includeTestUsers: true, log: false })
     const { app } = await import('../src/index.js')
-    database = (await import('../src/db/index.js')).db
+    database = await import('../src/db/index.js')
     server = app.listen(0)
     await new Promise(resolve => server.once('listening', resolve))
     baseUrl = `http://127.0.0.1:${server.address().port}`
@@ -130,6 +88,15 @@ describe('Cyber Lab IN database-backed LMS flow', () => {
 
   after(async () => {
     if (server) await new Promise(resolve => server.close(resolve))
+    if (database) await database.closeDatabase()
+  })
+
+  it('does not add development identities when production seeding is requested', async () => {
+    const before = await database.queryOne('SELECT count(*)::integer AS count FROM users')
+    const { seedBaselineData } = await import('../src/db/seed.js')
+    await seedBaselineData({ force: true, includeTestUsers: false, log: false })
+    const afterSeed = await database.queryOne('SELECT count(*)::integer AS count FROM users')
+    assert.equal(afterSeed.count, before.count)
   })
 
   it('registers a real user, hashes the password, and returns a working session', async () => {
@@ -404,9 +371,9 @@ describe('Cyber Lab IN database-backed LMS flow', () => {
     assert.equal(early.body.allowed, false)
     assert.equal(early.body.reason, 'outside_join_window_early')
 
-    database.prepare("INSERT INTO batches (id, course_id, name, status) VALUES ('batch_test_c001', 'c001', 'Test batch', 'active')").run()
-    database.prepare("UPDATE enrollments SET batch_id = 'batch_test_c001' WHERE user_id = (SELECT id FROM users WHERE email = 'student@cyberlabin.com') AND course_id = 'c001'").run()
-    const instructorId = database.prepare("SELECT id FROM users WHERE email = 'instructor@cyberlabin.com'").get().id
+    await database.execute("INSERT INTO batches (id, course_id, name, status) VALUES ('batch_test_c001', 'c001', 'Test batch', 'active')")
+    await database.execute("UPDATE enrollments SET batch_id = 'batch_test_c001' WHERE user_id = (SELECT id FROM users WHERE email = 'student@cyberlabin.com') AND course_id = 'c001'")
+    const instructorId = (await database.queryOne("SELECT id FROM users WHERE email = 'instructor@cyberlabin.com'")).id
     const start = new Date(Date.now() - 5 * 60 * 1000).toISOString()
     const end = new Date(Date.now() + 55 * 60 * 1000).toISOString()
     const created = await request('/api/live-classes', { method: 'POST', token: adminToken, body: JSON.stringify({ courseId: 'c001', batchId: 'batch_test_c001', instructorId, title: 'Batch access test', scheduledStart: start, scheduledEnd: end, provider: 'external' }) })
@@ -452,7 +419,7 @@ describe('Cyber Lab IN database-backed LMS flow', () => {
     assert.equal(denied.response.status, 403)
   })
 
-  it('protects CLI mutations with admin token, dry-run, confirmation, and audit-safe behavior', () => {
+  it('protects CLI mutations with admin token, dry-run, confirmation, and audit-safe behavior', async () => {
     const cli = (...cliArgs) => spawnSync(process.execPath, ['src/cli/cliadm.js', ...cliArgs], {
       cwd: process.cwd(),
       env: process.env,
@@ -467,12 +434,12 @@ describe('Cyber Lab IN database-backed LMS flow', () => {
     const dryRun = cli('user', 'create', '--email', dryRunEmail, '--name', 'Dry Run User', '--password', 'a-long-cli-passphrase', '--role', 'student', '--admin-token', 'test_admin_token', '--dry-run', '--json')
     assert.equal(dryRun.status, 0, dryRun.stderr)
     assert.equal(JSON.parse(dryRun.stdout).dryRun, true)
-    assert.equal(database.prepare('SELECT count(*) AS count FROM users WHERE email = ?').get(dryRunEmail).count, 0)
+    assert.equal((await database.queryOne('SELECT count(*)::integer AS count FROM users WHERE email = $1', [dryRunEmail])).count, 0)
 
-    const studentId = database.prepare("SELECT id FROM users WHERE email = 'student@cyberlabin.com'").get().id
+    const studentId = (await database.queryOne("SELECT id FROM users WHERE email = 'student@cyberlabin.com'")).id
     const blockedSuspend = cli('user', 'suspend', '--user-id', studentId, '--admin-token', 'test_admin_token')
     assert.notEqual(blockedSuspend.status, 0)
     assert.match(blockedSuspend.stderr, /confirm YES/)
-    assert.equal(database.prepare('SELECT status FROM users WHERE id = ?').get(studentId).status, 'active')
+    assert.equal((await database.queryOne('SELECT status FROM users WHERE id = $1', [studentId])).status, 'active')
   })
 })

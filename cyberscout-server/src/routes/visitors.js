@@ -6,9 +6,9 @@ import { visitorCookieOptions } from '../lib/cookies.js'
 
 const router = Router()
 
-router.post('/track', (req, res) => {
+router.post('/track', async (req, res) => {
   const visitorId = req.cookies?.cli_visitor_id || `visitor_${randomUUID()}`
-  const visitor = recordVisitor({
+  const visitor = await recordVisitor({
     visitorId,
     ipAddress: req.ip,
     userAgent: req.headers['user-agent'],
@@ -19,9 +19,9 @@ router.post('/track', (req, res) => {
   res.status(201).json({ visitorId: visitor.visitorId })
 })
 
-router.post('/consent', (req, res) => {
+router.post('/consent', async (req, res) => {
   const visitorId = req.cookies?.cli_visitor_id || `visitor_${randomUUID()}`
-  recordCookieConsent({
+  await recordCookieConsent({
     visitorId,
     necessary: true,
     analytics: Boolean(req.body?.analytics),
@@ -31,8 +31,8 @@ router.post('/consent', (req, res) => {
   res.json({ visitorId, consent: { necessary: true, analytics: Boolean(req.body?.analytics), marketing: Boolean(req.body?.marketing) } })
 })
 
-router.get('/stats', requireAuth, requireRole('admin', 'super_admin', 'marketing', 'sales'), (_req, res) => {
-  res.json({ stats: getVisitorStats() })
+router.get('/stats', requireAuth, requireRole('admin', 'super_admin', 'marketing', 'sales'), async (_req, res) => {
+  res.json({ stats: await getVisitorStats() })
 })
 
 export default router

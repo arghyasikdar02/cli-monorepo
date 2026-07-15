@@ -1,28 +1,21 @@
-PRAGMA foreign_keys = ON;
-
 CREATE TABLE IF NOT EXISTS ai_chat_sessions (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  course_id TEXT NOT NULL,
-  title TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
+  id text PRIMARY KEY,
+  user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  course_id text NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+  title text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS ai_chat_messages (
-  id TEXT PRIMARY KEY,
-  session_id TEXT NOT NULL,
-  user_id TEXT NOT NULL,
-  course_id TEXT NOT NULL,
-  role TEXT NOT NULL,
-  content TEXT NOT NULL,
-  citations TEXT NOT NULL DEFAULT '[]',
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  FOREIGN KEY (session_id) REFERENCES ai_chat_sessions(id) ON DELETE CASCADE,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
+  id text PRIMARY KEY,
+  session_id text NOT NULL REFERENCES ai_chat_sessions(id) ON DELETE CASCADE,
+  user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  course_id text NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+  role text NOT NULL,
+  content text NOT NULL,
+  citations jsonb NOT NULL DEFAULT '[]'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_ai_sessions_user_course ON ai_chat_sessions(user_id, course_id);

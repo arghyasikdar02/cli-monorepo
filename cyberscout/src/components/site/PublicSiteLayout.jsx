@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import CLILogo from '../CLILogo'
 import SiteIcon from '../ui/SiteIcon'
 import { useFocusTrap } from '../../hooks/useFocusTrap'
+import { openCookieSettings } from '../../lib/consent'
 
 const primaryLinks = [
   ['Courses', '/courses'],
@@ -174,7 +175,11 @@ function SiteFooter() {
           {footerLinks.map(([title, links]) => <nav key={title} aria-label={`${title} links`}><h2>{title}</h2>{links.map(([label, href]) => <Link key={href} to={href}>{label}</Link>)}</nav>)}
         </div>
       </div>
-      <div className="site-container site-footer-bottom"><p>© {new Date().getFullYear()} Cyber Lab IN. All rights reserved.</p><p>Third-party trademarks belong to their respective owners. Their use does not imply endorsement.</p></div>
+      <div className="site-container site-footer-bottom">
+        <p>© {new Date().getFullYear()} Cyber Lab IN. All rights reserved.</p>
+        <button type="button" className="site-footer-cookie-button" onClick={openCookieSettings}>Cookie settings</button>
+        <p>Third-party trademarks belong to their respective owners. Their use does not imply endorsement.</p>
+      </div>
     </footer>
   )
 }

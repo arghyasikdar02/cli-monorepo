@@ -1,13 +1,8 @@
 import { api } from './api'
-
-const CONSENT_KEY = 'cli_cookie_consent'
+import { readCookieConsent } from './consent'
 
 function analyticsAllowed() {
-  try {
-    return Boolean(JSON.parse(localStorage.getItem(CONSENT_KEY) || 'null')?.analytics)
-  } catch {
-    return false
-  }
+  return Boolean(readCookieConsent()?.analytics)
 }
 
 export function trackEvent(event, properties = {}) {

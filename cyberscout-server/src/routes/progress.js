@@ -7,14 +7,14 @@ const router = Router()
 
 router.use(requireAuth)
 
-router.get('/course/:courseId', requireCourseAccess({ allowRoles: ['admin', 'super_admin', 'support'] }), (req, res) => {
+router.get('/course/:courseId', requireCourseAccess({ allowRoles: ['admin', 'super_admin', 'support'] }), async (req, res) => {
   const userId = req.query.userId || req.user.id
-  res.json({ progress: getCourseProgress(userId, req.params.courseId) })
+  res.json({ progress: await getCourseProgress(userId, req.params.courseId) })
 })
 
-router.patch('/course/:courseId', requireCourseAccess({ allowRoles: ['admin', 'super_admin', 'support'] }), (req, res) => {
+router.patch('/course/:courseId', requireCourseAccess({ allowRoles: ['admin', 'super_admin', 'support'] }), async (req, res) => {
   const updates = pick(req.body, ['lessonProgress', 'videoProgress', 'documentProgress', 'labProgress', 'quizProgress'])
-  res.json({ progress: updateCourseProgress(req.user.id, req.params.courseId, updates) })
+  res.json({ progress: await updateCourseProgress(req.user.id, req.params.courseId, updates) })
 })
 
 export default router

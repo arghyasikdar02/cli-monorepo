@@ -8,7 +8,7 @@
   },
   "scripts": {
     "install:frontend": "npm install --prefix cyberscout",
-    "install:backend": "npm install --prefix cyberscout-server && npm run db:setup --prefix cyberscout-server",
+    "install:backend": "npm install --prefix cyberscout-server",
     "install:all": "npm run install:frontend && npm run install:backend",
     "db:migrate": "npm run db:migrate --prefix cyberscout-server",
     "db:seed": "npm run db:seed --prefix cyberscout-server",

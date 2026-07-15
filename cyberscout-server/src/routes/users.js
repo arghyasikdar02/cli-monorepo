@@ -8,37 +8,37 @@ const router = Router()
 router.use(requireAuth)
 router.use(requireRole('admin', 'super_admin', 'support'))
 
-router.get('/', (_req, res) => {
-  res.json({ users: listUsers(), roles: VALID_ROLES })
+router.get('/', async (_req, res) => {
+  res.json({ users: await listUsers(), roles: VALID_ROLES })
 })
 
-router.get('/:userId', (req, res) => {
-  const user = findUserById(req.params.userId)
+router.get('/:userId', async (req, res) => {
+  const user = await findUserById(req.params.userId)
   if (!user) return res.status(404).json({ error: 'User not found' })
   res.json({ user: publicUser(user) })
 })
 
-router.patch('/:userId', (req, res) => {
+router.patch('/:userId', async (req, res) => {
   const updates = pick(req.body, ['name', 'email', 'status', 'rank', 'xp', 'level', 'isPro'])
-  const user = updateUser(req.params.userId, updates)
+  const user = await updateUser(req.params.userId, updates)
   if (!user) return res.status(404).json({ error: 'User not found' })
-  recordAudit('user.update', req.user.id, 'user', user.id, updates)
+  await recordAudit('user.update', req.user.id, 'user', user.id, updates)
   res.json({ user: publicUser(user) })
 })
 
-router.patch('/:userId/suspend', (req, res) => {
-  const user = suspendUser(req.params.userId)
+router.patch('/:userId/suspend', async (req, res) => {
+  const user = await suspendUser(req.params.userId)
   if (!user) return res.status(404).json({ error: 'User not found' })
-  recordAudit('user.suspend', req.user.id, 'user', user.id, {})
+  await recordAudit('user.suspend', req.user.id, 'user', user.id, {})
   res.json({ user: publicUser(user) })
 })
 
-router.patch('/:userId/role', (req, res) => {
+router.patch('/:userId/role', async (req, res) => {
   const error = requireFields(req.body, ['role'])
   if (error) return res.status(400).json({ error })
-  const user = assignRole(req.params.userId, req.body.role)
+  const user = await assignRole(req.params.userId, req.body.role)
   if (!user) return res.status(400).json({ error: 'Invalid user or role' })
-  recordAudit('user.assign_role', req.user.id, 'user', user.id, { role: req.body.role })
+  await recordAudit('user.assign_role', req.user.id, 'user', user.id, { role: req.body.role })
   res.json({ user: publicUser(user) })
 })
 

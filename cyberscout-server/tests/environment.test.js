@@ -1,9 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import fs from 'node:fs'
-import os from 'node:os'
-import path from 'node:path'
 import { getAllowedOrigins, validateEnvironment } from '../src/lib/environment.js'
 
 const validProductionEnvironment = {
@@ -11,7 +8,7 @@ const validProductionEnvironment = {
   FRONTEND_URL: 'https://cyberlabin.com/',
   BACKEND_URL: 'https://cyberlabin.onrender.com/',
   CORS_ORIGINS: 'https://cyberlabin.com/, https://www.cyberlabin.com',
-  DATABASE_PATH: '/var/data/cyberlab.sqlite',
+  DATABASE_URL: 'postgresql://postgres:production-db-secret@db.project.supabase.co:5432/postgres?sslmode=require',
   JWT_SECRET: 'j'.repeat(64),
   VISITOR_HASH_SALT: 'v'.repeat(64),
   LAB_FLAG_SALT: 'l'.repeat(64),
@@ -26,7 +23,7 @@ describe('production environment validation', () => {
     const result = validateEnvironment({ ...validProductionEnvironment })
     assert.equal(result.frontendUrl, 'https://cyberlabin.com')
     assert.equal(result.backendUrl, 'https://cyberlabin.onrender.com')
-    assert.equal(result.databasePath, '/var/data/cyberlab.sqlite')
+    assert.equal(result.databaseUrl, validProductionEnvironment.DATABASE_URL)
     assert.deepEqual(result.allowedOrigins, ['https://cyberlabin.com', 'https://www.cyberlabin.com'])
   })
 
@@ -35,7 +32,7 @@ describe('production environment validation', () => {
       ...validProductionEnvironment,
       BACKEND_URL: 'http://localhost:3001',
       CORS_ORIGINS: 'https://preview.example.com',
-      DATABASE_PATH: './data/cyberlab.sqlite',
+      DATABASE_URL: 'file:./data/local.db',
       LAB_FLAG_SALT: 'replace-with-a-secret',
       CLIADM_ADMIN_TOKEN: 'short',
       COOKIE_SECURE: 'false',
@@ -48,7 +45,7 @@ describe('production environment validation', () => {
         assert.match(error.message, /LAB_FLAG_SALT:/)
         assert.match(error.message, /CLIADM_ADMIN_TOKEN:/)
         assert.match(error.message, /CORS_ORIGINS:/)
-        assert.match(error.message, /DATABASE_PATH:/)
+        assert.match(error.message, /DATABASE_URL:/)
         assert.match(error.message, /COOKIE_SECURE:/)
         assert.match(error.message, /BCRYPT_COST:/)
         assert.doesNotMatch(error.message, /replace-with-a-secret/)
@@ -57,11 +54,9 @@ describe('production environment validation', () => {
     )
   })
 
-  it('rejects an unimplemented Postgres URL instead of silently using SQLite', () => {
-    assert.throws(
-      () => validateEnvironment({ ...validProductionEnvironment, DATABASE_URL: 'postgresql://user:secret@example.com/database' }),
-      /DATABASE_URL: PostgreSQL URLs are not supported/,
-    )
+  it('accepts a standard PostgreSQL URL and rejects file database URLs', () => {
+    assert.doesNotThrow(() => validateEnvironment({ ...validProductionEnvironment, DATABASE_URL: 'postgresql://user:strong-db-secret@example.com/database' }))
+    assert.throws(() => validateEnvironment({ ...validProductionEnvironment, DATABASE_URL: 'file:./data/local.db' }), /DATABASE_URL: must use the postgresql:\/\//)
   })
 
   it('keeps local preview origins outside production only', () => {
@@ -77,9 +72,7 @@ describe('production environment validation', () => {
     )
   })
 
-  it('fails before opening SQLite when the production environment is invalid', () => {
-    const databasePath = path.join(os.tmpdir(), `cyberlab-invalid-start-${process.pid}.sqlite`)
-    fs.rmSync(databasePath, { force: true })
+  it('fails before opening the database pool when the production environment is invalid', () => {
     const result = spawnSync(process.execPath, ['src/start.js'], {
       cwd: process.cwd(),
       encoding: 'utf8',
@@ -87,7 +80,6 @@ describe('production environment validation', () => {
         ...process.env,
         ...validProductionEnvironment,
         BACKEND_URL: 'http://localhost:3001',
-        DATABASE_PATH: databasePath,
         LAB_FLAG_SALT: 'placeholder',
         GOOGLE_CLIENT_ID: '',
         GOOGLE_CLIENT_SECRET: '',
@@ -100,6 +92,5 @@ describe('production environment validation', () => {
     assert.equal(result.status, 1)
     assert.match(result.stderr, /BACKEND_URL:/)
     assert.match(result.stderr, /LAB_FLAG_SALT:/)
-    assert.equal(fs.existsSync(databasePath), false)
   })
 })

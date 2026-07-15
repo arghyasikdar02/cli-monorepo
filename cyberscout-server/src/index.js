@@ -1,4 +1,5 @@
 import 'dotenv/config'
+import 'express-async-errors'
 import express from 'express'
 import cors from 'cors'
 import cookieParser from 'cookie-parser'
@@ -27,7 +28,7 @@ import blogsRouter from './routes/blogs.js'
 import visitorsRouter from './routes/visitors.js'
 import videosRouter from './routes/videos.js'
 import webhooksRouter from './routes/webhooks.js'
-import { seedBaselineData } from './db/seed.js'
+import { checkDatabaseConnection, closeDatabase } from './db/index.js'
 import { normalizeOrigin, validateEnvironment } from './lib/environment.js'
 import { apiLimiter, csrfProtection, requestContext } from './middleware/security.js'
 
@@ -130,12 +131,18 @@ export function createApp() {
 export const app = createApp()
 
 if (process.env.NODE_ENV !== 'test') {
-  seedBaselineData({ force: process.env.SEED_BASELINE_FORCE === '1' })
-    .then(() => {
-      app.listen(PORT, HOST, () => console.log(`cyberscout-server ready on ${HOST}:${PORT}`))
-    })
-    .catch(error => {
-      console.error('Failed to prepare database before server start:', error)
-      process.exit(1)
-    })
+  try {
+    await checkDatabaseConnection()
+    app.listen(PORT, HOST, () => console.log(`cyberscout-server ready on ${HOST}:${PORT}; database=postgresql`))
+  } catch (error) {
+    console.error('PostgreSQL connection failed before server start:', error.message)
+    process.exit(1)
+  }
+}
+
+for (const signal of ['SIGTERM', 'SIGINT']) {
+  process.once(signal, async () => {
+    await closeDatabase().catch(() => {})
+    process.exit(0)
+  })
 }

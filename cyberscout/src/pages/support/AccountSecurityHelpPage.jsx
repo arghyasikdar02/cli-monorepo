@@ -7,7 +7,7 @@ const FAQS = [
   { q: 'How do I enable Two-Factor Authentication?', a: 'Go to Settings → Security → Enable 2FA. Scan the QR code with your authenticator app and enter the 6-digit code to confirm.' },
   { q: "I can't log into my account. What should I do?", a: "First, try resetting your password. If you still can't access your account, check that you're using the correct email. Contact support if the issue persists." },
   { q: 'How do I revoke access to active sessions?', a: "Navigate to Settings → Security → Active Sessions. You can revoke any session that isn't your current one by clicking 'Revoke'." },
-  { q: 'How is my account protected?', a: 'Cyber Lab IN uses TLS for data in transit and bcrypt password hashing with unique salts. Storage encryption depends on the configured production database provider and must be verified during deployment.' },
+  { q: 'How is my account protected?', a: 'Cyber Lab IN uses TLS for data in transit and bcrypt password hashing with unique salts. Additional storage protections are managed by the database provider.' },
   { q: 'How do I delete my account?', a: 'Contact our support team. Account deletion is permanent and removes all your progress, badges, and billing history.' },
 ]
 

@@ -8,7 +8,7 @@ import SiteIcon from '../../components/ui/SiteIcon'
 const authErrors = {
   oauth_failed: 'Google sign-in failed. Please try again.',
   oauth_state: 'Google sign-in could not be verified. Please start again from this page.',
-  oauth_unconfigured: 'Google sign-in is not configured for this environment. Use email access or add Google OAuth credentials.',
+  oauth_unconfigured: 'Google sign-in is unavailable right now. Use your email and password instead.',
 }
 
 function safeRedirect(value) {

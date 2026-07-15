@@ -28,10 +28,10 @@ function safeProperties(input) {
   }))
 }
 
-router.post('/events', (req, res) => {
+router.post('/events', async (req, res) => {
   const event = String(req.body?.event || '')
   if (!allowedEvents.has(event)) return res.status(400).json({ error: 'Unsupported analytics event' })
-  const result = recordAnalyticsEvent({
+  const result = await recordAnalyticsEvent({
     event,
     visitorId: req.cookies?.cli_visitor_id || null,
     path: req.body?.path,
@@ -42,12 +42,12 @@ router.post('/events', (req, res) => {
 
 router.use(requireAuth)
 
-router.get('/admin', requireRole('admin', 'super_admin'), (_req, res) => {
-  res.json({ analytics: getAdminAnalytics() })
+router.get('/admin', requireRole('admin', 'super_admin'), async (_req, res) => {
+  res.json({ analytics: await getAdminAnalytics() })
 })
 
-router.get('/sales', requireRole('admin', 'super_admin', 'marketing', 'sales'), (_req, res) => {
-  res.json({ analytics: getSalesDashboard().analytics })
+router.get('/sales', requireRole('admin', 'super_admin', 'marketing', 'sales'), async (_req, res) => {
+  res.json({ analytics: (await getSalesDashboard()).analytics })
 })
 
 export default router

@@ -1,9 +1,9 @@
 export const rotatingInvestigationPhrases = [
+  'role scenarios.',
   'real investigations.',
   'guided cyber labs.',
   'SOC casework.',
   'evidence analysis.',
-  'role scenarios.',
 ]
 
 export const roadmapFoundation = [
@@ -31,7 +31,7 @@ export const careerTracks = [
     id: 'blue-team',
     group: 'Blue Team',
     label: 'Defend systems',
-    description: 'Practise alert triage, evidence review and incident documentation before moving into deeper detection work.',
+    description: 'Practice alert triage, evidence review and incident documentation before moving into deeper detection work.',
     skills: ['Alert triage', 'Log and packet analysis', 'Incident documentation'],
     roles: ['SOC Analyst', 'Incident Responder', 'Threat Hunter', 'SIEM Engineer', 'Detection Engineer'],
   },

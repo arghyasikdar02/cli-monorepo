@@ -7,32 +7,32 @@ const router = Router()
 
 router.use(requireAuth)
 
-router.post('/', requireRole('admin', 'super_admin', 'support'), (req, res) => {
+router.post('/', requireRole('admin', 'super_admin', 'support'), async (req, res) => {
   const error = requireFields(req.body, ['userId', 'courseId'])
   if (error) return res.status(400).json({ error })
   try {
-    const enrollment = addEnrollment({ ...req.body, source: 'manual' }, req.user.id)
+    const enrollment = await addEnrollment({ ...req.body, source: 'manual' }, req.user.id)
     res.status(201).json({ enrollment })
   } catch (err) {
     res.status(400).json({ error: err.message || 'Enrollment failed' })
   }
 })
 
-router.get('/me', (req, res) => {
-  res.json({ enrollments: listEnrollmentsByUser(req.user.id) })
+router.get('/me', async (req, res) => {
+  res.json({ enrollments: await listEnrollmentsByUser(req.user.id) })
 })
 
-router.get('/users/:userId', requireRole('admin', 'super_admin', 'instructor', 'support'), (req, res) => {
-  res.json({ enrollments: listEnrollmentsByUser(req.params.userId) })
+router.get('/users/:userId', requireRole('admin', 'super_admin', 'instructor', 'support'), async (req, res) => {
+  res.json({ enrollments: await listEnrollmentsByUser(req.params.userId) })
 })
 
-router.get('/courses/:courseId', requireRole('admin', 'super_admin', 'instructor', 'support'), (req, res) => {
-  res.json({ enrollments: listEnrollmentsByCourse(req.params.courseId) })
+router.get('/courses/:courseId', requireRole('admin', 'super_admin', 'instructor', 'support'), async (req, res) => {
+  res.json({ enrollments: await listEnrollmentsByCourse(req.params.courseId) })
 })
 
-router.get('/check/:courseId', (req, res) => {
+router.get('/check/:courseId', async (req, res) => {
   const adminLike = (req.user.roles || [req.user.role]).some(role => ['admin', 'super_admin', 'instructor', 'support'].includes(role))
-  res.json({ allowed: adminLike || hasActiveEnrollment(req.user.id, req.params.courseId) })
+  res.json({ allowed: adminLike || await hasActiveEnrollment(req.user.id, req.params.courseId) })
 })
 
 export default router

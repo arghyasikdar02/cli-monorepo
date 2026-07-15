@@ -68,7 +68,7 @@ export default function DashboardPage() {
         </div>
 
         {loading && (
-          <div className="rounded-xl border border-slate-200 bg-white p-8 text-slate-500 shadow-card">Loading your dashboard from the database...</div>
+          <div className="rounded-xl border border-slate-200 bg-white p-8 text-slate-500 shadow-card">Loading your courses and progress...</div>
         )}
 
         {error && (

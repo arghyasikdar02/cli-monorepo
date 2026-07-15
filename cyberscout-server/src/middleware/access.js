@@ -14,14 +14,14 @@ export function currentRoles(user) {
   return user?.roles || [user?.role || 'student']
 }
 
-export function requireAuth(req, res, next) {
+export async function requireAuth(req, res, next) {
   const auth = req.headers.authorization
   const token = auth?.startsWith('Bearer ') ? auth.slice(7) : req.cookies?.cli_session
   if (!token) return res.status(401).json({ error: 'Authentication required' })
 
   try {
     const payload = verifyToken(token)
-    const user = findUserById(payload.sub)
+    const user = await findUserById(payload.sub)
     if (!user) return res.status(401).json({ error: 'User not found' })
     if (user.status === 'suspended') return res.status(403).json({ error: 'Account suspended' })
     if (Number(payload.tokenVersion || 0) !== Number(user.tokenVersion || 0)) {
@@ -52,43 +52,59 @@ function extractCourseId(req) {
 }
 
 export function requireCourseAccess(options = {}) {
-  return (req, res, next) => {
-    if (!req.user) return res.status(401).json({ error: 'Authentication required' })
-    const courseId = extractCourseId(req)
-    if (!courseId) return res.status(400).json({ error: 'courseId is required' })
-    const decision = canAccessCourse(req.user, courseId, { ...options, batchId: req.params.batchId || req.body?.batchId || req.query?.batchId })
-    if (assertDecision(decision, res)) return
-    return next()
+  return async (req, res, next) => {
+    try {
+      if (!req.user) return res.status(401).json({ error: 'Authentication required' })
+      const courseId = extractCourseId(req)
+      if (!courseId) return res.status(400).json({ error: 'courseId is required' })
+      const decision = await canAccessCourse(req.user, courseId, { ...options, batchId: req.params.batchId || req.body?.batchId || req.query?.batchId })
+      if (assertDecision(decision, res)) return
+      return next()
+    } catch (error) {
+      return next(error)
+    }
   }
 }
 
-export function requireCourseManager(req, res, next) {
-  if (!req.user) return res.status(401).json({ error: 'Authentication required' })
-  const courseId = extractCourseId(req)
-  if (!courseId) return res.status(400).json({ error: 'courseId is required' })
-  const decision = canManageCourse(req.user, courseId)
-  if (assertDecision(decision, res)) return
-  return next()
+export async function requireCourseManager(req, res, next) {
+  try {
+    if (!req.user) return res.status(401).json({ error: 'Authentication required' })
+    const courseId = extractCourseId(req)
+    if (!courseId) return res.status(400).json({ error: 'courseId is required' })
+    const decision = await canManageCourse(req.user, courseId)
+    if (assertDecision(decision, res)) return
+    return next()
+  } catch (error) {
+    return next(error)
+  }
 }
 
 export function requireBatchMembership(options = {}) {
-  return (req, res, next) => {
-    if (!req.user) return res.status(401).json({ error: 'Authentication required' })
-    const courseId = extractCourseId(req)
-    const batchId = req.params.batchId || req.body?.batchId || req.query?.batchId
-    if (!courseId) return res.status(400).json({ error: 'courseId is required' })
-    if (!batchId) return res.status(400).json({ error: 'batchId is required' })
-    const decision = canAccessBatch(req.user, courseId, batchId, options)
-    if (assertDecision(decision, res)) return
-    return next()
+  return async (req, res, next) => {
+    try {
+      if (!req.user) return res.status(401).json({ error: 'Authentication required' })
+      const courseId = extractCourseId(req)
+      const batchId = req.params.batchId || req.body?.batchId || req.query?.batchId
+      if (!courseId) return res.status(400).json({ error: 'courseId is required' })
+      if (!batchId) return res.status(400).json({ error: 'batchId is required' })
+      const decision = await canAccessBatch(req.user, courseId, batchId, options)
+      if (assertDecision(decision, res)) return
+      return next()
+    } catch (error) {
+      return next(error)
+    }
   }
 }
 
-export function requireInstructorAssignment(req, res, next) {
-  if (!req.user) return res.status(401).json({ error: 'Authentication required' })
-  const courseId = extractCourseId(req)
-  if (!courseId) return res.status(400).json({ error: 'courseId is required' })
-  const decision = canInstructorAccessCourse(req.user, courseId)
-  if (assertDecision(decision, res)) return
-  return next()
+export async function requireInstructorAssignment(req, res, next) {
+  try {
+    if (!req.user) return res.status(401).json({ error: 'Authentication required' })
+    const courseId = extractCourseId(req)
+    if (!courseId) return res.status(400).json({ error: 'courseId is required' })
+    const decision = await canInstructorAccessCourse(req.user, courseId)
+    if (assertDecision(decision, res)) return
+    return next()
+  } catch (error) {
+    return next(error)
+  }
 }

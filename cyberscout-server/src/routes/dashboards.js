@@ -16,39 +16,41 @@ const router = Router()
 
 router.use(requireAuth)
 
-router.get('/student', (req, res) => {
-  res.json({ dashboard: getStudentDashboard(req.user.id) })
+router.get('/student', async (req, res) => {
+  res.json({ dashboard: await getStudentDashboard(req.user.id) })
 })
 
-router.get('/admin', requireDashboardRole('admin'), (_req, res) => {
-  const analytics = getAdminAnalytics()
+router.get('/admin', requireDashboardRole('admin'), async (_req, res) => {
+  const [analytics, users, courses, enrollments, auditLogs] = await Promise.all([
+    getAdminAnalytics(), listUsers(), listCourses(), listAllEnrollments(), getAuditLogs(),
+  ])
   res.json({
     dashboard: {
       analytics,
-      users: listUsers(),
-      courses: listCourses(),
-      enrollments: listAllEnrollments(),
+      users,
+      courses,
+      enrollments,
       payments: [],
       liveClasses: [],
-      auditLogs: getAuditLogs().slice(0, 30),
+      auditLogs: auditLogs.slice(0, 30),
     },
   })
 })
 
-router.get('/instructor', requireDashboardRole('instructor'), (req, res) => {
-  res.json({ dashboard: getInstructorDashboard(req.user.id) })
+router.get('/instructor', requireDashboardRole('instructor'), async (req, res) => {
+  res.json({ dashboard: await getInstructorDashboard(req.user.id) })
 })
 
-router.get('/marketing', requireDashboardRole('marketing'), (_req, res) => {
-  res.json({ dashboard: getSalesDashboard() })
+router.get('/marketing', requireDashboardRole('marketing'), async (_req, res) => {
+  res.json({ dashboard: await getSalesDashboard() })
 })
 
-router.get('/sales', requireDashboardRole('marketing'), (_req, res) => {
-  res.json({ dashboard: getSalesDashboard() })
+router.get('/sales', requireDashboardRole('marketing'), async (_req, res) => {
+  res.json({ dashboard: await getSalesDashboard() })
 })
 
-router.get('/ops', requireDashboardRole('ops'), (_req, res) => {
-  res.json({ dashboard: getOpsDashboard() })
+router.get('/ops', requireDashboardRole('ops'), async (_req, res) => {
+  res.json({ dashboard: await getOpsDashboard() })
 })
 
 export default router

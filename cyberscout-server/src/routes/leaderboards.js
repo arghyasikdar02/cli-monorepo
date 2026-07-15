@@ -6,8 +6,8 @@ const router = Router()
 
 router.use(requireAuth)
 
-router.get('/course/:courseId', requireCourseAccess({ allowRoles: ['admin', 'super_admin', 'instructor', 'support'] }), (req, res) => {
-  res.json({ leaderboard: getCourseLeaderboard(req.params.courseId) })
+router.get('/course/:courseId', requireCourseAccess({ allowRoles: ['admin', 'super_admin', 'instructor', 'support'] }), async (req, res) => {
+  res.json({ leaderboard: await getCourseLeaderboard(req.params.courseId) })
 })
 
 export default router

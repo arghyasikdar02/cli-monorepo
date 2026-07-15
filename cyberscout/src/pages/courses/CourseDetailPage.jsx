@@ -66,7 +66,7 @@ export default function CourseDetailPage() {
     return (
       <AppShell>
         <div className="max-w-[1280px] mx-auto px-8 py-12">
-          <div className="rounded-xl border border-slate-200 bg-white p-8 text-slate-500 shadow-card">Loading course from the database...</div>
+          <div className="rounded-xl border border-slate-200 bg-white p-8 text-slate-500 shadow-card">Loading course details...</div>
         </div>
       </AppShell>
     )
@@ -290,7 +290,7 @@ export default function CourseDetailPage() {
               disabled={!hasLessons || enrolling}
               className="w-full bg-primary text-white py-3.5 rounded-xl font-space-grotesk font-bold text-sm hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-primary/10 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
             >
-              {enrolling ? 'Saving enrollment...' : course.enrolled ? 'Continue Learning' : 'Enroll Now — Free'}
+              {enrolling ? 'Saving enrolment...' : course.enrolled ? 'Continue learning' : 'Enrol now: free'}
             </button>
 
             <div className="space-y-2 pt-2 text-sm text-on-surface-variant">

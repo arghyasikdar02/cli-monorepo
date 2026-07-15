@@ -37,8 +37,10 @@
 
 ## Secrets and production configuration
 
-- `.env`, SQLite files, logs and build output are ignored.
-- Development seed identities are hard-disabled in production. Startup may create public catalogue records, but the first administrator must be bootstrapped explicitly through protected `cliadm` access.
+- `.env`, old local database files, logs and build output are ignored.
+- Development seed identities are hard-disabled in production. Startup never seeds records; catalogue and administrator creation are explicit operational actions.
+- `DATABASE_URL` is accepted only for PostgreSQL. Production requires TLS and never falls back to a local file database.
+- The Render backend owns the database credential. Supabase anon/authenticated roles have no direct table grants; frontend code receives no database password or service-role key.
 - Production startup rejects placeholder or short JWT, visitor-hash, lab-flag and CLI administration secrets before opening the database.
 - `FRONTEND_URL`, `BACKEND_URL` and CORS origins must be explicit public HTTPS origins in production; localhost and implicit defaults fail closed.
 - OAuth credentials must be configured as a complete non-placeholder pair.
@@ -51,6 +53,6 @@
 - `cliadm` mutations require an admin token; destructive commands require `--dry-run` or `--confirm YES`.
 - Health, request ID and safe error responses support incident diagnosis without exposing stack traces in production.
 
-## Production limitation
+## Production database
 
-SQLite is durable on Render only when the configured Starter service and `/var/data` persistent disk are present. It remains a single-instance database with operational limits; maintain tested off-site backups and complete the Postgres/Supabase adapter migration before higher-scale production use.
+Supabase PostgreSQL is the production source of truth. Migrations are transactionally tracked under a PostgreSQL advisory lock. Supabase backup, point-in-time recovery and connection limits remain operational responsibilities; use a dedicated test database for destructive test resets.

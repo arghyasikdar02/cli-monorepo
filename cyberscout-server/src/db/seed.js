@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { db } from './index.js'
+import { closeDatabase, execute, queryOne, transaction } from './index.js'
 import {
   createUser,
   enrollUser,
@@ -14,102 +14,52 @@ const __filename = fileURLToPath(import.meta.url)
 const PASSWORD = process.env.SEED_USER_PASSWORD || 'password123'
 const COST = Number(process.env.BCRYPT_COST || 12)
 
-function insertCourse(course) {
-  db.prepare(`
+async function insertCourse(course, client) {
+  await execute(`
     INSERT INTO courses (
       id, slug, title, category, level, duration, description, overview, instructor_name, instructor_title,
       status, price, mode, credential, prerequisites, brochure_url, category_slug, audience, outcomes, labs, instructor_id
     )
     VALUES (
-      @id, @slug, @title, @category, @level, @duration, @description, @overview, @instructorName, @instructorTitle,
-      @status, @price, @mode, @credential, @prerequisites, @brochureUrl, @categorySlug, @audience, @outcomes, @labs, @instructorId
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
+      $18::jsonb, $19::jsonb, $20::jsonb, $21
     )
-    ON CONFLICT(id) DO UPDATE SET
-      title = excluded.title,
-      category = excluded.category,
-      level = excluded.level,
-      duration = excluded.duration,
-      description = excluded.description,
-      overview = excluded.overview,
-      instructor_name = excluded.instructor_name,
-      instructor_title = excluded.instructor_title,
-      status = excluded.status,
-      price = excluded.price,
-      mode = excluded.mode,
-      credential = excluded.credential,
-      prerequisites = excluded.prerequisites,
-      brochure_url = excluded.brochure_url,
-      category_slug = excluded.category_slug,
-      audience = excluded.audience,
-      outcomes = excluded.outcomes,
-      labs = excluded.labs,
-      updated_at = datetime('now')
-  `).run({
-    ...course,
-    mode: course.mode || 'Online',
-    credential: course.credential || 'Certificate of Completion',
-    prerequisites: course.prerequisites || 'Basic computer and internet knowledge',
-    brochureUrl: course.brochureUrl || null,
-    categorySlug: course.categorySlug || 'cybersecurity',
-    audience: JSON.stringify(course.audience || []),
-    outcomes: JSON.stringify(course.outcomes || []),
-    labs: JSON.stringify(course.labs || []),
-    instructorId: course.instructorId || null,
-  })
+    ON CONFLICT(id) DO NOTHING
+  `, [
+    course.id, course.slug, course.title, course.category, course.level, course.duration, course.description,
+    course.overview, course.instructorName, course.instructorTitle, course.status, course.price,
+    course.mode || 'Online', course.credential || 'Certificate of Completion',
+    course.prerequisites || 'Basic computer and internet knowledge', course.brochureUrl || null,
+    course.categorySlug || 'cybersecurity', JSON.stringify(course.audience || []),
+    JSON.stringify(course.outcomes || []), JSON.stringify(course.labs || []), course.instructorId || null,
+  ], client)
 }
 
-function insertModule(module) {
-  db.prepare(`
+async function insertModule(module, client) {
+  await execute(`
     INSERT INTO course_modules (id, course_id, title, sort_order)
-    VALUES (@id, @courseId, @title, @sortOrder)
-    ON CONFLICT(id) DO UPDATE SET title = excluded.title, sort_order = excluded.sort_order
-  `).run(module)
+    VALUES ($1, $2, $3, $4) ON CONFLICT(id) DO NOTHING
+  `, [module.id, module.courseId, module.title, module.sortOrder], client)
 }
 
-function insertLesson(lesson) {
-  db.prepare(`
+async function insertLesson(lesson, client) {
+  await execute(`
     INSERT INTO lessons (id, course_id, module_id, title, duration, content, sort_order, status)
-    VALUES (@id, @courseId, @moduleId, @title, @duration, @content, @sortOrder, 'published')
-    ON CONFLICT(id) DO UPDATE SET
-      title = excluded.title,
-      duration = excluded.duration,
-      content = excluded.content,
-      sort_order = excluded.sort_order,
-      status = excluded.status
-  `).run(lesson)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, 'published') ON CONFLICT(id) DO NOTHING
+  `, [lesson.id, lesson.courseId, lesson.moduleId, lesson.title, lesson.duration, lesson.content, lesson.sortOrder], client)
 }
 
-function insertMaterial(material) {
-  db.prepare(`
+async function insertMaterial(material, client) {
+  await execute(`
     INSERT INTO course_materials (id, course_id, lesson_id, type, title, description, content, resource_url, is_public, sort_order)
-    VALUES (@id, @courseId, @lessonId, @type, @title, @description, @content, @resourceUrl, @isPublic, @sortOrder)
-    ON CONFLICT(id) DO UPDATE SET
-      title = excluded.title,
-      description = excluded.description,
-      content = excluded.content,
-      resource_url = excluded.resource_url,
-      is_public = excluded.is_public,
-      sort_order = excluded.sort_order
-  `).run(material)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT(id) DO NOTHING
+  `, [material.id, material.courseId, material.lessonId, material.type, material.title, material.description, material.content, material.resourceUrl, Boolean(material.isPublic), material.sortOrder], client)
 }
 
 async function ensureUser({ name, email, role, roles }) {
-  const existing = findUserByEmail(email)
-  const passwordHash = existing?.passwordHash ? existing.passwordHash : await bcrypt.hash(PASSWORD, COST)
-  if (existing) {
-    const mergedRoles = Array.from(new Set([...(existing.roles || []), ...(roles || [role])]))
-    const needsUpdate = existing.role !== role ||
-      JSON.stringify(existing.roles || []) !== JSON.stringify(mergedRoles) ||
-      !existing.passwordHash
-    if (needsUpdate) {
-      db.prepare(`
-        UPDATE users
-        SET role = ?, roles = ?, password_hash = ?, updated_at = datetime('now')
-        WHERE id = ?
-      `).run(role, JSON.stringify(mergedRoles), passwordHash, existing.id)
-    }
-    return findUserByEmail(email)
-  }
+  const existing = await findUserByEmail(email)
+  if (existing) return existing
+  const passwordHash = await bcrypt.hash(PASSWORD, COST)
   return createUser({
     name,
     email,
@@ -332,48 +282,106 @@ const materials = [
   },
 ]
 
-function catalogSeedIsReady() {
-  const courseCount = db.prepare("SELECT count(*) AS count FROM courses WHERE id IN ('c001', 'c002')").get().count
-  const materialCount = db.prepare("SELECT count(*) AS count FROM course_materials WHERE id IN ('mat001_public', 'mat002_public')").get().count
-  return courseCount === 2 && materialCount === 2
+const blogs = [
+  {
+    id: 'blog_cybersecurity',
+    slug: 'what-is-cybersecurity',
+    title: 'What is cybersecurity?',
+    excerpt: 'A beginner-friendly explanation of cybersecurity and why hands-on practice matters.',
+    body: 'Cybersecurity is the practice of protecting systems, accounts, networks, websites, and digital information from attacks, misuse, and unauthorised access.\n\nFor beginners, the best starting point is learning how real risks appear in everyday systems.\n\nExplore Cyber Security Essentials for guided defensive practice.',
+    metaTitle: 'What is Cybersecurity? Beginner Guide',
+    metaDescription: 'Learn what cybersecurity means, why it matters, and how beginners can start with guided labs and practical defensive skills.',
+    category: 'Beginner Cybersecurity',
+  },
+  {
+    id: 'blog_phishing',
+    slug: 'what-is-phishing-and-how-to-prevent-it',
+    title: 'What is phishing and how to prevent it?',
+    excerpt: 'Learn how phishing works and the simple habits that reduce risk.',
+    body: 'Phishing is a social engineering attack that tries to trick someone into clicking a link, opening an attachment, sharing credentials, or taking urgent action.\n\nCheck the sender, domain, destination, urgency, and reporting route before acting.',
+    metaTitle: 'What is Phishing and How to Prevent It?',
+    metaDescription: 'Understand phishing indicators, prevention habits, and beginner-safe practice through guided labs.',
+    category: 'Beginner Cybersecurity',
+  },
+  {
+    id: 'blog_ethical_hacking',
+    slug: 'what-is-ethical-hacking',
+    title: 'What is ethical hacking?',
+    excerpt: 'A practical explanation of ethical hacking, authorisation, and responsible learning.',
+    body: 'Ethical hacking is authorised security testing. The goal is to find weaknesses safely, document risk clearly, and help improve defence.\n\nBeginners should first learn security fundamentals and responsible reporting.',
+    metaTitle: 'What is Ethical Hacking?',
+    metaDescription: 'Learn what ethical hacking means, why authorisation matters, and which cybersecurity foundations beginners should learn first.',
+    category: 'Ethical Hacking',
+  },
+  {
+    id: 'blog_beginners',
+    slug: 'how-to-learn-cybersecurity-for-beginners',
+    title: 'How to learn cybersecurity for beginners?',
+    excerpt: 'A practical learning path for students, IT beginners, and career switchers.',
+    body: 'The best way to learn cybersecurity for beginners is to combine simple explanations with practical exercises. Start with account safety, phishing prevention, network basics, web security, and defensive reporting.',
+    metaTitle: 'How to Learn Cybersecurity for Beginners',
+    metaDescription: 'A beginner-friendly cybersecurity learning path with hands-on labs and defensive reporting.',
+    category: 'Career Guidance',
+  },
+]
+
+async function insertBlog(blog, client) {
+  await execute(`
+    INSERT INTO blogs (id, slug, title, excerpt, body, meta_title, meta_description, category, author_name, published_at, last_reviewed_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'Arghya Sikdar', CURRENT_TIMESTAMP, CURRENT_DATE)
+    ON CONFLICT(id) DO NOTHING
+  `, [blog.id, blog.slug, blog.title, blog.excerpt, blog.body, blog.metaTitle, blog.metaDescription, blog.category], client)
 }
 
-function developmentSeedIsReady() {
-  const liveClassCount = db.prepare("SELECT count(*) AS count FROM live_classes WHERE id = 'live_c001_01'").get().count
-  const instructorAssignmentCount = db.prepare("SELECT count(*) AS count FROM courses WHERE id = 'c002' AND instructor_id IS NOT NULL").get().count
-  const userCount = db.prepare(`
-    SELECT count(*) AS count
-    FROM users
-    WHERE email IN (
-      'student@cyberlabin.com',
-      'neel0409@gmail.com',
-      'admin@cyberlabin.com',
-      'instructor@cyberlabin.com',
-      'marketing@cyberlabin.com',
-      'ops@cyberlabin.com'
-    )
-  `).get().count
-  return liveClassCount === 1 && userCount === 6 && instructorAssignmentCount === 1
+async function catalogSeedIsReady() {
+  const row = await queryOne(`
+    SELECT
+      (SELECT count(*) FROM courses WHERE id IN ('c001', 'c002'))::integer AS courses,
+      (SELECT count(*) FROM course_materials WHERE id IN ('mat001_public', 'mat002_public'))::integer AS materials,
+      (SELECT count(*) FROM blogs WHERE id IN ('blog_cybersecurity', 'blog_phishing', 'blog_ethical_hacking', 'blog_beginners'))::integer AS blogs
+  `)
+  return row.courses === 2 && row.materials === 2 && row.blogs === 4
+}
+
+async function developmentSeedIsReady() {
+  const row = await queryOne(`
+    SELECT
+      (SELECT count(*) FROM live_classes WHERE id = 'live_c001_01')::integer AS live_classes,
+      (SELECT count(*) FROM courses WHERE id = 'c002' AND instructor_id IS NOT NULL)::integer AS instructor_assignments,
+      (SELECT count(*) FROM users WHERE email IN (
+        'student@cyberlabin.com', 'neel0409@gmail.com', 'admin@cyberlabin.com',
+        'instructor@cyberlabin.com', 'marketing@cyberlabin.com', 'ops@cyberlabin.com'
+      ))::integer AS users
+  `)
+  return row.live_classes === 1 && row.users === 6 && row.instructor_assignments === 1
 }
 
 export async function seedBaselineData({
   force = false,
   log = true,
-  includeTestUsers = process.env.NODE_ENV !== 'production',
+  includeTestUsers = process.env.SEED_DEVELOPMENT_USERS === '1',
 } = {}) {
   const allowTestUsers = includeTestUsers && process.env.NODE_ENV !== 'production'
-  const catalogReady = catalogSeedIsReady()
-  const developmentReady = !allowTestUsers || developmentSeedIsReady()
+  const catalogReady = await catalogSeedIsReady()
+  const developmentReady = !allowTestUsers || await developmentSeedIsReady()
 
   if (!force && catalogReady && developmentReady) {
     if (log) console.log(allowTestUsers ? 'Development seed data already ready.' : 'Public catalogue already ready.')
     return { seeded: false }
   }
 
-  for (const course of courses) insertCourse(course)
-  for (const module of modules) insertModule(module)
-  for (const lesson of lessons) insertLesson(lesson)
-  for (const material of materials) insertMaterial(material)
+  await transaction(async client => {
+    await execute(`
+      INSERT INTO course_categories (id, name, slug, description)
+      VALUES ('cat_cybersecurity', 'Cybersecurity', 'cybersecurity', 'Beginner-friendly and practical cybersecurity training.')
+      ON CONFLICT(id) DO NOTHING
+    `, [], client)
+    for (const course of courses) await insertCourse(course, client)
+    for (const module of modules) await insertModule(module, client)
+    for (const lesson of lessons) await insertLesson(lesson, client)
+    for (const material of materials) await insertMaterial(material, client)
+    for (const blog of blogs) await insertBlog(blog, client)
+  })
 
   if (!allowTestUsers) {
     if (log) console.log('Public catalogue ready. Test identities were not created.')
@@ -387,24 +395,28 @@ export async function seedBaselineData({
   await ensureUser({ name: 'Cyber Lab Marketing', email: 'marketing@cyberlabin.com', role: 'marketing', roles: ['marketing'] })
   await ensureUser({ name: 'Cyber Lab Ops', email: 'ops@cyberlabin.com', role: 'ops', roles: ['ops'] })
 
-  db.prepare("UPDATE courses SET instructor_id = ? WHERE instructor_name = 'Arghya Sikdar'").run(instructor.id)
+  await execute("UPDATE courses SET instructor_id = $1 WHERE instructor_name = 'Arghya Sikdar' AND instructor_id IS NULL", [instructor.id])
 
-  if (getCourseById('c001')) enrollUser(student.id, 'c001', 'seed')
-  if (getCourseById('c002')) enrollUser(neel.id, 'c002', 'seed')
+  if (await getCourseById('c001')) await enrollUser(student.id, 'c001', 'seed')
+  if (await getCourseById('c002')) await enrollUser(neel.id, 'c002', 'seed')
 
-  db.prepare(`
+  await execute(`
     INSERT INTO live_classes (id, course_id, instructor_id, title, provider, scheduled_start, scheduled_end, status)
-    VALUES ('live_c001_01', 'c001', (SELECT id FROM users WHERE email = 'instructor@cyberlabin.com'), 'Security Foundations Live Q&A', 'external', datetime('now', '+2 days'), datetime('now', '+2 days', '+1 hour'), 'scheduled')
+    VALUES ('live_c001_01', 'c001', (SELECT id FROM users WHERE email = 'instructor@cyberlabin.com'), 'Security Foundations Live Q&A', 'external', CURRENT_TIMESTAMP + INTERVAL '2 days', CURRENT_TIMESTAMP + INTERVAL '2 days 1 hour', 'scheduled')
     ON CONFLICT(id) DO NOTHING
-  `).run()
+  `)
 
   if (log) console.log('Development seed data ready.')
   return { seeded: true, testUsersSeeded: true }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
-  seedBaselineData({ force: true }).catch(error => {
+  try {
+    await seedBaselineData()
+  } catch (error) {
     console.error(error)
-    process.exit(1)
-  })
+    process.exitCode = 1
+  } finally {
+    await closeDatabase()
+  }
 }

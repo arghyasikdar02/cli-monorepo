@@ -5,14 +5,15 @@ Cyber Lab IN is a practical cybersecurity education platform built as the restor
 ## Active applications
 
 - `cyberscout/`: public website, authentication, learner UI and role dashboards.
-- `cyberscout-server/`: Express API, authorization, SQLite repositories, migrations and CLI administration.
-- `supabase/`: reviewed Postgres/RLS migration starter only; it is not the active database adapter.
+- `cyberscout-server/`: Express API, authorization, PostgreSQL repositories, migrations and CLI administration.
+- `supabase/`: Supabase-specific deny-by-default direct-access policy and schema-source guidance.
 
 The archived migration copies remain local and are ignored by Git. Active scripts do not reference them.
 
 ## Local setup
 
 Requirements: Node.js 24.14.1 and npm 10 or newer. The runtime is pinned in `.nvmrc`, package engines, CI and `render.yaml`.
+Create a Supabase project or start a local PostgreSQL 16 database, then set `DATABASE_URL` in `cyberscout-server/.env` before running database commands.
 
 ```bash
 cp cyberscout-server/.env.example cyberscout-server/.env
@@ -34,7 +35,7 @@ The root scripts stop an existing process on ports 3001, 5173 or 5174 before sta
 
 ## Database
 
-Local SQLite data is stored in `cyberscout-server/data/cyberlab.sqlite` and ignored by Git. `DATABASE_PATH` selects another file when needed.
+Supabase PostgreSQL is the only active database engine. `DATABASE_URL` is required in every environment. Local development may use a disposable PostgreSQL database; file database URLs are rejected.
 
 ```bash
 npm run db:migrate
@@ -43,6 +44,7 @@ npm run db:setup
 ```
 
 Migrations are additive and recorded in `schema_migrations`. Migration `008_persistent_learning_modules.sql` replaces the former in-memory learning store with persistent batches, videos, protected documents, labs, quizzes, assignments, progress, certificates and payment records.
+`db:seed` is an explicit, repeatable operation and uses `ON CONFLICT DO NOTHING`; it is not run during Render startup. Development identities are created only when `SEED_DEVELOPMENT_USERS=1` outside production.
 
 ## Authentication
 
@@ -81,7 +83,7 @@ npm run cliadm -- audit search --json
 
 Mutation commands require `--admin-token`; destructive commands also require `--dry-run` or `--confirm YES`. See `npm run cliadm -- --help` and `docs/architecture/API_ROUTES_DOCUMENTATION.md`.
 
-Development seeding creates local test identities only when `NODE_ENV` is not `production`. Production startup seeds public catalogue content but never creates predictable role accounts. Bootstrap the first production administrator from a protected Render shell with a strong password and `cliadm`, then rotate the shell variables:
+Development seeding creates local test identities only when `SEED_DEVELOPMENT_USERS=1` and `NODE_ENV` is not `production`. Production startup runs migrations but never runs a seed. Run the catalogue seed once deliberately, then bootstrap the first production administrator from a protected Render shell with a strong password and `cliadm`:
 
 ```bash
 read -s CLIADM_NEW_PASSWORD
@@ -104,13 +106,13 @@ unset CLIADM_NEW_PASSWORD CLIADM_TOKEN
 
 - Root directory: `cyberscout-server`
 - Build command: `npm ci`
-- Start command: `npm start`
+- Start command: `npm run db:migrate && npm start`
 - Health endpoint: `/api/health`
 - Render readiness endpoint: `/health`
 
 Use the root `render.yaml`, enter every `sync: false` secret in Render and follow `RENDER_DEPLOYMENT.md`. Google OAuth must authorize `https://cyberlabin.com/api/auth/google/callback`.
 
-The Blueprint mounts a persistent disk at `/var/data` and therefore requires a paid Render instance. Free Render storage is ephemeral and must not hold production enrolment, lead or payment records. Complete the repository migration to Supabase Postgres before higher-scale production use. See `RENDER_DEPLOYMENT.md` and `REMAINING_WORK.md`.
+Render is stateless; all persistent application records are stored in Supabase PostgreSQL. No Render disk is configured or required. See `RENDER_DEPLOYMENT.md` for the required secret connection string and deployment order.
 
 ## Documentation
 

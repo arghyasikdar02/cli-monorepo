@@ -67,8 +67,8 @@ function buildCourseAnswer(materials, message) {
 
 router.use(requireAuth)
 
-router.get('/courses/:courseId/knowledge-base', requireCourseAccess({ allowRoles: ['admin', 'super_admin', 'instructor', 'support'] }), (req, res) => {
-  const { materials } = listCourseMaterialsForUser(req.user, req.params.courseId)
+router.get('/courses/:courseId/knowledge-base', requireCourseAccess({ allowRoles: ['admin', 'super_admin', 'instructor', 'support'] }), async (req, res) => {
+  const { materials } = await listCourseMaterialsForUser(req.user, req.params.courseId)
   res.json({
     documents: materials.map(material => ({
       id: material.id,
@@ -79,34 +79,37 @@ router.get('/courses/:courseId/knowledge-base', requireCourseAccess({ allowRoles
   })
 })
 
-router.get('/courses/:courseId/sessions', requireCourseAccess({ allowRoles: ['admin', 'super_admin', 'instructor', 'support'] }), (req, res) => {
-  const usage = countAuditActionsSince(req.user.id, 'ai.chat', req.params.courseId, startOfTodayIso())
-  res.json({ sessions: listAiSessions(req.user.id, req.params.courseId), usage, limit: AI_USAGE_LIMIT })
+router.get('/courses/:courseId/sessions', requireCourseAccess({ allowRoles: ['admin', 'super_admin', 'instructor', 'support'] }), async (req, res) => {
+  const [usage, sessions] = await Promise.all([
+    countAuditActionsSince(req.user.id, 'ai.chat', req.params.courseId, startOfTodayIso()),
+    listAiSessions(req.user.id, req.params.courseId),
+  ])
+  res.json({ sessions, usage, limit: AI_USAGE_LIMIT })
 })
 
-router.post('/courses/:courseId/sessions', aiLimiter, requireCourseAccess({ allowRoles: ['admin', 'super_admin', 'instructor', 'support'] }), (req, res) => {
-  res.status(201).json({ session: createAiSession(req.user.id, req.params.courseId, req.body.title || 'Course chat') })
+router.post('/courses/:courseId/sessions', aiLimiter, requireCourseAccess({ allowRoles: ['admin', 'super_admin', 'instructor', 'support'] }), async (req, res) => {
+  res.status(201).json({ session: await createAiSession(req.user.id, req.params.courseId, req.body.title || 'Course chat') })
 })
 
-router.get('/courses/:courseId/sessions/:sessionId/messages', requireCourseAccess({ allowRoles: ['admin', 'super_admin', 'instructor', 'support'] }), (req, res) => {
-  res.json({ messages: listAiMessages(req.params.sessionId, req.user.id, req.params.courseId) })
+router.get('/courses/:courseId/sessions/:sessionId/messages', requireCourseAccess({ allowRoles: ['admin', 'super_admin', 'instructor', 'support'] }), async (req, res) => {
+  res.json({ messages: await listAiMessages(req.params.sessionId, req.user.id, req.params.courseId) })
 })
 
-router.post('/courses/:courseId/chat', aiLimiter, requireCourseAccess({ allowRoles: ['admin', 'super_admin', 'instructor', 'support'] }), (req, res) => {
+router.post('/courses/:courseId/chat', aiLimiter, requireCourseAccess({ allowRoles: ['admin', 'super_admin', 'instructor', 'support'] }), async (req, res) => {
   const error = requireFields(req.body, ['message'])
   if (error) return res.status(400).json({ error })
-  const usage = countAuditActionsSince(req.user.id, 'ai.chat', req.params.courseId, startOfTodayIso())
+  const usage = await countAuditActionsSince(req.user.id, 'ai.chat', req.params.courseId, startOfTodayIso())
   if (usage >= AI_USAGE_LIMIT) return res.status(429).json({ error: 'AI usage limit reached for this course' })
-  const { allowed, materials } = listCourseMaterialsForUser(req.user, req.params.courseId)
+  const { allowed, materials } = await listCourseMaterialsForUser(req.user, req.params.courseId)
   if (!allowed) return res.status(403).json({ error: 'Active enrollment required for course AI' })
   const result = buildCourseAnswer(materials, req.body.message)
   const session = req.body.sessionId
-    ? getAiSession(req.body.sessionId, req.user.id, req.params.courseId)
-    : createAiSession(req.user.id, req.params.courseId, 'Course chat')
+    ? await getAiSession(req.body.sessionId, req.user.id, req.params.courseId)
+    : await createAiSession(req.user.id, req.params.courseId, 'Course chat')
   if (!session) return res.status(404).json({ error: 'AI chat session not found' })
-  const userMessage = addAiMessage(session.id, req.user.id, req.params.courseId, 'user', req.body.message)
-  const assistantMessage = addAiMessage(session.id, req.user.id, req.params.courseId, 'assistant', result.answer, result.citations)
-  recordAudit('ai.chat', req.user.id, 'course', req.params.courseId, {
+  const userMessage = await addAiMessage(session.id, req.user.id, req.params.courseId, 'user', req.body.message)
+  const assistantMessage = await addAiMessage(session.id, req.user.id, req.params.courseId, 'assistant', result.answer, result.citations)
+  await recordAudit('ai.chat', req.user.id, 'course', req.params.courseId, {
     refused: result.refused,
     citations: result.citations.map(citation => citation.id),
   })

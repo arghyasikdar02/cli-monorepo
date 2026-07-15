@@ -5,7 +5,7 @@ import LeadCaptureForm from '../../components/ui/LeadCaptureForm'
 import FaqChatbot from '../../components/ui/FaqChatbot'
 import SiteIcon from '../../components/ui/SiteIcon'
 import CyberCareerRoadmap from '../../components/home/CyberCareerRoadmap'
-import RotatingInvestigationHeadline from '../../components/home/RotatingInvestigationHeadline'
+import HeroSection from '../../components/home/HeroSection'
 import { api } from '../../lib/api'
 import { trackEvent } from '../../lib/analytics'
 import { featuredCourseFallback, homepageFaqs, learningPaths, learningSteps, sampleLabs } from '../../content/homeContent'
@@ -121,38 +121,19 @@ export default function WelcomePage() {
     return () => script.remove()
   }, [])
 
-  const facts = [
-    ['Level', featuredCourse.level],
-    ['Duration', featuredCourse.duration],
-    ['Credential', featuredCourse.credential],
-  ]
-
   return (
     <PublicSiteLayout chatbot={<FaqChatbot />}>
-      <section className="home-hero home-hero-focused">
+      <HeroSection />
+
+      <section className="home-roadmap-section">
         <div className="site-container">
-          <div className="home-hero-grid">
-            <div className="home-hero-copy">
-            <p className="site-eyebrow">Beginner cybersecurity training</p>
-            <RotatingInvestigationHeadline />
-            <p>Start with clear explanations, then inspect evidence, make decisions and report what you found. Learning goes beyond watching videos.</p>
-            <div className="site-action-row">
-              <Link to="/courses/cybersecurity/cyber-security-essentials" className="site-button-primary" onClick={() => trackEvent('hero_primary_cta', { destination: 'cyber_security_essentials' })}>Explore Cyber Security Essentials<SiteIcon name="arrow_forward" /></Link>
-              <Link to="/labs/phishing-indicator-analysis" className="site-button-secondary" onClick={() => trackEvent('hero_secondary_cta', { destination: 'sample_lab' })}>See a sample lab</Link>
-            </div>
-            </div>
-            <div className="home-hero-context">
-              <p>Cyber Lab IN combines structured teaching, live guidance and guided practical work for complete beginners, college students, career switchers and early-career IT professionals.</p>
-              <dl className="home-hero-facts">{facts.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
-            </div>
-          </div>
           <CyberCareerRoadmap />
         </div>
       </section>
 
       <section className="home-trust-section" aria-labelledby="trust-title">
         <div className="site-container home-trust-grid">
-          <div><p className="site-eyebrow">Why learners can assess the course clearly</p><h2 id="trust-title">Published facts, named instruction and practical work</h2></div>
+          <div><p className="site-eyebrow">Course standards</p><h2 id="trust-title">Clear teaching, guided practice and accountable access</h2></div>
           <div className="home-trust-list">
             <article><strong>Arghya Sikdar</strong><p>Founder, cybersecurity educator and course instructor with CEH and CHFI credentials.</p></article>
             <article><strong>Guided practice</strong><p>Lab tasks state the evidence, authorised scope and expected defensive finding.</p></article>
@@ -164,8 +145,8 @@ export default function WelcomePage() {
       <section className="home-section home-course-focus" id="course">
         <div className="site-container">
           <div className="home-section-heading"><div><p className="site-eyebrow">Published beginner course</p><h2>Cyber Security Essentials</h2></div><p>{featuredCourse.description}</p></div>
-          {courseState === 'loading' && <StatePanel title="Checking the published course details" message="The current course record is loading." />}
-          {courseState === 'fallback' && <p className="home-data-note" role="status">The live catalogue could not be refreshed. The latest published course outline is shown below.</p>}
+          {courseState === 'loading' && <StatePanel title="Loading course details" message="The course outline will appear shortly." />}
+          {courseState === 'fallback' && <p className="home-data-note" role="status">Course updates are temporarily unavailable. The published outline is still available below.</p>}
           {courseState !== 'loading' && (
             <div className="home-course-product">
               <div className="home-course-outcome">
@@ -206,7 +187,7 @@ export default function WelcomePage() {
 
       <section className="home-section home-paths-focused" id="learning-paths">
         <div className="site-container">
-          <div className="home-section-heading"><div><p className="site-eyebrow">Learning paths</p><h2>Begin with foundations, then choose a direction</h2></div><p>Only the foundation path is presented as available now. Specialist paths are planning guides, not open enrolments.</p></div>
+          <div className="home-section-heading"><div><p className="site-eyebrow">Learning paths</p><h2>Begin with foundations, then choose a direction</h2></div><p>Cybersecurity Foundations is available now. Specialist paths show what you can study next as new courses are published.</p></div>
           <div className="home-path-status-list">{learningPaths.map(([title, status, level, description, href]) => <article key={href}><div><span className={status === 'Available now' ? 'is-available' : ''}>{status}</span><small>{level}</small></div><h3>{title}</h3><p>{description}</p><Link to={href} className="site-text-link">View path details<SiteIcon name="arrow_forward" /></Link></article>)}</div>
         </div>
       </section>

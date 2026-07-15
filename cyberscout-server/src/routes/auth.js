@@ -87,28 +87,38 @@ export function setupPassport() {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
       callbackURL: GOOGLE_CALLBACK_URL,
     },
-    (_accessToken, _refreshToken, profile, done) => {
-      let user = findUserByGoogleId(profile.id)
-      if (!user) {
-        const email = String(profile.emails?.[0]?.value || '').trim().toLowerCase()
-        if (!email) return done(new Error('Google account did not provide an email address'))
-        const existingUser = findUserByEmail(email)
-        user = existingUser
-          ? updateUser(existingUser.id, { googleId: profile.id })
-          : createUser({
-              googleId: profile.id,
-              name: profile.displayName,
-              email,
-              passwordHash: null,
-              role: 'student',
-              roles: ['student'],
-            })
+    async (_accessToken, _refreshToken, profile, done) => {
+      try {
+        let user = await findUserByGoogleId(profile.id)
+        if (!user) {
+          const email = String(profile.emails?.[0]?.value || '').trim().toLowerCase()
+          if (!email) return done(new Error('Google account did not provide an email address'))
+          const existingUser = await findUserByEmail(email)
+          user = existingUser
+            ? await updateUser(existingUser.id, { googleId: profile.id })
+            : await createUser({
+                googleId: profile.id,
+                name: profile.displayName,
+                email,
+                passwordHash: null,
+                role: 'student',
+                roles: ['student'],
+              })
+        }
+        return done(null, user)
+      } catch (error) {
+        return done(error)
       }
-      done(null, user)
     }
   ))
   passport.serializeUser((user, done) => done(null, user.id))
-  passport.deserializeUser((id, done) => done(null, findUserById(id)))
+  passport.deserializeUser(async (id, done) => {
+    try {
+      done(null, await findUserById(id))
+    } catch (error) {
+      done(error)
+    }
+  })
 }
 
 // GET /api/auth/config
@@ -134,16 +144,16 @@ router.post('/register', registrationLimiter, async (req, res) => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email))) return res.status(400).json({ error: 'Enter a valid email address' })
     const passwordError = validatePassword(password)
     if (passwordError) return res.status(400).json({ error: passwordError })
-    if (findUserByEmail(email)) return res.status(409).json({ error: 'Email already registered' })
-    if (username && findUserByUsername(username)) return res.status(409).json({ error: 'Username already taken' })
+    if (await findUserByEmail(email)) return res.status(409).json({ error: 'Email already registered' })
+    if (username && await findUserByUsername(username)) return res.status(409).json({ error: 'Username already taken' })
     const passwordHash = await bcrypt.hash(password, Number(process.env.BCRYPT_COST || 12))
-    const user = createUser({ name, email, username, passwordHash, googleId: null, role: 'student', roles: ['student'] })
-    recordAudit('auth.register', user.id, 'user', user.id, {})
+    const user = await createUser({ name, email, username, passwordHash, googleId: null, role: 'student', roles: ['student'] })
+    await recordAudit('auth.register', user.id, 'user', user.id, {})
     const token = signUserToken(user)
     setAuthCookie(res, token)
     res.json({ user: publicUser(user), redirectTo: dashboardPathForUser(user) })
   } catch (error) {
-    if (error?.code === 'SQLITE_CONSTRAINT_UNIQUE') return res.status(409).json({ error: 'Email or username already registered' })
+    if (error?.code === '23505') return res.status(409).json({ error: 'Email or username already registered' })
     res.status(500).json({ error: 'Registration failed' })
   }
 })
@@ -153,14 +163,14 @@ router.post('/login', loginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' })
-    const user = findUserByEmail(email)
+    const user = await findUserByEmail(email)
     if (!user || !user.passwordHash) return res.status(401).json({ error: 'Invalid credentials' })
     if (user.status === 'suspended') return res.status(403).json({ error: 'Account suspended' })
     const valid = await bcrypt.compare(password, user.passwordHash)
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' })
-    updateUser(user.id, { lastLogin: new Date().toISOString() })
-    recordAudit('auth.login', user.id, 'user', user.id, {})
-    const freshUser = findUserById(user.id)
+    await updateUser(user.id, { lastLogin: new Date().toISOString() })
+    await recordAudit('auth.login', user.id, 'user', user.id, {})
+    const freshUser = await findUserById(user.id)
     const token = signUserToken(freshUser)
     setAuthCookie(res, token)
     res.json({ user: publicUser(freshUser), redirectTo: dashboardPathForUser(freshUser) })
@@ -211,11 +221,11 @@ router.get('/google/callback',
       failureRedirect: `${FRONTEND_URL}/login?error=oauth_failed`,
     })(req, res, next)
   },
-  (req, res) => {
+  async (req, res) => {
     const token = signUserToken(req.user)
     setAuthCookie(res, token)
-    updateUser(req.user.id, { lastLogin: new Date().toISOString() })
-    recordAudit('auth.oauth_login', req.user.id, 'user', req.user.id, { provider: 'google' })
+    await updateUser(req.user.id, { lastLogin: new Date().toISOString() })
+    await recordAudit('auth.oauth_login', req.user.id, 'user', req.user.id, { provider: 'google' })
     const redirect = safeRelativeRedirect(req.oauthState?.redirect)
     const redirectQuery = redirect ? `?redirect=${encodeURIComponent(redirect)}` : ''
     res.redirect(`${FRONTEND_URL}/oauth/callback${redirectQuery}`)
@@ -233,14 +243,14 @@ router.post('/change-password', loginLimiter, requireAuth, async (req, res) => {
     const { currentPassword = '', newPassword = '' } = req.body
     const passwordError = validatePassword(newPassword)
     if (passwordError) return res.status(400).json({ error: passwordError })
-    const user = findUserById(req.user.id)
+    const user = await findUserById(req.user.id)
     if (!user) return res.status(401).json({ error: 'User not found' })
     if (user.passwordHash) {
       const valid = await bcrypt.compare(currentPassword, user.passwordHash)
       if (!valid) return res.status(401).json({ error: 'Current password is incorrect' })
     }
     const passwordHash = await bcrypt.hash(newPassword, Number(process.env.BCRYPT_COST || 12))
-    const updatedUser = updateUserPassword(user.id, passwordHash)
+    const updatedUser = await updateUserPassword(user.id, passwordHash)
     const token = signUserToken(updatedUser)
     setAuthCookie(res, token)
     res.json({ user: publicUser(updatedUser), message: user.passwordHash ? 'Password updated' : 'Password set for this account' })

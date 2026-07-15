@@ -7,6 +7,11 @@
   --site-blue: #0b65a3;
   --site-blue-dark: #084f80;
   --site-cyan: #007fa8;
+  --site-accent-cyan: #22d3ee;
+  --site-accent-light-blue: #7dd3fc;
+  --site-accent-magenta: #f472b6;
+  --site-accent-purple: #7c3aed;
+  --site-accent-violet: #8b5cf6;
   --site-white: #ffffff;
   --site-surface: #f4f7f9;
   --site-surface-strong: #eaf0f4;
@@ -1370,6 +1375,23 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
   font-size: clamp(1.25rem, 2vw, 1.65rem);
   font-weight: 550;
   line-height: 1.55;
+}
+
+.site-footer-cookie-button {
+  min-height: 2.75rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #c2cdd5;
+  font: inherit;
+  font-size: 0.72rem;
+  text-decoration: underline;
+  text-underline-offset: 0.2rem;
+  cursor: pointer;
+}
+
+.site-footer-cookie-button:hover {
+  color: var(--site-white);
 }
 
 .home-credibility-strip {
@@ -5383,23 +5405,6 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
   }
 }
 
-.cookie-settings-button {
-  position: fixed;
-  bottom: 1rem;
-  left: 1rem;
-  z-index: 140;
-  min-height: 2.75rem;
-  padding: 0.55rem 0.8rem;
-  border: 1px solid #7d8992;
-  border-radius: 0.15rem;
-  background: var(--site-white);
-  color: #34434d;
-  box-shadow: var(--site-shadow-small);
-  font-size: 0.7rem;
-  font-weight: 750;
-  cursor: pointer;
-}
-
 .cookie-consent-panel {
   position: fixed;
   right: 0.75rem;
@@ -5897,38 +5902,85 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
 }
 
 .home-hero-focused {
+  position: relative;
+  display: grid;
+  isolation: isolate;
+  min-height: clamp(34rem, 70svh, 46rem);
+  align-items: center;
+  overflow: hidden;
   padding: clamp(4rem, 7vw, 6.5rem) 0;
-  background: var(--site-white);
+  background: #050816;
+  color: var(--site-white);
+}
+
+.home-hero-media,
+.home-hero-overlay {
+  position: absolute;
+  pointer-events: none;
+  inset: 0;
+}
+
+.home-hero-media {
+  z-index: 0;
+  overflow: hidden;
+  background: #050816;
+}
+
+.home-hero-media video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 66% 50%;
+  transform: scale(1.015);
+}
+
+.home-hero-overlay {
+  z-index: 1;
+  background:
+    linear-gradient(90deg, rgb(5 8 22 / 0.86) 0%, rgb(5 8 22 / 0.62) 46%, rgb(5 8 22 / 0.16) 100%),
+    linear-gradient(0deg, rgb(5 8 22 / 0.26) 0%, transparent 38%);
+}
+
+.home-hero-content {
+  position: relative;
+  z-index: 2;
 }
 
 .home-hero-focused .home-hero-grid {
-  grid-template-columns: minmax(0, 1.25fr) minmax(20rem, 0.75fr);
-  align-items: end;
-  gap: clamp(3rem, 8vw, 8rem);
+  grid-template-columns: minmax(0, 48rem);
+  align-items: center;
 }
 
 .home-hero-focused .home-hero-copy h1 {
   max-width: 52rem;
+  color: var(--site-white);
   font-size: clamp(2.7rem, 4.4vw, 4.7rem);
-  line-height: 1.03;
+  line-height: 1.06;
 }
 
 .home-hero-focused .home-hero-copy > p:not(.site-eyebrow) {
   max-width: 40rem;
+  color: #e2e8f0;
   font-size: clamp(1.02rem, 1.4vw, 1.18rem);
 }
 
-.home-hero-context {
-  max-width: 31rem;
-  padding-top: 1.4rem;
-  border-top: 1px solid var(--site-ink);
+.home-hero-focused .home-hero-copy .site-eyebrow {
+  color: var(--site-accent-cyan);
 }
 
-.home-hero-context > p {
-  margin: 0;
-  color: var(--site-muted);
-  font-size: 0.98rem;
-  line-height: 1.7;
+.home-hero-focused .site-action-row {
+  margin-top: 2rem;
+}
+
+.home-hero-focused .home-hero-copy .site-button-primary {
+  border-color: var(--site-accent-cyan);
+  background: var(--site-blue);
+  color: var(--site-white) !important;
+}
+
+.home-hero-focused .home-hero-copy .site-button-primary:hover {
+  border-color: var(--site-white);
+  background: var(--site-blue-dark);
 }
 
 .rotating-investigation-headline {
@@ -5945,7 +5997,6 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
   height: 1.12em;
   margin-top: 0.08em;
   overflow: hidden;
-  color: var(--site-blue-dark);
   font-size: 0.86em;
   line-height: 1.05;
   white-space: nowrap;
@@ -5957,6 +6008,18 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
   display: block;
   max-width: 100%;
   transform: translateY(0);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.rotating-headline-phrase.is-purple {
+  background-image: linear-gradient(90deg, var(--site-accent-purple), var(--site-accent-violet));
+}
+
+.rotating-headline-phrase.is-cyan {
+  background-image: linear-gradient(90deg, var(--site-accent-cyan), #60a5fa);
 }
 
 .rotating-headline-phrase.is-entering {
@@ -5977,35 +6040,10 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
   to { transform: translateY(-112%); }
 }
 
-.home-hero-facts {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0;
-  margin: 2.2rem 0 0;
-  border-top: 1px solid var(--site-border);
-  border-bottom: 1px solid var(--site-border);
-}
-
-.home-hero-facts div {
-  padding: 0.9rem 1rem 0.9rem 0;
-}
-
-.home-hero-facts div + div {
-  padding-left: 1rem;
-  border-left: 1px solid var(--site-border);
-}
-
-.home-hero-facts dt {
-  color: var(--site-muted);
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.home-hero-facts dd {
-  margin: 0.22rem 0 0;
-  font-size: 0.86rem;
-  font-weight: 750;
+@media (prefers-reduced-motion: reduce) {
+  .home-hero-media video {
+    display: none;
+  }
 }
 
 .site-visually-hidden {
@@ -6021,10 +6059,16 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
 }
 
 .career-roadmap {
-  margin: clamp(4rem, 7vw, 6.5rem) 0 0;
-  border-top: 1px solid var(--site-border);
-  border-bottom: 1px solid var(--site-border);
-  background: var(--site-surface);
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: var(--site-white);
+  box-shadow: none;
+}
+
+.home-roadmap-section {
+  padding: clamp(4.5rem, 7vw, 7rem) 0;
+  background: #02040b;
 }
 
 .career-roadmap-heading {
@@ -6032,14 +6076,19 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
   gap: 2rem;
-  padding: clamp(1.5rem, 3vw, 2.5rem);
-  border-bottom: 1px solid var(--site-border);
-  background: var(--site-white);
+  padding: 0 0 clamp(2rem, 4vw, 3rem);
+  border-bottom: 1px solid rgb(148 163 184 / 0.22);
+  background: transparent;
+}
+
+.career-roadmap-heading .site-eyebrow {
+  color: var(--site-accent-light-blue);
 }
 
 .career-roadmap-heading h2 {
   max-width: 43rem;
   margin: 0;
+  color: var(--site-white);
   font-size: clamp(1.8rem, 3.1vw, 3rem);
   line-height: 1.12;
 }
@@ -6047,8 +6096,12 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
 .career-roadmap-heading > div > p:last-child {
   max-width: 42rem;
   margin: 0.8rem 0 0;
-  color: var(--site-muted);
+  color: #cbd5e1;
   line-height: 1.65;
+}
+
+.career-roadmap .site-text-link {
+  color: var(--site-accent-cyan) !important;
 }
 
 .career-roadmap-map {
@@ -6060,6 +6113,7 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
   min-height: 38rem;
   padding: clamp(2rem, 4vw, 3.5rem);
   overflow: hidden;
+  background: #050816;
 }
 
 .career-roadmap-connections {
@@ -6073,14 +6127,17 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
 
 .career-roadmap-line {
   fill: none;
-  stroke: #b8c7d1;
+  stroke: rgb(148 163 184 / 0.28);
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
 }
 
-.career-roadmap-line.is-shared,
+.career-roadmap-line.is-shared {
+  stroke: url(#roadmap-connector-shared);
+}
+
 .career-roadmap-line.is-active {
-  stroke: var(--site-blue);
+  stroke: url(#roadmap-connector-active);
 }
 
 .career-roadmap.is-in-view .career-roadmap-line.is-shared {
@@ -6106,11 +6163,41 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
 
 .career-roadmap-stage {
   padding: 1.35rem;
-  border: 1px solid var(--site-border);
-  border-top: 3px solid var(--site-blue);
+  border: 1px solid transparent;
+  border-top-width: 3px;
   border-radius: 0.2rem;
-  background: var(--site-white);
-  box-shadow: 0 10px 24px rgb(16 24 32 / 0.07);
+  background: linear-gradient(#0b1020, #0b1020) padding-box, linear-gradient(135deg, var(--site-accent-light-blue), var(--site-accent-cyan)) border-box;
+  box-shadow: 0 14px 30px rgb(0 0 0 / 0.24);
+}
+
+.career-roadmap-core {
+  background: linear-gradient(#0b1020, #0b1020) padding-box, linear-gradient(135deg, var(--site-accent-magenta), var(--site-accent-purple)) border-box;
+}
+
+.career-roadmap-flow-indicator {
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  width: clamp(2.5rem, 5vw, 5.5rem);
+  height: 2px;
+  overflow: hidden;
+  transform: translateY(-50%);
+  background: linear-gradient(90deg, var(--site-accent-light-blue), var(--site-accent-purple));
+  pointer-events: none;
+}
+
+.career-roadmap-flow-indicator span {
+  display: block;
+  width: 30%;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--site-white), var(--site-accent-cyan));
+  animation: roadmap-progress-flow 2.8s linear infinite;
+}
+
+@keyframes roadmap-progress-flow {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(440%); }
 }
 
 .career-roadmap.is-in-view .career-roadmap-foundation {
@@ -6128,20 +6215,29 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
 
 .career-roadmap-step,
 .career-roadmap-track-heading span {
-  color: var(--site-blue-dark);
+  color: var(--site-accent-cyan);
   font-size: 0.68rem;
   font-weight: 800;
   text-transform: uppercase;
 }
 
+.career-roadmap-foundation .career-roadmap-step {
+  color: var(--site-accent-light-blue);
+}
+
+.career-roadmap-core .career-roadmap-step {
+  color: var(--site-accent-magenta);
+}
+
 .career-roadmap-stage h3 {
   margin: 0.3rem 0 0;
+  color: var(--site-white);
   font-size: 1.18rem;
 }
 
 .career-roadmap-stage > p {
   margin: 0.55rem 0 1rem;
-  color: var(--site-muted);
+  color: #cbd5e1;
   font-size: 0.78rem;
   line-height: 1.55;
 }
@@ -6159,7 +6255,7 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
 .career-roadmap-detail li {
   position: relative;
   padding-left: 0.8rem;
-  color: #34444f;
+  color: #e2e8f0;
   font-size: 0.74rem;
   line-height: 1.4;
 }
@@ -6172,8 +6268,16 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
   width: 0.28rem;
   height: 0.28rem;
   border-radius: 50%;
-  background: var(--site-blue);
+  background: var(--site-accent-cyan);
   content: '';
+}
+
+.career-roadmap-foundation li::before {
+  background: var(--site-accent-light-blue);
+}
+
+.career-roadmap-core li::before {
+  background: var(--site-accent-magenta);
 }
 
 .career-roadmap-core ul {
@@ -6195,6 +6299,7 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
 .career-roadmap-track-heading strong {
   display: block;
   margin-top: 0.2rem;
+  color: var(--site-white);
   font-size: 1.05rem;
 }
 
@@ -6206,29 +6311,30 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
 .career-roadmap-tabs button {
   min-height: 4.3rem;
   padding: 0.65rem 0.8rem;
-  border: 1px solid var(--site-border);
+  border: 1px solid rgb(148 163 184 / 0.28);
   border-left: 3px solid transparent;
   border-radius: 0.15rem;
-  background: rgb(255 255 255 / 0.78);
-  color: var(--site-ink);
+  background: #111827;
+  color: var(--site-white);
   text-align: left;
   cursor: pointer;
   transition: border-color var(--site-motion), background var(--site-motion);
 }
 
 .career-roadmap-tabs button:hover {
-  border-color: #9fb6c5;
+  border-color: var(--site-accent-cyan);
+  background: #151d30;
 }
 
 .career-roadmap-tabs button[aria-selected='true'] {
-  border-color: var(--site-blue);
-  border-left-color: var(--site-blue);
-  background: var(--site-white);
+  border-color: transparent;
+  border-left-color: var(--site-accent-magenta);
+  background: linear-gradient(#111827, #111827) padding-box, linear-gradient(135deg, var(--site-accent-magenta), var(--site-accent-purple), var(--site-accent-cyan)) border-box;
 }
 
 .career-roadmap-tabs button:focus-visible,
 .career-roadmap-detail:focus-visible {
-  outline: 3px solid rgb(11 101 163 / 0.28);
+  outline: 3px solid var(--site-accent-cyan);
   outline-offset: 2px;
 }
 
@@ -6238,7 +6344,7 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
 }
 
 .career-roadmap-tabs span {
-  color: var(--site-muted);
+  color: #a5f3fc;
   font-size: 0.65rem;
 }
 
@@ -6251,9 +6357,9 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
 .career-roadmap-detail {
   min-height: 20.1rem;
   padding: 1rem 1.1rem;
-  border: 1px solid var(--site-border);
-  border-top: 3px solid var(--site-blue);
-  background: var(--site-white);
+  border: 1px solid transparent;
+  border-top-width: 3px;
+  background: linear-gradient(#0b1020, #0b1020) padding-box, linear-gradient(135deg, var(--site-accent-purple), var(--site-accent-light-blue)) border-box;
   animation: roadmap-detail-enter 420ms ease-out both;
 }
 
@@ -6264,11 +6370,12 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
 
 .career-roadmap-detail-copy {
   padding-bottom: 0.9rem;
-  border-bottom: 1px solid var(--site-border);
+  border-bottom: 1px solid rgb(148 163 184 / 0.24);
 }
 
 .career-roadmap-detail-copy p {
   margin: 0;
+  color: var(--site-white);
   font-size: 0.83rem;
   line-height: 1.55;
 }
@@ -6276,24 +6383,24 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
 .career-roadmap-detail-copy span {
   display: block;
   margin-top: 0.55rem;
-  color: var(--site-muted);
+  color: #cbd5e1;
   font-size: 0.7rem;
   line-height: 1.45;
 }
 
 .career-roadmap-detail h4 {
   margin: 0.9rem 0 0.55rem;
-  color: var(--site-muted);
+  color: var(--site-accent-cyan);
   font-size: 0.65rem;
   text-transform: uppercase;
 }
 
 .career-roadmap-note {
   margin: 0;
-  padding: 0.85rem clamp(1.5rem, 3vw, 2.5rem);
-  border-top: 1px solid var(--site-border);
-  background: var(--site-white);
-  color: var(--site-muted);
+  padding: 0.85rem 0 0;
+  border-top: 1px solid rgb(148 163 184 / 0.22);
+  background: transparent;
+  color: #cbd5e1;
   font-size: 0.7rem;
   line-height: 1.5;
 }
@@ -6754,11 +6861,6 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
     display: inline-grid;
   }
 
-  .home-hero-focused .home-hero-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(18rem, 0.65fr);
-    gap: 3rem;
-  }
-
   .career-roadmap-map {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     min-height: 0;
@@ -6786,7 +6888,6 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
 }
 
 @media (max-width: 900px) {
-  .home-hero-focused .home-hero-grid,
   .home-trust-grid,
   .home-lab-examples-grid,
   .home-instructor-focused-grid,
@@ -6798,9 +6899,12 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
     max-width: 46rem;
   }
 
-  .home-hero-context {
-    max-width: 46rem;
-    margin-top: 0.5rem;
+  .home-hero-media video {
+    object-position: 62% 50%;
+  }
+
+  .home-hero-overlay {
+    background: linear-gradient(90deg, rgb(5 8 22 / 0.86), rgb(5 8 22 / 0.52));
   }
 
   .home-course-product {
@@ -6839,36 +6943,35 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
   }
 
   .home-hero-focused {
-    padding: 3.4rem 0 3rem;
+    min-height: clamp(31rem, 70svh, 38rem);
+    padding: 2.8rem 0;
+  }
+
+  .home-hero-media video {
+    object-position: 58% 50%;
+    transform: scale(1.01);
+  }
+
+  .home-hero-overlay {
+    background:
+      linear-gradient(90deg, rgb(5 8 22 / 0.88), rgb(5 8 22 / 0.56)),
+      linear-gradient(0deg, rgb(5 8 22 / 0.44), transparent 48%);
   }
 
   .home-hero-focused .home-hero-copy h1 {
-    font-size: clamp(2.25rem, 11vw, 3.25rem);
+    font-size: 2.5rem;
+  }
+
+  .home-hero-focused .home-hero-copy .site-eyebrow {
+    max-width: 19rem;
+    font-size: 0.68rem;
+    letter-spacing: 0.055em;
   }
 
   .rotating-headline-window {
     height: 1.12em;
-    font-size: 0.8em;
+    font-size: 0.72em;
     white-space: nowrap;
-  }
-
-  .home-hero-facts {
-    grid-template-columns: 1fr;
-  }
-
-  .home-hero-facts div,
-  .home-hero-facts div + div {
-    display: grid;
-    grid-template-columns: 5rem 1fr;
-    align-items: baseline;
-    gap: 0.75rem;
-    padding: 0.7rem 0;
-    border-left: 0;
-    border-bottom: 1px solid var(--site-border);
-  }
-
-  .home-hero-facts div:last-child {
-    border-bottom: 0;
   }
 
   .career-roadmap-heading {
@@ -6880,6 +6983,29 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
     grid-template-columns: 1fr;
     gap: 1.5rem;
     padding: 1.5rem;
+  }
+
+  .career-roadmap-flow-indicator {
+    top: auto;
+    right: auto;
+    bottom: 100%;
+    left: 50%;
+    width: 2px;
+    height: 1.5rem;
+    transform: translateX(-50%);
+    background: linear-gradient(180deg, var(--site-accent-light-blue), var(--site-accent-purple));
+  }
+
+  .career-roadmap-flow-indicator span {
+    width: 100%;
+    height: 30%;
+    background: linear-gradient(180deg, transparent, var(--site-white), var(--site-accent-cyan));
+    animation-name: roadmap-progress-flow-mobile;
+  }
+
+  @keyframes roadmap-progress-flow-mobile {
+    from { transform: translateY(-110%); }
+    to { transform: translateY(440%); }
   }
 
   .career-roadmap-specialisations {
@@ -6970,6 +7096,10 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
 }
 
 @media (max-width: 430px) {
+  .home-hero-focused .home-hero-copy h1 {
+    font-size: 2.25rem;
+  }
+
   .site-action-row {
     align-items: stretch;
     flex-direction: column;
@@ -6986,5 +7116,12 @@ html.dark [class~="dark:bg-[radial-gradient(circle_at_20%_8%,rgba(14,165,233,0.1
 
   .career-roadmap-core ul {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .career-roadmap-flow-indicator span {
+    animation: none;
+    transform: none;
   }
 }

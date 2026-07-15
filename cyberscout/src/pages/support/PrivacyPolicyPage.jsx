@@ -7,7 +7,7 @@ const SECTIONS = [
   { title: 'Your Rights', content: 'Depending on your location, you may have rights to access, correct, delete, or port your data. To exercise these rights, contact privacy@cyberlabin.com. We respond within 30 days.' },
   { title: 'Cookies', content: 'We use essential cookies for site functionality and analytics cookies (with your consent) to understand usage. You can manage cookie preferences in your browser settings.' },
   { title: 'Data Retention', content: 'We retain account data for the duration of your account plus 30 days after deletion. Payment records are retained for 7 years for tax compliance. Logs are retained for 90 days.' },
-  { title: 'Security', content: 'We use production-oriented security controls such as TLS in transit, access controls, password hashing, audit logging where implemented, and ongoing review. No method is 100% secure, but we continuously improve our protections.' },
+  { title: 'Security', content: 'We use TLS for data in transit, access controls, password hashing and audit logs where available. No system is completely secure, so these protections are reviewed and improved over time.' },
   { title: 'Changes to This Policy', content: 'We may update this policy and will notify you of material changes via email or in-app notification. Continued use after changes constitutes acceptance.' },
 ]
 

@@ -12,15 +12,15 @@
     "db:setup": "npm run db:migrate && npm run db:seed",
     "dev": "node --watch src/start.js",
     "start": "node src/start.js",
-    "test": "NODE_ENV=test DATABASE_URL=file:./data/test.sqlite JWT_SECRET=test_secret_at_least_32_chars_1234567890 CLIADM_ADMIN_TOKEN=test_admin_token node --test tests/*.test.js"
+    "test": "NODE_ENV=test DATABASE_URL=${TEST_DATABASE_URL:-postgresql://postgres:postgres@127.0.0.1:55432/cyberlabin_test} DATABASE_SSL=disable JWT_SECRET=test_secret_at_least_32_chars_1234567890 CLIADM_ADMIN_TOKEN=test_admin_token SEED_DEVELOPMENT_USERS=1 BCRYPT_COST=4 node --test tests/*.test.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
-    "better-sqlite3": "^12.10.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "express-async-errors": "^3.1.1",
     "express-rate-limit": "^8.5.2",
     "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.2",

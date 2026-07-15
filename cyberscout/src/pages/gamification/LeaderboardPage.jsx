@@ -54,7 +54,7 @@ export default function LeaderboardPage() {
         </div>
 
         {error && <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">{error}</div>}
-        {loading && <div className="rounded-xl border border-slate-200 bg-white p-8 text-slate-500 shadow-card">Loading leaderboard from the database...</div>}
+        {loading && <div className="rounded-xl border border-slate-200 bg-white p-8 text-slate-500 shadow-card">Loading leaderboard...</div>}
 
         {!loading && !courses.length && (
           <div className="rounded-xl border border-slate-200 bg-white p-10 text-center shadow-card">

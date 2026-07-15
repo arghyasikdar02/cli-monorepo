@@ -1,111 +1,101 @@
 # Render Backend Deployment
 
-The active backend is the Express application in `cyberscout-server/`. The root `render.yaml` is the source of truth for Render Blueprint deployment.
+The Render service is stateless. Supabase PostgreSQL is the only production database, and Render must never create a local database file.
 
-## Service Configuration
+## Service settings
 
 | Setting | Value |
 | --- | --- |
-| Service type | Web Service |
-| Runtime | Node |
+| Service type | Web service |
 | Root directory | `cyberscout-server` |
+| Runtime | Node |
 | Node version | `24.14.1` |
 | Build command | `npm ci` |
-| Start command | `npm start` |
-| Health-check path | `/health` |
-| Disk mount path | `/var/data` |
-| Production database | `/var/data/cyberlab.sqlite` |
+| Start command | `npm run db:migrate && npm start` |
+| Health check | `/health` |
 
-`npm start` validates the complete production environment before opening SQLite, then runs pending idempotent migrations and safe public catalogue preparation before Express starts. Do not use `npm run db:setup && npm start` in Render: it repeats the standalone seed command before the guarded startup path and provides no persistence benefit.
+The start command runs only pending tracked migrations. It does not run `db:seed`, create test users, reset data, or require a Render disk.
 
-## Required Environment
+## Required variables
 
-The Blueprint supplies the non-secret URL, cookie, Node and database values. Enter these four secret values manually in Render:
-
-- `JWT_SECRET`: at least 32 random characters.
-- `VISITOR_HASH_SALT`: at least 24 random characters.
-- `LAB_FLAG_SALT`: at least 24 random characters.
-- `CLIADM_ADMIN_TOKEN`: at least 32 random characters.
-
-Generate a different value for each variable:
-
-```bash
-openssl rand -hex 32
-```
-
-The configured production origins are:
+Enter secret values in the Render dashboard. Do not store them in `render.yaml` or Git.
 
 ```text
+NODE_ENV=production
 FRONTEND_URL=https://cyberlabin.com
 BACKEND_URL=https://cyberlabin.onrender.com
 CORS_ORIGINS=https://cyberlabin.com,https://www.cyberlabin.com
+COOKIE_SECURE=true
+COOKIE_SAME_SITE=lax
+BCRYPT_COST=12
+DATABASE_SSL=require
+
+DATABASE_URL=<Supabase PostgreSQL connection string>
+JWT_SECRET=<random 32+ characters>
+VISITOR_HASH_SALT=<random 24+ characters>
+LAB_FLAG_SALT=<random 24+ characters>
+CLIADM_ADMIN_TOKEN=<random 32+ characters>
 ```
 
-All origin values must use HTTPS. A trailing slash is accepted and normalized, but paths, query strings and localhost origins are rejected in production.
+Generate independent secrets with `openssl rand -hex 32`. `DATABASE_URL` must begin with `postgresql://` or `postgres://` and include the database password. Use the Supabase connection string appropriate for a persistent server; use the direct connection for migrations when network support permits, or a Supabase pooler connection documented as DDL-compatible.
 
-## Optional Integrations
-
-Google OAuth requires all of:
+Optional complete groups:
 
 ```text
-GOOGLE_CLIENT_ID
-GOOGLE_CLIENT_SECRET
-GOOGLE_CALLBACK_URL=https://cyberlabin.com/api/auth/google/callback
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_CALLBACK_URL=https://cyberlabin.onrender.com/api/auth/google/callback
+
+RAZORPAY_KEY_ID=
+RAZORPAY_KEY_SECRET=
+RAZORPAY_WEBHOOK_SECRET=
 ```
 
-Razorpay requires all of:
+Configure every value in an optional group together or leave the group unset.
 
-```text
-RAZORPAY_KEY_ID
-RAZORPAY_KEY_SECRET
-RAZORPAY_WEBHOOK_SECRET
-```
+## First deployment
 
-Leave an optional group entirely unset until it is ready. Never paste a secret into `render.yaml`, Git, build logs or support messages.
-
-## Persistent SQLite
-
-The Blueprint mounts a 1 GB disk at `/var/data` and sets `DATABASE_PATH=/var/data/cyberlab.sqlite`. Render persistent disks require a paid instance; the Blueprint therefore uses the Starter plan. The free plan cannot provide durable SQLite storage.
-
-Migrations are recorded in `schema_migrations` and do not reapply. Startup does not delete the database, overwrite user records or create development test identities in production. Public catalogue records use idempotent upserts.
-
-Create an on-disk backup from a protected Render Shell, then copy it to independent storage:
+1. Back up the Supabase project and inspect existing tables before applying migrations.
+2. Enter all required Render variables, especially `DATABASE_URL`.
+3. Deploy from the root `render.yaml` or enter the service settings above.
+4. Confirm the logs show each new PostgreSQL migration and `database=postgresql`.
+5. Verify `https://cyberlabin.onrender.com/health` returns HTTP 200.
+6. Run the catalogue seed once from a protected shell only when baseline rows are missing:
 
 ```bash
-node src/cli/cliadm.js backups create --admin-token "$CLIADM_TOKEN" --confirm YES --json
+npm run db:seed
 ```
 
-A backup stored only on the same disk is not an off-site backup. Schedule exports and test restoration before accepting paid enrolments. A managed Postgres migration remains the preferred long-term production design.
+Do not set `SEED_DEVELOPMENT_USERS=1` in production. Re-running the seed is safe because baseline inserts use `ON CONFLICT DO NOTHING`, but it is not part of normal restart or deploy behavior.
 
-## Deployment Checklist
+## Verification
 
-- [ ] Connect the GitHub repository as a Render Blueprint.
-- [ ] Confirm `render.yaml` selects `cyberscout-server` as the root directory.
-- [ ] Confirm the service plan supports a persistent disk.
-- [ ] Confirm `/var/data` is mounted and `DATABASE_PATH` is `/var/data/cyberlab.sqlite`.
-- [ ] Enter unique values for all four required secrets.
-- [ ] Confirm `FRONTEND_URL`, `BACKEND_URL` and every CORS origin use HTTPS.
-- [ ] Confirm the start command is `npm start`.
-- [ ] Deploy and wait for the `/health` check to pass.
-- [ ] Verify the response without authentication: `curl -fsS https://cyberlabin.onrender.com/health`.
-- [ ] From Render Shell, run `node src/cli/cliadm.js system health --json` and confirm the database path starts with `/var/data/`.
-- [ ] Restart the service and confirm user and lead records remain present.
-- [ ] Test login through `https://cyberlabin.com`, not only the direct Render hostname.
+```bash
+curl -fsS https://cyberlabin.onrender.com/health
+curl -fsS https://cyberlabin.onrender.com/api/courses
+```
 
-## Diagnosing CORS And Cookies
+Use an authenticated smoke test for `/api/auth/me`, dashboards, enrollment and lead persistence. Check Supabase table records to confirm that writes are landing in PostgreSQL.
 
-The Vercel frontend normally calls same-origin `/api`, which proxies to Render. This permits secure HTTP-only cookies with `SameSite=Lax`. Leave `VITE_API_URL` unset in Vercel.
+## Troubleshooting
 
-For an additional frontend hostname, add its exact HTTPS origin to `CORS_ORIGINS`. Do not add a path and do not use `*`. If the browser calls Render directly from another site, explicitly review whether `COOKIE_SAME_SITE=none` is required; `Secure` remains mandatory.
+- `DATABASE_URL is required`: enter the Supabase connection string as a Render secret.
+- `must use postgresql://`: a file URL or malformed database URL is configured.
+- TLS/certificate failure: use the current Supabase connection string and keep `DATABASE_SSL=require`; supply `DATABASE_SSL_CA` only when Supabase provides a CA chain. Do not disable verification in production.
+- CORS rejection: ensure the browser origin exactly matches an HTTPS origin in `CORS_ORIGINS`.
+- Existing-schema compatibility failure: no tracked migration was applied. Back up Supabase and complete an explicit data migration; do not alter IDs or delete tables to force deployment.
+- Migration failure: note the migration filename in the log, take a backup, and correct the schema conflict. Do not delete `schema_migrations` or reset production tables.
+- Connection saturation: lower `DATABASE_POOL_MAX` or use the Supabase pooler URL recommended for long-running application servers.
 
-The service logs one safe CORS message and request ID. It never logs configured secret values.
+## Copyable checklist
 
-## Redeploy And Verify
-
-1. Push the commit to the branch tracked by Render.
-2. In Render, choose **Manual Deploy > Deploy latest commit** when automatic deployment is disabled.
-3. Confirm migrations finish and the log reports `Public catalogue ready` or `Public catalogue already ready`.
-4. Confirm the log reports `cyberscout-server ready on 0.0.0.0:<port>`.
-5. Verify `/health`, public courses, login and one authenticated dashboard request.
-
-This document does not claim the live service was deployed. Live success must be confirmed from Render and the public health URL after configuration.
+- [ ] Supabase backup captured.
+- [ ] `DATABASE_URL` entered as a Render secret.
+- [ ] Four independent application secrets generated and entered.
+- [ ] Production HTTPS origins configured.
+- [ ] No `DATABASE_PATH`, Render disk, or file URL configured.
+- [ ] Start command is `npm run db:migrate && npm start`.
+- [ ] `/health` returns HTTP 200.
+- [ ] Logs identify `database=postgresql`.
+- [ ] Seed run once only if catalogue rows were absent.
+- [ ] Login, course reads, enrollment, leads and dashboards verified against Supabase.

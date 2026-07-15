@@ -1,39 +1,31 @@
-PRAGMA foreign_keys = ON;
-
 CREATE TABLE IF NOT EXISTS leads (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL DEFAULT '',
-  email TEXT NOT NULL,
-  course_id TEXT,
-  source TEXT NOT NULL DEFAULT 'website',
-  stage TEXT NOT NULL DEFAULT 'new',
-  owner_id TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-  FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE SET NULL,
-  FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE SET NULL
+  id text PRIMARY KEY,
+  name text NOT NULL DEFAULT '',
+  email text NOT NULL,
+  course_id text REFERENCES courses(id) ON DELETE SET NULL,
+  source text NOT NULL DEFAULT 'website',
+  stage text NOT NULL DEFAULT 'new',
+  owner_id text REFERENCES users(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS lead_notes (
-  id TEXT PRIMARY KEY,
-  lead_id TEXT NOT NULL,
-  author_id TEXT,
-  note TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  FOREIGN KEY (lead_id) REFERENCES leads(id) ON DELETE CASCADE,
-  FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE SET NULL
+  id text PRIMARY KEY,
+  lead_id text NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+  author_id text REFERENCES users(id) ON DELETE SET NULL,
+  note text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS follow_ups (
-  id TEXT PRIMARY KEY,
-  lead_id TEXT NOT NULL,
-  owner_id TEXT,
-  due_at TEXT NOT NULL,
-  note TEXT NOT NULL DEFAULT '',
-  status TEXT NOT NULL DEFAULT 'open',
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  FOREIGN KEY (lead_id) REFERENCES leads(id) ON DELETE CASCADE,
-  FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE SET NULL
+  id text PRIMARY KEY,
+  lead_id text NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+  owner_id text REFERENCES users(id) ON DELETE SET NULL,
+  due_at timestamptz NOT NULL,
+  note text NOT NULL DEFAULT '',
+  status text NOT NULL DEFAULT 'open',
+  created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_leads_email ON leads(email);

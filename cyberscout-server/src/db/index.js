@@ -1,89 +1,102 @@
-import Database from 'better-sqlite3'
-import fs from 'node:fs'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import pg from 'pg'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-const serverRoot = path.resolve(__dirname, '../..')
-const migrationsDir = path.resolve(serverRoot, 'db/migrations')
+const { Pool } = pg
 
-function databaseFileFromEnvironment() {
-  const fallback = path.join(serverRoot, 'data/cyberlab.sqlite')
-  const configuredPath = String(process.env.DATABASE_PATH || '').trim()
-  if (configuredPath) {
-    return path.isAbsolute(configuredPath) ? configuredPath : path.resolve(serverRoot, configuredPath)
-  }
-  const value = process.env.DATABASE_URL
-  if (!value) return fallback
-  if (value.startsWith('file:')) {
-    const rawPath = value.slice('file:'.length)
-    return path.isAbsolute(rawPath) ? rawPath : path.resolve(serverRoot, rawPath)
-  }
-  if (value.startsWith('sqlite:')) {
-    const rawPath = value.slice('sqlite:'.length)
-    return path.isAbsolute(rawPath) ? rawPath : path.resolve(serverRoot, rawPath)
-  }
-  throw new Error('Unsupported DATABASE_URL. The active repository requires DATABASE_PATH or a file:/sqlite: URL.')
-}
-
-const dbPath = databaseFileFromEnvironment()
-fs.mkdirSync(path.dirname(dbPath), { recursive: true, mode: 0o700 })
-
-export const db = new Database(dbPath)
-try {
-  fs.chmodSync(dbPath, 0o600)
-} catch {
-  // Some mounted filesystems do not expose POSIX mode changes to the process.
-}
-db.pragma('foreign_keys = ON')
-db.pragma('journal_mode = WAL')
-
-export function runPendingMigrations({ log = false } = {}) {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS schema_migrations (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL UNIQUE,
-      applied_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-  `)
-
-  if (!fs.existsSync(migrationsDir)) {
-    if (log) console.warn(`Migrations directory not found: ${migrationsDir}`)
-    return []
+function parseDatabaseUrl(value = process.env.DATABASE_URL) {
+  const raw = String(value || '').trim()
+  if (!raw) {
+    throw new Error('DATABASE_URL is required. Configure the Supabase PostgreSQL connection string.')
   }
 
-  const applied = new Set(db.prepare('SELECT name FROM schema_migrations').all().map(row => row.name))
-  const files = fs.readdirSync(migrationsDir).filter(file => file.endsWith('.sql')).sort()
-  const appliedNow = []
-
-  for (const file of files) {
-    if (applied.has(file)) continue
-    const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8')
-    const run = db.transaction(() => {
-      db.exec(sql)
-      db.prepare('INSERT INTO schema_migrations (name) VALUES (?)').run(file)
-    })
-    run()
-    appliedNow.push(file)
-    if (log) console.log(`Applied migration: ${file}`)
+  let url
+  try {
+    url = new URL(raw)
+  } catch {
+    throw new Error('DATABASE_URL must be a valid PostgreSQL URL.')
   }
 
-  return appliedNow
+  if (!['postgres:', 'postgresql:'].includes(url.protocol)) {
+    throw new Error('DATABASE_URL must use the postgresql:// or postgres:// protocol.')
+  }
+  if (!url.hostname || !url.username || !url.pathname || url.pathname === '/') {
+    throw new Error('DATABASE_URL must include a PostgreSQL host, user, and database name.')
+  }
+  return { raw, url }
 }
 
-if (process.env.DB_SKIP_AUTO_MIGRATE !== '1') {
-  runPendingMigrations({ log: process.env.DB_MIGRATION_LOG === '1' || process.env.NODE_ENV === 'production' })
+function sslConfiguration(url) {
+  const setting = String(process.env.DATABASE_SSL || '').trim().toLowerCase()
+  if (['0', 'false', 'disable', 'off'].includes(setting)) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('DATABASE_SSL cannot be disabled in production.')
+    }
+    return false
+  }
+
+  const localHost = ['localhost', '127.0.0.1', '::1'].includes(url.hostname)
+  if (!setting && localHost && process.env.NODE_ENV !== 'production') return false
+
+  const certificate = String(process.env.DATABASE_SSL_CA || '').replace(/\\n/g, '\n').trim()
+  return certificate
+    ? { ca: certificate, rejectUnauthorized: true }
+    : { rejectUnauthorized: true }
 }
 
-export function transaction(fn) {
-  return db.transaction(fn)()
+const { raw: connectionString, url: databaseUrl } = parseDatabaseUrl()
+
+export const databaseEngine = 'postgresql'
+export const pool = new Pool({
+  connectionString,
+  ssl: sslConfiguration(databaseUrl),
+  max: Number(process.env.DATABASE_POOL_MAX || 10),
+  idleTimeoutMillis: Number(process.env.DATABASE_IDLE_TIMEOUT_MS || 30_000),
+  connectionTimeoutMillis: Number(process.env.DATABASE_CONNECT_TIMEOUT_MS || 10_000),
+  application_name: process.env.DATABASE_APPLICATION_NAME || 'cyberlabin-api',
+})
+
+pool.on('error', (error) => {
+  console.error('Unexpected PostgreSQL pool error:', error.message)
+})
+
+export async function query(text, values = [], client = pool) {
+  return client.query(text, values)
 }
 
-export function closeDatabase() {
-  db.close()
+export async function queryOne(text, values = [], client = pool) {
+  const result = await query(text, values, client)
+  return result.rows[0] || null
 }
 
-export function databasePath() {
-  return dbPath
+export async function queryMany(text, values = [], client = pool) {
+  const result = await query(text, values, client)
+  return result.rows
+}
+
+export async function execute(text, values = [], client = pool) {
+  const result = await query(text, values, client)
+  return { rowCount: result.rowCount, rows: result.rows }
+}
+
+export async function transaction(work) {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const result = await work(client)
+    await client.query('COMMIT')
+    return result
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+export async function checkDatabaseConnection() {
+  const row = await queryOne('SELECT current_database() AS database, CURRENT_TIMESTAMP AS checked_at')
+  return { engine: databaseEngine, database: row.database, checkedAt: row.checked_at }
+}
+
+export async function closeDatabase() {
+  await pool.end()
 }

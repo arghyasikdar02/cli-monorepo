@@ -94,7 +94,7 @@ export default function CourseCatalogPage() {
 
         {loading && (
           <div className="rounded-xl border border-slate-200 bg-white p-8 text-sm text-slate-500 shadow-card">
-            Loading courses from the database...
+            Loading courses...
           </div>
         )}
 

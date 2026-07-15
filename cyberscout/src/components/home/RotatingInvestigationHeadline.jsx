@@ -10,6 +10,7 @@ export default function RotatingInvestigationHeadline() {
   const rotation = useRotatingPhrase(rotatingInvestigationPhrases, { active: inView, reducedMotion, interval: 3000 })
   const currentPhrase = rotatingInvestigationPhrases[rotation.current]
   const previousPhrase = rotatingInvestigationPhrases[rotation.previous]
+  const phraseTone = index => index % 2 === 0 ? 'is-purple' : 'is-cyan'
 
   useEffect(() => {
     if (!('IntersectionObserver' in window) || !rootRef.current) return undefined
@@ -19,11 +20,11 @@ export default function RotatingInvestigationHeadline() {
   }, [])
 
   return (
-    <h1 ref={rootRef} className="rotating-investigation-headline" aria-label="Learn cybersecurity through real investigations, guided cyber labs and hands-on evidence analysis.">
+    <h1 ref={rootRef} className="rotating-investigation-headline" aria-label="Learn cybersecurity through role scenarios and real investigations.">
       <span aria-hidden="true" className="rotating-headline-stable">Learn cybersecurity through</span>
       <span aria-hidden="true" className="rotating-headline-window">
-        {rotation.cycle > 0 && <span key={`out-${rotation.cycle}`} className="rotating-headline-phrase is-leaving">{previousPhrase}</span>}
-        <span key={`in-${rotation.cycle}`} className={`rotating-headline-phrase ${rotation.cycle > 0 ? 'is-entering' : 'is-current'}`}>{currentPhrase}</span>
+        {rotation.cycle > 0 && <span key={`out-${rotation.cycle}`} className={`rotating-headline-phrase is-leaving ${phraseTone(rotation.previous)}`}>{previousPhrase}</span>}
+        <span key={`in-${rotation.cycle}`} className={`rotating-headline-phrase ${rotation.cycle > 0 ? 'is-entering' : 'is-current'} ${phraseTone(rotation.current)}`}>{currentPhrase}</span>
       </span>
     </h1>
   )

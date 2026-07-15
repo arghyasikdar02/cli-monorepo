@@ -2,11 +2,11 @@
 
 Only items blocked by missing production access, approved facts or human assets are listed here.
 
-## Managed production database migration
+## Supabase production credential and data cutover
 
-**Blocked by:** Supabase project access and a deployment window.
+**Blocked by:** the real Supabase `DATABASE_URL`, a verified backup and deployment access.
 
-The active repository adapter uses SQLite. The Render Blueprint now keeps it on a paid persistent disk at `/var/data`, which is suitable for controlled early operation but remains single-instance. Before higher-scale enrolment and payment workloads, port the repository layer to Postgres, apply the reviewed `/supabase/schema.sql` and RLS policies, migrate data, run the isolation suite against Postgres, and switch only after a verified backup and rollback plan.
+The code now uses Supabase PostgreSQL exclusively and the PostgreSQL integration suite passes locally. Before the live cutover, back up the current Supabase project, inspect its existing table shapes, run `npm run db:migrate --prefix cyberscout-server`, apply `supabase/rls-policies.sql`, run the idempotent catalogue seed once if needed, and verify live reads/writes. The actual Supabase project could not be queried because no production connection string is stored in the repository.
 
 ## Google OAuth production activation
 
@@ -48,4 +48,4 @@ Publish course schedule, language, fee, refund terms, legal entity details, supp
 
 **Blocked by:** a deployed production build and stable backend/database.
 
-The local production bundle scores 96 performance, 100 accessibility, 100 best practices and 100 SEO in Lighthouse. Repeat the audit against the final Vercel/Render deployment from representative Indian mobile connections and use real-user Web Vitals to validate CDN, cold-start and database latency.
+The local production bundle scores 96 performance, 100 accessibility, 100 best practices and 100 SEO in Lighthouse. Repeat the audit against the final Vercel/Render/Supabase deployment from representative Indian mobile connections and use real-user Web Vitals to validate CDN, cold-start and database latency.

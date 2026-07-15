@@ -19,17 +19,17 @@ function verifyRazorpaySignature(req) {
   return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(String(signature)))
 }
 
-export function handleRazorpayWebhook(req, res) {
+export async function handleRazorpayWebhook(req, res) {
   if (!verifyRazorpaySignature(req)) return res.status(400).json({ error: 'Invalid Razorpay signature' })
   const eventId = req.headers['x-razorpay-event-id'] || req.body?.id || req.body?.event_id || `evt_${Date.now()}`
-  const result = recordPaymentWebhook(String(eventId), req.body)
+  const result = await recordPaymentWebhook(String(eventId), req.body)
   return res.json({ received: true, ...result })
 }
 
-router.post('/orders', requireAuth, (req, res) => {
+router.post('/orders', requireAuth, async (req, res) => {
   const error = requireFields(req.body, ['courseId'])
   if (error) return res.status(400).json({ error })
-  const course = getCourseById(req.body.courseId)
+  const course = await getCourseById(req.body.courseId)
   if (!course || course.status !== 'published') return res.status(404).json({ error: 'Published course not found' })
   if (Number(course.price || 0) <= 0) return res.status(409).json({ error: 'Online payment is not available until a verified course fee is configured.' })
   const keyId = process.env.RAZORPAY_KEY_ID
@@ -38,21 +38,22 @@ router.post('/orders', requireAuth, (req, res) => {
 
   const amount = Math.round(Number(course.price) * 100)
   const receipt = `cli_${Date.now()}_${req.user.id.slice(-8)}`.slice(0, 40)
-  fetch('https://api.razorpay.com/v1/orders', {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString('base64')}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ amount, currency: 'INR', receipt, notes: { userId: req.user.id, courseId: course.id } }),
-  })
-    .then(async response => {
-      const body = await response.json().catch(() => ({}))
-      if (!response.ok || !body.id) throw new Error('Razorpay order creation failed')
-      const payment = createPaymentOrder({ userId: req.user.id, courseId: course.id, amount: body.amount, currency: body.currency, providerOrderId: body.id, metadata: { receipt } }, req.user.id)
-      res.status(201).json({ payment, provider: { type: 'razorpay', keyId } })
+  try {
+    const response = await fetch('https://api.razorpay.com/v1/orders', {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString('base64')}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ amount, currency: 'INR', receipt, notes: { userId: req.user.id, courseId: course.id } }),
     })
-    .catch(() => res.status(502).json({ error: 'The payment provider is temporarily unavailable.' }))
+    const body = await response.json().catch(() => ({}))
+    if (!response.ok || !body.id) throw new Error('Razorpay order creation failed')
+    const payment = await createPaymentOrder({ userId: req.user.id, courseId: course.id, amount: body.amount, currency: body.currency, providerOrderId: body.id, metadata: { receipt } }, req.user.id)
+    return res.status(201).json({ payment, provider: { type: 'razorpay', keyId } })
+  } catch {
+    return res.status(502).json({ error: 'The payment provider is temporarily unavailable.' })
+  }
 })
 
 router.get('/', requireAuth, requireRole('admin', 'super_admin', 'finance'), (_req, res) => {

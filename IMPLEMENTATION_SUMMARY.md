@@ -32,7 +32,8 @@
 ## Backend and data
 
 - Removed the in-memory `platformStore` and legacy user store.
-- Added persistent SQLite migrations for funnel analytics and learning modules.
+- Replaced the SQLite repository with a shared `pg` connection pool and PostgreSQL-parameterized queries across all backend modules.
+- Converted all nine tracked migrations to safe PostgreSQL transactions, JSONB/boolean/timestamptz types, advisory-lock serialization and migration-history tracking.
 - Split public catalogue bootstrap from development-only test identities; production startup cannot create predictable seeded role accounts.
 - Database-backed modules now cover batches, videos, documents and access events, labs and hashed flags, quizzes and attempts, assignments, progress, certificates, payment intents/events and analytics.
 - Corrected admin, marketing, instructor and ops dashboards to query real records.
@@ -63,13 +64,15 @@
 - Active architecture remains `cyberscout/` plus `cyberscout-server/`; no monorepo or framework migration was created.
 - Pinned Node 24.14.1 across package engines, `.nvmrc`, CI and the Render Blueprint.
 - Added a strict pre-database startup gate, aggregated production environment validation, normalized HTTPS origin handling and a public database-aware `/health` readiness route.
-- Configured Render for a 1 GB persistent disk at `/var/data`, idempotent migrations and production-safe catalogue preparation without predictable test identities.
+- Configured Render as a stateless service using a secret Supabase `DATABASE_URL`, TLS, tracked migrations before start and no automatic seed.
 
 ## Verification result
 
 - Frontend lint: pass.
 - Backend integration, security and environment suite: 24/24 pass.
-- Clean Node 24.14.1 production install and startup: pass; all eight migrations applied, public catalogue seeded without test users, and `/health` returned ready.
+- PostgreSQL 16 integration: pass; all nine migrations applied, duplicate-safe seed verified, and all 24 backend tests passed against PostgreSQL.
+- Render-shaped production startup: pass against a disposable TLS-enabled PostgreSQL 16 server; the connection negotiated TLS 1.3, health returned 200, CORS matched the configured frontend, and a database write persisted.
+- Live Supabase read/write verification remains pending because the production `DATABASE_URL` is not stored in or available to this workspace.
 - Production build and 41-route prerender: pass.
 - Production-bundle Lighthouse after the roadmap implementation: performance 96, accessibility 100, best practices 100 and SEO 100; LCP 2.5 seconds, CLS 0 and total blocking time 130 ms.
 - API smoke checks and `cliadm` health, analytics and audit commands: pass.

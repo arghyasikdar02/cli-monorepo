@@ -4,12 +4,12 @@ import SiteIcon from './SiteIcon'
 import { useFocusTrap } from '../../hooks/useFocusTrap'
 
 const options = [
-  ['fees', 'Course fees', 'Cyber Security Essentials is currently listed from the course database. The fee can change by cohort, and the course page always shows the current configured amount.'],
+  ['fees', 'Course fees', 'The current fee appears on the course page when it has been published. Contact the team if it is not listed.'],
   ['duration', 'Course duration', 'The course is designed as a focused 7-day online program with guided labs and beginner-friendly explanations.'],
   ['beginner', 'Beginner suitability', 'Yes. It is built for students, IT beginners, career switchers, non-technical learners, and junior IT staff with basic computer and internet knowledge.'],
   ['certificate', 'Certificate', 'Learners receive a Certificate of Completion after finishing the course requirements.'],
   ['labs', 'Hands-on labs', 'The course includes guided labs for phishing indicators, account hardening, web request-response practice, unsafe input, SQL Injection awareness, XSS awareness, and defensive reporting.'],
-  ['career', 'Placement and career guidance', 'Cyber Lab IN avoids unsupported placement claims. The course builds foundation skills for SOC, ethical hacking, network security, digital forensics, cloud security, and AI-powered security paths.'],
+  ['career', 'Placement and career guidance', 'The course builds foundations for further study in SOC operations, ethical hacking, network security, digital forensics and cloud security. It does not guarantee employment or placement.'],
   ['enroll', 'How to enroll', 'Use Start Learning or Enroll Now on the course page. If you want help choosing a starting point, request a callback here.'],
 ]
 

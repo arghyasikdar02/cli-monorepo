@@ -1,5 +1,3 @@
-import path from 'node:path'
-
 const PLACEHOLDER_PATTERN = /change[_-]?me|replace(?:[_-]|\s+)(?:me|with)|your[_-]|placeholder|dummy|password123|test[_-]?secret/i
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1'])
 
@@ -84,13 +82,31 @@ function validateHttpsUrl(env, name, errors) {
   }
 }
 
-function resolveDatabasePath(env) {
-  const explicitPath = String(env.DATABASE_PATH || '').trim()
-  if (explicitPath) return explicitPath
-  const databaseUrl = String(env.DATABASE_URL || '').trim()
-  if (databaseUrl.startsWith('file:')) return databaseUrl.slice('file:'.length)
-  if (databaseUrl.startsWith('sqlite:')) return databaseUrl.slice('sqlite:'.length)
-  return ''
+function validateDatabaseUrl(env, errors, { required = true } = {}) {
+  const raw = String(env.DATABASE_URL || '').trim()
+  if (!raw) {
+    if (required) errors.push('DATABASE_URL: required; set the Supabase PostgreSQL connection string')
+    return ''
+  }
+  try {
+    const url = new URL(raw)
+    if (!['postgres:', 'postgresql:'].includes(url.protocol)) {
+      errors.push('DATABASE_URL: must use the postgresql:// or postgres:// protocol')
+      return ''
+    }
+    if (!url.hostname || !url.username || !url.pathname || url.pathname === '/') {
+      errors.push('DATABASE_URL: must include a PostgreSQL host, user and database name')
+      return ''
+    }
+    if (isPlaceholder(url.password)) {
+      errors.push('DATABASE_URL: replace the placeholder database password')
+      return ''
+    }
+    return raw
+  } catch {
+    errors.push('DATABASE_URL: must be a valid Supabase PostgreSQL URL')
+    return ''
+  }
 }
 
 export function validateEnvironment(env = process.env) {
@@ -99,11 +115,14 @@ export function validateEnvironment(env = process.env) {
   const developmentBackend = normalizeOrigin(env.BACKEND_URL) || `http://localhost:${env.PORT || 3001}`
 
   if (!isProduction) {
+    const errors = []
+    const databaseUrl = validateDatabaseUrl(env, errors, { required: true })
+    if (errors.length) throw new Error(`Invalid database environment:\n- ${errors.join('\n- ')}`)
     return {
       frontendUrl: developmentFrontend,
       backendUrl: developmentBackend,
       allowedOrigins: getAllowedOrigins(env),
-      databasePath: resolveDatabasePath(env),
+      databaseUrl,
     }
   }
 
@@ -147,14 +166,9 @@ export function validateEnvironment(env = process.env) {
     errors.push('CORS_ORIGINS: must include the normalized FRONTEND_URL origin')
   }
 
-  const databasePath = resolveDatabasePath(env)
-  if (!databasePath) {
-    errors.push('DATABASE_PATH: required in production; use an absolute path on a persistent disk such as /var/data/cyberlab.sqlite')
-  } else if (!path.isAbsolute(databasePath)) {
-    errors.push('DATABASE_PATH: must be an absolute production path; use /var/data/cyberlab.sqlite on Render')
-  }
-  if (/^(?:postgres|postgresql):/i.test(String(env.DATABASE_URL || ''))) {
-    errors.push('DATABASE_URL: PostgreSQL URLs are not supported by the active SQLite repository; configure DATABASE_PATH instead')
+  const databaseUrl = validateDatabaseUrl(env, errors)
+  if (['0', 'false', 'disable', 'off'].includes(String(env.DATABASE_SSL || '').trim().toLowerCase())) {
+    errors.push('DATABASE_SSL: cannot be disabled in production')
   }
 
   if (String(env.COOKIE_SECURE || 'true').toLowerCase() !== 'true') {
@@ -193,5 +207,5 @@ export function validateEnvironment(env = process.env) {
     throw new Error(`Invalid production environment:\n- ${errors.join('\n- ')}`)
   }
 
-  return { frontendUrl, backendUrl, allowedOrigins, databasePath }
+  return { frontendUrl, backendUrl, allowedOrigins, databaseUrl }
 }

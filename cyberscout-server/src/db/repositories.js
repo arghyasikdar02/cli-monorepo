@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { db } from './index.js'
+import { execute, queryMany, queryOne, transaction } from './index.js'
 
 export const VALID_ROLES = [
   'student',
@@ -19,11 +19,27 @@ function id(prefix) {
 }
 
 function parseJson(value, fallback) {
+  if (value === null || value === undefined || value === '') return fallback
+  if (typeof value === 'object') return value
   try {
-    return value ? JSON.parse(value) : fallback
+    return JSON.parse(value)
   } catch {
     return fallback
   }
+}
+
+function parameter(values, value) {
+  values.push(value)
+  return `$${values.length}`
+}
+
+function inParameters(values, items) {
+  return items.map(item => parameter(values, item)).join(', ')
+}
+
+async function countQuery(sql, values = [], client) {
+  const row = await queryOne(sql, values, client)
+  return Number(row?.count || 0)
 }
 
 function userFromRow(row) {
@@ -62,6 +78,14 @@ export function publicUser(user) {
   }
 }
 
+function slugify(value) {
+  return String(value || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
 function courseFromRow(row, extra = {}) {
   if (!row) return null
   return {
@@ -73,15 +97,12 @@ function courseFromRow(row, extra = {}) {
     duration: row.duration,
     description: row.description,
     overview: row.overview,
-    instructor: {
-      name: row.instructor_name,
-      title: row.instructor_title,
-    },
+    instructor: { name: row.instructor_name, title: row.instructor_title },
     instructorName: row.instructor_name,
     instructorTitle: row.instructor_title,
     instructorId: row.instructor_id || null,
     status: row.status,
-    price: row.price,
+    price: Number(row.price || 0),
     mode: row.mode || 'Online',
     credential: row.credential || 'Certificate of Completion',
     prerequisites: row.prerequisites || 'Basic computer and internet knowledge',
@@ -90,26 +111,20 @@ function courseFromRow(row, extra = {}) {
     audience: parseJson(row.audience, []),
     outcomes: parseJson(row.outcomes, []),
     labs: parseJson(row.labs, []),
-    moduleCount: extra.moduleCount ?? row.module_count ?? 0,
-    lessonCount: extra.lessonCount ?? row.lesson_count ?? 0,
-    materialCount: extra.materialCount ?? row.material_count ?? 0,
+    moduleCount: Number(extra.moduleCount ?? row.module_count ?? 0),
+    lessonCount: Number(extra.lessonCount ?? row.lesson_count ?? 0),
+    materialCount: Number(extra.materialCount ?? row.material_count ?? 0),
     enrolled: Boolean(extra.enrolled ?? row.enrolled ?? false),
     progress: Number(extra.progress ?? row.progress ?? 0),
     currentLessonId: extra.currentLessonId ?? row.current_lesson_id ?? null,
-    currentModule: extra.currentModule ?? row.current_module ?? 1,
+    currentModule: Number(extra.currentModule ?? row.current_module ?? 1),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
 }
 
 function moduleFromRow(row) {
-  return {
-    id: row.id,
-    courseId: row.course_id,
-    title: row.title,
-    order: row.sort_order,
-    lessons: [],
-  }
+  return { id: row.id, courseId: row.course_id, title: row.title, order: row.sort_order, lessons: [] }
 }
 
 function lessonFromRow(row, completed = false) {
@@ -142,27 +157,28 @@ function materialFromRow(row) {
   }
 }
 
-export function findUserByEmail(email) {
+export async function findUserByEmail(email, client) {
   const normalized = String(email || '').trim().toLowerCase()
-  return userFromRow(db.prepare('SELECT * FROM users WHERE lower(email) = ?').get(normalized))
+  return userFromRow(await queryOne('SELECT * FROM users WHERE lower(email) = $1', [normalized], client))
 }
 
-export function findUserByUsername(username) {
+export async function findUserByUsername(username, client) {
   const normalized = String(username || '').trim().toLowerCase()
   if (!normalized) return null
-  return userFromRow(db.prepare('SELECT * FROM users WHERE lower(username) = ?').get(normalized))
+  return userFromRow(await queryOne('SELECT * FROM users WHERE lower(username) = $1', [normalized], client))
 }
 
-export function findUserByGoogleId(googleId) {
-  return userFromRow(db.prepare('SELECT * FROM users WHERE google_id = ?').get(googleId))
+export async function findUserByGoogleId(googleId, client) {
+  return userFromRow(await queryOne('SELECT * FROM users WHERE google_id = $1', [googleId], client))
 }
 
-export function findUserById(userId) {
-  return userFromRow(db.prepare('SELECT * FROM users WHERE id = ?').get(userId))
+export async function findUserById(userId, client) {
+  return userFromRow(await queryOne('SELECT * FROM users WHERE id = $1', [userId], client))
 }
 
-export function listUsers() {
-  return db.prepare('SELECT * FROM users ORDER BY created_at DESC').all().map(userFromRow).map(publicUser)
+export async function listUsers() {
+  const rows = await queryMany('SELECT * FROM users ORDER BY created_at DESC')
+  return rows.map(userFromRow).map(publicUser)
 }
 
 export function userHasRole(user, allowedRoles) {
@@ -170,480 +186,355 @@ export function userHasRole(user, allowedRoles) {
   return roles.some(role => allowedRoles.includes(role))
 }
 
-export function createUser({ name, email, username, passwordHash, googleId = null, role = 'student', roles = ['student'] }) {
+export async function createUser({ name, email, username, passwordHash, googleId = null, role = 'student', roles = ['student'] }, client) {
   const normalizedEmail = String(email || '').trim().toLowerCase()
   const normalizedUsername = username ? String(username).trim().toLowerCase() : null
   const primaryRole = VALID_ROLES.includes(role) ? role : 'student'
   const safeRoles = Array.from(new Set((roles?.length ? roles : [primaryRole]).filter(item => VALID_ROLES.includes(item))))
   const userId = id('usr')
-  db.prepare(`
+  await execute(`
     INSERT INTO users (id, name, username, email, password_hash, google_id, role, roles)
-    VALUES (@id, @name, @username, @email, @passwordHash, @googleId, @role, @roles)
-  `).run({
-    id: userId,
-    name: String(name || '').trim(),
-    username: normalizedUsername,
-    email: normalizedEmail,
-    passwordHash,
-    googleId,
-    role: primaryRole,
-    roles: JSON.stringify(safeRoles.length ? safeRoles : [primaryRole]),
-  })
-  return findUserById(userId)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+  `, [userId, String(name || '').trim(), normalizedUsername, normalizedEmail, passwordHash, googleId, primaryRole, JSON.stringify(safeRoles.length ? safeRoles : [primaryRole])], client)
+  return findUserById(userId, client)
 }
 
-export function updateUser(userId, updates) {
+export async function updateUser(userId, updates, client) {
   const allowed = {
-    name: 'name',
-    username: 'username',
-    email: 'email',
-    googleId: 'google_id',
-    passwordHash: 'password_hash',
-    status: 'status',
-    lastLogin: 'last_login_at',
-    tokenVersion: 'token_version',
-    passwordUpdatedAt: 'password_updated_at',
+    name: 'name', username: 'username', email: 'email', googleId: 'google_id', passwordHash: 'password_hash',
+    status: 'status', lastLogin: 'last_login_at', tokenVersion: 'token_version', passwordUpdatedAt: 'password_updated_at',
   }
+  const values = []
   const sets = []
-  const params = { id: userId }
   for (const [key, column] of Object.entries(allowed)) {
-    if (updates[key] !== undefined) {
-      sets.push(`${column} = @${key}`)
-      params[key] = key === 'email' || key === 'username' ? String(updates[key]).trim().toLowerCase() : updates[key]
-    }
+    if (updates[key] === undefined) continue
+    const value = key === 'email' || key === 'username' ? String(updates[key]).trim().toLowerCase() : updates[key]
+    sets.push(`${column} = ${parameter(values, value)}`)
   }
-  if (!sets.length) return findUserById(userId)
-  sets.push("updated_at = datetime('now')")
-  db.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = @id`).run(params)
+  if (!sets.length) return findUserById(userId, client)
+  sets.push('updated_at = CURRENT_TIMESTAMP')
+  const userParameter = parameter(values, userId)
+  await execute(`UPDATE users SET ${sets.join(', ')} WHERE id = ${userParameter}`, values, client)
+  return findUserById(userId, client)
+}
+
+export async function updateUserPassword(userId, passwordHash) {
+  await execute(`
+    UPDATE users SET password_hash = $1, password_updated_at = CURRENT_TIMESTAMP,
+      token_version = coalesce(token_version, 0) + 1, updated_at = CURRENT_TIMESTAMP
+    WHERE id = $2
+  `, [passwordHash, userId])
+  await recordAudit('auth.password_change', userId, 'user', userId, {})
   return findUserById(userId)
 }
 
-export function updateUserPassword(userId, passwordHash) {
-  db.prepare(`
-    UPDATE users
-    SET password_hash = ?,
-        password_updated_at = datetime('now'),
-        token_version = coalesce(token_version, 0) + 1,
-        updated_at = datetime('now')
-    WHERE id = ?
-  `).run(passwordHash, userId)
-  recordAudit('auth.password_change', userId, 'user', userId, {})
-  return findUserById(userId)
-}
-
-export function assignRole(userId, role) {
+export async function assignRole(userId, role) {
   if (!VALID_ROLES.includes(role)) return null
-  const user = findUserById(userId)
+  const user = await findUserById(userId)
   if (!user) return null
   const roles = Array.from(new Set([...(user.roles || []), role]))
-  db.prepare("UPDATE users SET role = ?, roles = ?, updated_at = datetime('now') WHERE id = ?")
-    .run(role, JSON.stringify(roles), userId)
+  await execute('UPDATE users SET role = $1, roles = $2::jsonb, updated_at = CURRENT_TIMESTAMP WHERE id = $3', [role, JSON.stringify(roles), userId])
   return findUserById(userId)
 }
 
-export function suspendUser(userId) {
+export async function suspendUser(userId) {
   return updateUser(userId, { status: 'suspended' })
 }
 
-export function listPublicCourses() {
-  return db.prepare(`
-    SELECT c.*,
-      (SELECT count(*) FROM course_modules m WHERE m.course_id = c.id) AS module_count,
-      (SELECT count(*) FROM lessons l WHERE l.course_id = c.id AND l.status = 'published') AS lesson_count,
-      (SELECT count(*) FROM course_materials cm WHERE cm.course_id = c.id) AS material_count
-    FROM courses c
-    WHERE c.status = 'published'
-    ORDER BY c.created_at ASC
-  `).all().map(row => courseFromRow(row))
+const COURSE_COUNTS = `
+  SELECT c.*,
+    (SELECT count(*) FROM course_modules m WHERE m.course_id = c.id) AS module_count,
+    (SELECT count(*) FROM lessons l WHERE l.course_id = c.id AND l.status = 'published') AS lesson_count,
+    (SELECT count(*) FROM course_materials cm WHERE cm.course_id = c.id) AS material_count
+  FROM courses c
+`
+
+export async function listPublicCourses() {
+  const rows = await queryMany(`${COURSE_COUNTS} WHERE c.status = 'published' ORDER BY c.created_at ASC`)
+  return rows.map(courseFromRow)
 }
 
-export function listCourses() {
-  return db.prepare(`
-    SELECT c.*,
-      (SELECT count(*) FROM course_modules m WHERE m.course_id = c.id) AS module_count,
-      (SELECT count(*) FROM lessons l WHERE l.course_id = c.id AND l.status = 'published') AS lesson_count,
-      (SELECT count(*) FROM course_materials cm WHERE cm.course_id = c.id) AS material_count
-    FROM courses c
-    ORDER BY c.created_at ASC
-  `).all().map(row => courseFromRow(row))
+export async function listCourses() {
+  const rows = await queryMany(`${COURSE_COUNTS} ORDER BY c.created_at ASC`)
+  return rows.map(courseFromRow)
 }
 
-function slugify(value) {
-  return String(value || '')
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-}
-
-export function createCourse(input, actorId = null) {
+export async function createCourse(input, actorId = null) {
   const courseId = input.id || id('crs')
   const title = String(input.title || '').trim()
   if (!title) throw new Error('Course title is required')
-  const course = {
-    id: courseId,
-    slug: input.slug || `${slugify(title)}-${courseId.slice(-6)}`,
+  const values = [
+    courseId,
+    input.slug || `${slugify(title)}-${courseId.slice(-6)}`,
     title,
-    category: input.category || 'Cybersecurity',
-    level: input.level || 'Beginner',
-    duration: input.duration || 'Self-paced',
-    description: input.description || 'Course description pending.',
-    overview: input.overview || input.description || 'Course overview pending.',
-    instructorName: input.instructorName || input.instructor?.name || 'Cyber Lab IN Faculty',
-    instructorTitle: input.instructorTitle || input.instructor?.title || 'Cybersecurity Educators',
-    status: input.status || 'draft',
-    price: Number(input.price || 0),
-    mode: input.mode || 'Online',
-    credential: input.credential || 'Certificate of Completion',
-    prerequisites: input.prerequisites || 'Basic computer and internet knowledge',
-    brochureUrl: input.brochureUrl || null,
-    categorySlug: input.categorySlug || slugify(input.category || 'Cybersecurity'),
-    audience: JSON.stringify(input.audience || []),
-    outcomes: JSON.stringify(input.outcomes || []),
-    labs: JSON.stringify(input.labs || []),
-    instructorId: input.instructorId || null,
-  }
-  db.prepare(`
+    input.category || 'Cybersecurity',
+    input.level || 'Beginner',
+    input.duration || 'Self-paced',
+    input.description || 'Course description pending.',
+    input.overview || input.description || 'Course overview pending.',
+    input.instructorName || input.instructor?.name || 'Cyber Lab IN Faculty',
+    input.instructorTitle || input.instructor?.title || 'Cybersecurity Educators',
+    input.status || 'draft',
+    Number(input.price || 0),
+    input.mode || 'Online',
+    input.credential || 'Certificate of Completion',
+    input.prerequisites || 'Basic computer and internet knowledge',
+    input.brochureUrl || null,
+    input.categorySlug || slugify(input.category || 'Cybersecurity'),
+    JSON.stringify(input.audience || []),
+    JSON.stringify(input.outcomes || []),
+    JSON.stringify(input.labs || []),
+    input.instructorId || null,
+  ]
+  await execute(`
     INSERT INTO courses (
       id, slug, title, category, level, duration, description, overview, instructor_name, instructor_title,
       status, price, mode, credential, prerequisites, brochure_url, category_slug, audience, outcomes, labs, instructor_id
+    ) VALUES (
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
+      $18::jsonb, $19::jsonb, $20::jsonb, $21
     )
-    VALUES (
-      @id, @slug, @title, @category, @level, @duration, @description, @overview, @instructorName, @instructorTitle,
-      @status, @price, @mode, @credential, @prerequisites, @brochureUrl, @categorySlug, @audience, @outcomes, @labs, @instructorId
-    )
-  `).run(course)
-  recordAudit('course.create', actorId, 'course', courseId, { title: course.title })
+  `, values)
+  await recordAudit('course.create', actorId, 'course', courseId, { title })
   return getCourseById(courseId)
 }
 
-export function updateCourse(courseId, updates, actorId = null) {
+export async function updateCourse(courseId, updates, actorId = null) {
   const allowed = {
-    title: 'title',
-    category: 'category',
-    level: 'level',
-    duration: 'duration',
-    description: 'description',
-    overview: 'overview',
-    status: 'status',
-    price: 'price',
-    mode: 'mode',
-    credential: 'credential',
-    prerequisites: 'prerequisites',
-    brochureUrl: 'brochure_url',
-    categorySlug: 'category_slug',
-    instructorId: 'instructor_id',
+    title: 'title', category: 'category', level: 'level', duration: 'duration', description: 'description', overview: 'overview',
+    status: 'status', price: 'price', mode: 'mode', credential: 'credential', prerequisites: 'prerequisites',
+    brochureUrl: 'brochure_url', categorySlug: 'category_slug', instructorId: 'instructor_id',
   }
+  const values = []
   const sets = []
-  const params = { id: courseId }
   for (const [key, column] of Object.entries(allowed)) {
-    if (updates[key] !== undefined) {
-      sets.push(`${column} = @${key}`)
-      params[key] = updates[key]
-    }
+    if (updates[key] !== undefined) sets.push(`${column} = ${parameter(values, updates[key])}`)
   }
   for (const [key, column] of Object.entries({ audience: 'audience', outcomes: 'outcomes', labs: 'labs' })) {
-    if (updates[key] !== undefined) {
-      sets.push(`${column} = @${key}`)
-      params[key] = JSON.stringify(Array.isArray(updates[key]) ? updates[key] : [])
-    }
+    if (updates[key] !== undefined) sets.push(`${column} = ${parameter(values, JSON.stringify(Array.isArray(updates[key]) ? updates[key] : []))}::jsonb`)
   }
   if (updates.instructorName !== undefined || updates.instructor?.name !== undefined) {
-    sets.push('instructor_name = @instructorName')
-    params.instructorName = updates.instructorName || updates.instructor.name
+    sets.push(`instructor_name = ${parameter(values, updates.instructorName || updates.instructor.name)}`)
   }
   if (updates.instructorTitle !== undefined || updates.instructor?.title !== undefined) {
-    sets.push('instructor_title = @instructorTitle')
-    params.instructorTitle = updates.instructorTitle || updates.instructor.title
+    sets.push(`instructor_title = ${parameter(values, updates.instructorTitle || updates.instructor.title)}`)
   }
   if (!sets.length) return getCourseById(courseId)
-  sets.push("updated_at = datetime('now')")
-  db.prepare(`UPDATE courses SET ${sets.join(', ')} WHERE id = @id`).run(params)
-  recordAudit('course.update', actorId, 'course', courseId, updates)
+  sets.push('updated_at = CURRENT_TIMESTAMP')
+  const courseParameter = parameter(values, courseId)
+  await execute(`UPDATE courses SET ${sets.join(', ')} WHERE id = ${courseParameter}`, values)
+  await recordAudit('course.update', actorId, 'course', courseId, updates)
   return getCourseById(courseId)
 }
 
-export function publishCourse(courseId, actorId = null) {
+export async function publishCourse(courseId, actorId = null) {
   return updateCourse(courseId, { status: 'published' }, actorId)
 }
 
-export function archiveCourse(courseId, actorId = null) {
+export async function archiveCourse(courseId, actorId = null) {
   return updateCourse(courseId, { status: 'archived' }, actorId)
 }
 
-export function getPublicCourse(courseId) {
-  const row = db.prepare(`
-    SELECT c.*,
-      (SELECT count(*) FROM course_modules m WHERE m.course_id = c.id) AS module_count,
-      (SELECT count(*) FROM lessons l WHERE l.course_id = c.id AND l.status = 'published') AS lesson_count,
-      (SELECT count(*) FROM course_materials cm WHERE cm.course_id = c.id) AS material_count
-    FROM courses c
-    WHERE c.id = ? AND c.status = 'published'
-  `).get(courseId)
+export async function getPublicCourse(courseId) {
+  const row = await queryOne(`${COURSE_COUNTS} WHERE c.id = $1 AND c.status = 'published'`, [courseId])
   if (!row) return null
   const course = courseFromRow(row)
-  course.modules = listCourseModules(courseId, null, { publicOnly: true })
+  course.modules = await listCourseModules(courseId, null, { publicOnly: true })
   return course
 }
 
-export function getPublicCourseBySlug(categorySlug, courseSlug) {
-  const row = db.prepare(`
-    SELECT c.*,
-      (SELECT count(*) FROM course_modules m WHERE m.course_id = c.id) AS module_count,
-      (SELECT count(*) FROM lessons l WHERE l.course_id = c.id AND l.status = 'published') AS lesson_count,
-      (SELECT count(*) FROM course_materials cm WHERE cm.course_id = c.id) AS material_count
-    FROM courses c
-    WHERE c.category_slug = ? AND c.slug = ? AND c.status = 'published'
-  `).get(categorySlug, courseSlug)
+export async function getPublicCourseBySlug(categorySlug, courseSlug) {
+  const row = await queryOne(`${COURSE_COUNTS} WHERE c.category_slug = $1 AND c.slug = $2 AND c.status = 'published'`, [categorySlug, courseSlug])
   if (!row) return null
   const course = courseFromRow(row)
-  course.modules = listCourseModules(course.id, null, { publicOnly: true })
-  course.materials = listCourseMaterials(course.id).filter(material => material.isPublic)
+  course.modules = await listCourseModules(course.id, null, { publicOnly: true })
+  course.materials = (await listCourseMaterials(course.id)).filter(material => material.isPublic)
   return course
 }
 
-export function getCourseById(courseId) {
-  const row = db.prepare(`
-    SELECT c.*,
-      (SELECT count(*) FROM course_modules m WHERE m.course_id = c.id) AS module_count,
-      (SELECT count(*) FROM lessons l WHERE l.course_id = c.id AND l.status = 'published') AS lesson_count,
-      (SELECT count(*) FROM course_materials cm WHERE cm.course_id = c.id) AS material_count
-    FROM courses c
-    WHERE c.id = ?
-  `).get(courseId)
-  return courseFromRow(row)
+export async function getCourseById(courseId, client) {
+  return courseFromRow(await queryOne(`${COURSE_COUNTS} WHERE c.id = $1`, [courseId], client))
 }
 
-export function hasActiveEnrollment(userId, courseId, batchId = null) {
-  if (batchId) {
-    return Boolean(db.prepare(`
-      SELECT 1 FROM enrollments
-      WHERE user_id = ? AND course_id = ? AND batch_id = ? AND status = 'active'
-    `).get(userId, courseId, batchId))
-  }
-  return Boolean(db.prepare(`
-    SELECT 1 FROM enrollments
-    WHERE user_id = ? AND course_id = ? AND status = 'active'
-  `).get(userId, courseId))
+export async function hasActiveEnrollment(userId, courseId, batchId = null, client) {
+  const values = [userId, courseId]
+  const batchClause = batchId ? ` AND batch_id = ${parameter(values, batchId)}` : ''
+  return Boolean(await queryOne(`SELECT 1 FROM enrollments WHERE user_id = $1 AND course_id = $2${batchClause} AND status = 'active'`, values, client))
 }
 
-export function canReadCourse(user, courseId, allowedRoles = []) {
+export async function canReadCourse(user, courseId, allowedRoles = []) {
   if (!user || !courseId) return false
   if (userHasRole(user, ['admin', 'super_admin', 'support', ...allowedRoles])) return true
   if (userHasRole(user, ['instructor']) && allowedRoles.includes('instructor')) return true
   return hasActiveEnrollment(user.id, courseId)
 }
 
-export function enrollUser(userId, courseId, source = 'self_service', batchId = null) {
-  if (!findUserById(userId)) throw new Error('User not found')
-  const course = getCourseById(courseId)
+export async function enrollUser(userId, courseId, source = 'self_service', batchId = null, client) {
+  if (!await findUserById(userId, client)) throw new Error('User not found')
+  const course = await getCourseById(courseId, client)
   if (!course || course.status !== 'published') throw new Error('Course not found')
-  const existing = db.prepare('SELECT * FROM enrollments WHERE user_id = ? AND course_id = ?').get(userId, courseId)
+  const existing = await queryOne('SELECT * FROM enrollments WHERE user_id = $1 AND course_id = $2', [userId, courseId], client)
+  let enrollmentId
   if (existing) {
-    db.prepare("UPDATE enrollments SET status = 'active', batch_id = ?, updated_at = datetime('now') WHERE id = ?").run(batchId, existing.id)
-    return getEnrollment(existing.id)
+    enrollmentId = existing.id
+    await execute("UPDATE enrollments SET status = 'active', batch_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2", [batchId, existing.id], client)
+  } else {
+    enrollmentId = id('enr')
+    await execute('INSERT INTO enrollments (id, user_id, course_id, batch_id, source) VALUES ($1, $2, $3, $4, $5)', [enrollmentId, userId, courseId, batchId, source], client)
   }
-  const enrollmentId = id('enr')
-  db.prepare(`
-    INSERT INTO enrollments (id, user_id, course_id, batch_id, source)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(enrollmentId, userId, courseId, batchId, source)
-  const firstLesson = db.prepare(`
-    SELECT id FROM lessons WHERE course_id = ? AND status = 'published' ORDER BY sort_order ASC LIMIT 1
-  `).get(courseId)
-  if (firstLesson) {
-    upsertProgress(userId, courseId, firstLesson.id, 0)
-  }
-  return getEnrollment(enrollmentId)
+  const firstLesson = await queryOne("SELECT id FROM lessons WHERE course_id = $1 AND status = 'published' ORDER BY sort_order ASC LIMIT 1", [courseId], client)
+  if (firstLesson) await upsertProgress(userId, courseId, firstLesson.id, 0, client)
+  return getEnrollment(enrollmentId, client)
 }
 
-export function addEnrollment({ userId, courseId, batchId = null, source = 'manual' }) {
+export async function addEnrollment({ userId, courseId, batchId = null, source = 'manual' }) {
   return enrollUser(userId, courseId, source, batchId)
 }
 
-export function getEnrollment(enrollmentId) {
-  return db.prepare(`
+export async function getEnrollment(enrollmentId, client) {
+  return queryOne(`
     SELECT e.*, u.name AS user_name, u.email AS user_email, c.title AS course_title
-    FROM enrollments e
-    JOIN users u ON u.id = e.user_id
-    JOIN courses c ON c.id = e.course_id
-    WHERE e.id = ?
-  `).get(enrollmentId)
+    FROM enrollments e JOIN users u ON u.id = e.user_id JOIN courses c ON c.id = e.course_id
+    WHERE e.id = $1
+  `, [enrollmentId], client)
 }
 
-export function listEnrollmentsByUser(userId) {
-  return db.prepare(`
+export async function listEnrollmentsByUser(userId) {
+  return queryMany(`
     SELECT e.*, c.title AS course_title, c.slug AS course_slug
-    FROM enrollments e
-    JOIN courses c ON c.id = e.course_id
-    WHERE e.user_id = ?
-    ORDER BY e.enrolled_at DESC
-  `).all(userId)
+    FROM enrollments e JOIN courses c ON c.id = e.course_id
+    WHERE e.user_id = $1 ORDER BY e.enrolled_at DESC
+  `, [userId])
 }
 
-export function listEnrollmentsByCourse(courseId) {
-  return db.prepare(`
+export async function listEnrollmentsByCourse(courseId) {
+  return queryMany(`
     SELECT e.*, u.name AS user_name, u.email AS user_email
-    FROM enrollments e
-    JOIN users u ON u.id = e.user_id
-    WHERE e.course_id = ?
-    ORDER BY e.enrolled_at DESC
-  `).all(courseId)
+    FROM enrollments e JOIN users u ON u.id = e.user_id
+    WHERE e.course_id = $1 ORDER BY e.enrolled_at DESC
+  `, [courseId])
 }
 
-export function listAllEnrollments() {
-  return db.prepare(`
+export async function listAllEnrollments() {
+  return queryMany(`
     SELECT e.*, u.name AS user_name, u.email AS user_email, c.title AS course_title
-    FROM enrollments e
-    JOIN users u ON u.id = e.user_id
-    JOIN courses c ON c.id = e.course_id
+    FROM enrollments e JOIN users u ON u.id = e.user_id JOIN courses c ON c.id = e.course_id
     ORDER BY e.enrolled_at DESC
-  `).all()
+  `)
 }
 
-function courseProgress(userId, courseId) {
-  const total = db.prepare("SELECT count(*) AS count FROM lessons WHERE course_id = ? AND status = 'published'").get(courseId).count
+async function courseProgress(userId, courseId) {
+  const total = await countQuery("SELECT count(*) FROM lessons WHERE course_id = $1 AND status = 'published'", [courseId])
   if (!total) return 0
-  const complete = db.prepare(`
-    SELECT count(*) AS count FROM user_progress
-    WHERE user_id = ? AND course_id = ? AND completion_percentage >= 100
-  `).get(userId, courseId).count
+  const complete = await countQuery('SELECT count(*) FROM user_progress WHERE user_id = $1 AND course_id = $2 AND completion_percentage >= 100', [userId, courseId])
   return Math.round((complete / total) * 100)
 }
 
-function currentLesson(userId, courseId) {
-  return db.prepare(`
+async function currentLesson(userId, courseId) {
+  return queryOne(`
     SELECT l.id, m.sort_order AS module_order
-    FROM lessons l
-    JOIN course_modules m ON m.id = l.module_id
-    LEFT JOIN user_progress p ON p.lesson_id = l.id AND p.user_id = ?
-    WHERE l.course_id = ? AND l.status = 'published' AND coalesce(p.completion_percentage, 0) < 100
-    ORDER BY m.sort_order ASC, l.sort_order ASC
-    LIMIT 1
-  `).get(userId, courseId)
+    FROM lessons l JOIN course_modules m ON m.id = l.module_id
+    LEFT JOIN user_progress p ON p.lesson_id = l.id AND p.user_id = $1
+    WHERE l.course_id = $2 AND l.status = 'published' AND coalesce(p.completion_percentage, 0) < 100
+    ORDER BY m.sort_order ASC, l.sort_order ASC LIMIT 1
+  `, [userId, courseId])
 }
 
-export function listEnrolledCourses(userId) {
-  const rows = db.prepare(`
-    SELECT c.*,
-      (SELECT count(*) FROM course_modules m WHERE m.course_id = c.id) AS module_count,
-      (SELECT count(*) FROM lessons l WHERE l.course_id = c.id AND l.status = 'published') AS lesson_count,
-      (SELECT count(*) FROM course_materials cm WHERE cm.course_id = c.id) AS material_count
-    FROM enrollments e
-    JOIN courses c ON c.id = e.course_id
-    WHERE e.user_id = ? AND e.status = 'active'
+export async function listEnrolledCourses(userId) {
+  const rows = await queryMany(`${COURSE_COUNTS}
+    JOIN enrollments e ON e.course_id = c.id
+    WHERE e.user_id = $1 AND e.status = 'active'
     ORDER BY e.enrolled_at DESC
-  `).all(userId)
-  return rows.map(row => {
-    const lesson = currentLesson(userId, row.id)
-    return courseFromRow(row, {
-      enrolled: true,
-      progress: courseProgress(userId, row.id),
-      currentLessonId: lesson?.id ?? null,
-      currentModule: lesson?.module_order ?? 1,
-    })
-  })
+  `, [userId])
+  return Promise.all(rows.map(async row => {
+    const [lesson, progress] = await Promise.all([currentLesson(userId, row.id), courseProgress(userId, row.id)])
+    return courseFromRow(row, { enrolled: true, progress, currentLessonId: lesson?.id ?? null, currentModule: lesson?.module_order ?? 1 })
+  }))
 }
 
-export function listCourseModules(courseId, userId = null, { publicOnly = false } = {}) {
-  const modules = db.prepare(`
-    SELECT * FROM course_modules WHERE course_id = ? ORDER BY sort_order ASC
-  `).all(courseId).map(moduleFromRow)
-  const lessons = db.prepare(`
+export async function listCourseModules(courseId, userId = null, { publicOnly = false } = {}) {
+  const moduleRows = await queryMany('SELECT * FROM course_modules WHERE course_id = $1 ORDER BY sort_order ASC', [courseId])
+  const modules = moduleRows.map(moduleFromRow)
+  const lessons = await queryMany(`
     SELECT l.*, p.completion_percentage
-    FROM lessons l
-    LEFT JOIN user_progress p ON p.lesson_id = l.id AND p.user_id = ?
-    WHERE l.course_id = ? AND l.status = 'published'
-    ORDER BY l.sort_order ASC
-  `).all(userId || '', courseId)
+    FROM lessons l LEFT JOIN user_progress p ON p.lesson_id = l.id AND p.user_id = $1
+    WHERE l.course_id = $2 AND l.status = 'published' ORDER BY l.sort_order ASC
+  `, [userId || '', courseId])
   const byModule = new Map(modules.map(module => [module.id, module]))
   for (const lesson of lessons) {
     const target = byModule.get(lesson.module_id)
-    if (!target) continue
-    target.lessons.push(lessonFromRow(lesson, !publicOnly && Number(lesson.completion_percentage || 0) >= 100))
+    if (target) target.lessons.push(lessonFromRow(lesson, !publicOnly && Number(lesson.completion_percentage || 0) >= 100))
   }
   return modules
 }
 
-export function getCourseForUser(courseId, user) {
-  const course = getCourseById(courseId)
+export async function getCourseForUser(courseId, user) {
+  const course = await getCourseById(courseId)
   if (!course || course.status !== 'published') return null
-  const enrolled = user ? hasActiveEnrollment(user.id, courseId) : false
+  const enrolled = user ? await hasActiveEnrollment(user.id, courseId) : false
   const elevated = user ? userHasRole(user, ['admin', 'super_admin', 'instructor', 'support']) : false
   const canViewPrivate = enrolled || elevated
-  const lesson = user ? currentLesson(user.id, courseId) : null
+  const [lesson, modules, allMaterials] = await Promise.all([
+    user ? currentLesson(user.id, courseId) : null,
+    listCourseModules(courseId, canViewPrivate ? user.id : null, { publicOnly: !canViewPrivate }),
+    listCourseMaterials(courseId),
+  ])
   return {
     ...course,
     enrolled,
-    progress: user && enrolled ? courseProgress(user.id, courseId) : 0,
+    progress: user && enrolled ? await courseProgress(user.id, courseId) : 0,
     currentLessonId: lesson?.id ?? null,
     currentModule: lesson?.module_order ?? 1,
-    modules: listCourseModules(courseId, canViewPrivate ? user.id : null, { publicOnly: !canViewPrivate }),
-    materials: canViewPrivate ? listCourseMaterials(courseId) : listCourseMaterials(courseId).filter(material => material.isPublic),
-    lockedMaterialCount: canViewPrivate ? 0 : listCourseMaterials(courseId).filter(material => !material.isPublic).length,
+    modules,
+    materials: canViewPrivate ? allMaterials : allMaterials.filter(material => material.isPublic),
+    lockedMaterialCount: canViewPrivate ? 0 : allMaterials.filter(material => !material.isPublic).length,
   }
 }
 
-export function listCourseMaterials(courseId) {
-  return db.prepare(`
-    SELECT * FROM course_materials
-    WHERE course_id = ?
-    ORDER BY sort_order ASC
-  `).all(courseId).map(materialFromRow)
+export async function listCourseMaterials(courseId) {
+  const rows = await queryMany('SELECT * FROM course_materials WHERE course_id = $1 ORDER BY sort_order ASC', [courseId])
+  return rows.map(materialFromRow)
 }
 
-export function listCourseMaterialsForUser(user, courseId, reqMeta = {}) {
-  if (!canReadCourse(user, courseId, ['instructor'])) {
-    const publicMaterials = listCourseMaterials(courseId).filter(material => material.isPublic)
-    return { allowed: false, materials: publicMaterials }
+export async function listCourseMaterialsForUser(user, courseId, reqMeta = {}) {
+  if (!await canReadCourse(user, courseId, ['instructor'])) {
+    return { allowed: false, materials: (await listCourseMaterials(courseId)).filter(material => material.isPublic) }
   }
-  const materials = listCourseMaterials(courseId)
-  for (const material of materials) {
-    if (material.type === 'pdf') {
-      recordDocumentAccess({
-        userId: user.id,
-        courseId,
-        materialId: material.id,
-        event: 'metadata_view',
-        ...reqMeta,
-      })
-    }
-  }
+  const materials = await listCourseMaterials(courseId)
+  await Promise.all(materials.filter(material => material.type === 'pdf').map(material => recordDocumentAccess({
+    userId: user.id, courseId, materialId: material.id, event: 'metadata_view', ...reqMeta,
+  })))
   return { allowed: true, materials }
 }
 
-export function upsertProgress(userId, courseId, lessonId, completionPercentage) {
-  const existing = db.prepare(`
-    SELECT id FROM user_progress WHERE user_id = ? AND course_id = ? AND lesson_id = ?
-  `).get(userId, courseId, lessonId)
+export async function upsertProgress(userId, courseId, lessonId, completionPercentage, client) {
   const safePercentage = Math.max(0, Math.min(100, Number(completionPercentage) || 0))
-  if (existing) {
-    db.prepare(`
-      UPDATE user_progress
-      SET completion_percentage = ?, completed_at = CASE WHEN ? >= 100 THEN datetime('now') ELSE completed_at END, updated_at = datetime('now')
-      WHERE id = ?
-    `).run(safePercentage, safePercentage, existing.id)
-    return existing.id
-  }
   const progressId = id('prg')
-  db.prepare(`
+  const row = await queryOne(`
     INSERT INTO user_progress (id, user_id, course_id, lesson_id, completion_percentage, completed_at)
-    VALUES (?, ?, ?, ?, ?, CASE WHEN ? >= 100 THEN datetime('now') ELSE NULL END)
-  `).run(progressId, userId, courseId, lessonId, safePercentage, safePercentage)
-  return progressId
+    VALUES ($1, $2, $3, $4, $5, CASE WHEN $5 >= 100 THEN CURRENT_TIMESTAMP ELSE NULL END)
+    ON CONFLICT (user_id, course_id, lesson_id) DO UPDATE SET
+      completion_percentage = EXCLUDED.completion_percentage,
+      completed_at = CASE WHEN EXCLUDED.completion_percentage >= 100 THEN CURRENT_TIMESTAMP ELSE user_progress.completed_at END,
+      updated_at = CURRENT_TIMESTAMP
+    RETURNING id
+  `, [progressId, userId, courseId, lessonId, safePercentage], client)
+  return row.id
 }
 
-export function getStudentDashboard(userId) {
-  const enrolledCourses = listEnrolledCourses(userId)
+export async function getStudentDashboard(userId) {
+  const enrolledCourses = await listEnrolledCourses(userId)
   const enrolledCourseIds = enrolledCourses.map(course => course.id)
+  const values = []
   const materialsCount = enrolledCourseIds.length
-    ? db.prepare(`SELECT count(*) AS count FROM course_materials WHERE course_id IN (${enrolledCourseIds.map(() => '?').join(',')})`).get(...enrolledCourseIds).count
+    ? await countQuery(`SELECT count(*) FROM course_materials WHERE course_id IN (${inParameters(values, enrolledCourseIds)})`, values)
     : 0
   const completedCourses = enrolledCourses.filter(course => course.progress >= 100).length
   const nextCourse = enrolledCourses.find(course => course.currentLessonId) || enrolledCourses[0] || null
+  const [recommendedCourses, liveClasses] = await Promise.all([listPublicCourses(), listUpcomingLiveClasses(userId)])
   return {
     enrolledCourses,
-    recommendedCourses: listPublicCourses().filter(course => !enrolledCourseIds.includes(course.id)),
+    recommendedCourses: recommendedCourses.filter(course => !enrolledCourseIds.includes(course.id)),
     summary: {
       enrolledCourses: enrolledCourses.length,
       completedCourses,
@@ -653,176 +544,104 @@ export function getStudentDashboard(userId) {
         : 0,
     },
     activeCourse: nextCourse,
-    liveClasses: listUpcomingLiveClasses(userId),
+    liveClasses,
   }
 }
 
-export function getCourseLeaderboard(courseId, limit = 25) {
-  return db.prepare(`
-    SELECT
-      u.id AS userId,
-      u.name,
-      u.email,
-      e.course_id AS courseId,
+export async function getCourseLeaderboard(courseId, limit = 25) {
+  const rows = await queryMany(`
+    SELECT u.id AS "userId", u.name, u.email, e.course_id AS "courseId",
       round(avg(coalesce(p.completion_percentage, 0))) AS progress,
-      count(CASE WHEN coalesce(p.completion_percentage, 0) >= 100 THEN 1 END) AS completedLessons
-    FROM enrollments e
-    JOIN users u ON u.id = e.user_id
+      count(*) FILTER (WHERE coalesce(p.completion_percentage, 0) >= 100) AS "completedLessons"
+    FROM enrollments e JOIN users u ON u.id = e.user_id
     LEFT JOIN user_progress p ON p.user_id = e.user_id AND p.course_id = e.course_id
-    WHERE e.course_id = ? AND e.status = 'active'
+    WHERE e.course_id = $1 AND e.status = 'active'
     GROUP BY u.id, u.name, u.email, e.course_id
-    HAVING progress > 0 OR completedLessons > 0
-    ORDER BY progress DESC, completedLessons DESC, u.name ASC
-    LIMIT ?
-  `).all(courseId, Number(limit) || 25).map((row, index) => ({
+    HAVING avg(coalesce(p.completion_percentage, 0)) > 0
+      OR count(*) FILTER (WHERE coalesce(p.completion_percentage, 0) >= 100) > 0
+    ORDER BY progress DESC, "completedLessons" DESC, u.name ASC LIMIT $2
+  `, [courseId, Number(limit) || 25])
+  return rows.map((row, index) => ({
     rank: index + 1,
-    userId: row.userId,
-    name: row.name,
-    email: row.email,
-    courseId: row.courseId,
+    ...row,
     progress: Number(row.progress || 0),
     completedLessons: Number(row.completedLessons || 0),
     score: Number(row.progress || 0),
   }))
 }
 
-export function getInstructorDashboard(instructorId) {
-  const assignedCourses = db.prepare(`
-    SELECT c.*,
-      (SELECT count(*) FROM course_modules m WHERE m.course_id = c.id) AS module_count,
-      (SELECT count(*) FROM lessons l WHERE l.course_id = c.id AND l.status = 'published') AS lesson_count,
-      (SELECT count(*) FROM course_materials cm WHERE cm.course_id = c.id) AS material_count
-    FROM courses c
-    WHERE c.status = 'published' AND c.instructor_id = ?
-    ORDER BY c.created_at ASC
-  `).all(instructorId).map(row => courseFromRow(row))
+export async function getInstructorDashboard(instructorId) {
+  const assignedRows = await queryMany(`${COURSE_COUNTS}
+    WHERE c.status = 'published' AND c.instructor_id = $1 ORDER BY c.created_at ASC
+  `, [instructorId])
+  const assignedCourses = assignedRows.map(courseFromRow)
   const courseIds = assignedCourses.map(course => course.id)
-  const students = courseIds.length
-    ? db.prepare(`
-      SELECT DISTINCT u.id, u.name, u.email
-      FROM enrollments e
-      JOIN users u ON u.id = e.user_id
-      WHERE e.course_id IN (${courseIds.map(() => '?').join(',')}) AND e.status = 'active'
-      ORDER BY u.name ASC
-    `).all(...courseIds)
-    : []
-  const progress = courseIds.length
-    ? db.prepare(`
-      SELECT p.id, p.user_id AS userId, p.course_id AS courseId, p.lesson_id AS lessonId, p.completion_percentage AS completionPercentage, p.updated_at AS updatedAt
-      FROM user_progress p
-      WHERE p.course_id IN (${courseIds.map(() => '?').join(',')})
-      ORDER BY p.updated_at DESC
-      LIMIT 50
-    `).all(...courseIds)
-    : []
-  const attendance = courseIds.length
-    ? db.prepare(`
-      SELECT a.id, a.live_class_id AS liveClassId, a.user_id AS userId, a.event,
-        a.created_at AS createdAt, lc.course_id AS courseId
-      FROM live_class_attendance a
-      JOIN live_classes lc ON lc.id = a.live_class_id
-      WHERE lc.course_id IN (${courseIds.map(() => '?').join(',')})
-      ORDER BY a.created_at DESC
-      LIMIT 100
-    `).all(...courseIds)
-    : []
-  const labAttempts = courseIds.length
-    ? db.prepare(`
-      SELECT id, lab_id AS labId, course_id AS courseId, user_id AS userId, status, score,
-        started_at AS startedAt, submitted_at AS submittedAt
-      FROM lab_attempts
-      WHERE course_id IN (${courseIds.map(() => '?').join(',')})
-      ORDER BY started_at DESC
-      LIMIT 100
-    `).all(...courseIds)
-    : []
-  const quizResults = courseIds.length
-    ? db.prepare(`
-      SELECT id, quiz_id AS quizId, course_id AS courseId, user_id AS userId, score, submitted_at AS submittedAt
-      FROM quiz_attempts
-      WHERE course_id IN (${courseIds.map(() => '?').join(',')})
-      ORDER BY submitted_at DESC
-      LIMIT 100
-    `).all(...courseIds)
-    : []
-  return {
-    instructorId,
-    assignedCourses,
-    students,
-    attendance,
-    labAttempts,
-    quizResults,
-    progress,
+  if (!courseIds.length) {
+    return { instructorId, assignedCourses, students: [], attendance: [], labAttempts: [], quizResults: [], progress: [] }
   }
+  const values = []
+  const courseList = inParameters(values, courseIds)
+  const [students, progress, attendance, labAttempts, quizResults] = await Promise.all([
+    queryMany(`SELECT DISTINCT u.id, u.name, u.email FROM enrollments e JOIN users u ON u.id = e.user_id WHERE e.course_id IN (${courseList}) AND e.status = 'active' ORDER BY u.name ASC`, values),
+    queryMany(`SELECT p.id, p.user_id AS "userId", p.course_id AS "courseId", p.lesson_id AS "lessonId", p.completion_percentage AS "completionPercentage", p.updated_at AS "updatedAt" FROM user_progress p WHERE p.course_id IN (${courseList}) ORDER BY p.updated_at DESC LIMIT 50`, values),
+    queryMany(`SELECT a.id, a.live_class_id AS "liveClassId", a.user_id AS "userId", a.event, a.created_at AS "createdAt", lc.course_id AS "courseId" FROM live_class_attendance a JOIN live_classes lc ON lc.id = a.live_class_id WHERE lc.course_id IN (${courseList}) ORDER BY a.created_at DESC LIMIT 100`, values),
+    queryMany(`SELECT id, lab_id AS "labId", course_id AS "courseId", user_id AS "userId", status, score, started_at AS "startedAt", submitted_at AS "submittedAt" FROM lab_attempts WHERE course_id IN (${courseList}) ORDER BY started_at DESC LIMIT 100`, values),
+    queryMany(`SELECT id, quiz_id AS "quizId", course_id AS "courseId", user_id AS "userId", score, submitted_at AS "submittedAt" FROM quiz_attempts WHERE course_id IN (${courseList}) ORDER BY submitted_at DESC LIMIT 100`, values),
+  ])
+  return { instructorId, assignedCourses, students, attendance, labAttempts, quizResults, progress }
 }
 
-export function getSalesDashboard() {
-  const leads = listLeads()
-  const stages = leads.reduce((acc, lead) => {
-    acc[lead.status] = (acc[lead.status] || 0) + 1
-    return acc
-  }, {})
-  const sources = leads.reduce((acc, lead) => {
-    acc[lead.source] = (acc[lead.source] || 0) + 1
-    return acc
-  }, {})
-  const courseWise = db.prepare(`
-    SELECT coalesce(c.title, 'Unspecified') AS course, count(*) AS count
-    FROM leads l
-    LEFT JOIN courses c ON c.id = l.course_id
-    GROUP BY coalesce(c.title, 'Unspecified')
-    ORDER BY count(*) DESC
-  `).all()
+export async function getSalesDashboard() {
+  const [leads, followUps, visitorAnalytics, courseWise] = await Promise.all([
+    listLeads(),
+    listFollowUps(),
+    getVisitorStats(),
+    queryMany(`
+      SELECT coalesce(c.title, 'Unspecified') AS course, count(*)::integer AS count
+      FROM leads l LEFT JOIN courses c ON c.id = l.course_id
+      GROUP BY coalesce(c.title, 'Unspecified') ORDER BY count(*) DESC
+    `),
+  ])
+  const stages = leads.reduce((acc, lead) => ({ ...acc, [lead.status]: (acc[lead.status] || 0) + 1 }), {})
+  const sources = leads.reduce((acc, lead) => ({ ...acc, [lead.source]: (acc[lead.source] || 0) + 1 }), {})
   const suggestions = []
   const newLeads = stages.new || 0
   const callbackLeads = leads.filter(lead => /call|callback|counsellor/i.test(`${lead.message} ${lead.source}`)).length
   if (newLeads > 0) suggestions.push(`${newLeads} new lead${newLeads === 1 ? '' : 's'} need first contact.`)
   if (callbackLeads > 0) suggestions.push(`${callbackLeads} lead${callbackLeads === 1 ? '' : 's'} asked for a callback or counsellor contact.`)
+  return { leads, followUps, visitorAnalytics, analytics: { totalLeads: leads.length, stages, sources, courseWise, suggestions } }
+}
+
+export async function getOpsDashboard() {
+  const [labRows, labAttempts, liveClassAttendance, documentAccessLogs, labs, activeAttempts] = await Promise.all([
+    queryMany("SELECT * FROM labs WHERE status != 'archived' ORDER BY created_at DESC LIMIT 100"),
+    queryMany('SELECT id, lab_id AS "labId", course_id AS "courseId", user_id AS "userId", status, score, started_at AS "startedAt", submitted_at AS "submittedAt" FROM lab_attempts ORDER BY started_at DESC LIMIT 100'),
+    queryMany('SELECT id, live_class_id AS "liveClassId", user_id AS "userId", event, created_at AS "createdAt" FROM live_class_attendance ORDER BY created_at DESC LIMIT 100'),
+    listDocumentAccessLogs(100),
+    countQuery("SELECT count(*) FROM labs WHERE status != 'archived'"),
+    countQuery("SELECT count(*) FROM lab_attempts WHERE status = 'started'"),
+  ])
   return {
-    leads,
-    followUps: listFollowUps(),
-    visitorAnalytics: getVisitorStats(),
-    analytics: {
-      totalLeads: leads.length,
-      stages,
-      sources,
-      courseWise,
-      suggestions,
-    },
+    labs: labRows.map(labFromRow),
+    labAttempts,
+    liveClassAttendance,
+    documentAccessLogs,
+    systemHealth: { status: 'ok', store: 'postgresql', labs, activeAttempts, generatedAt: new Date().toISOString() },
   }
 }
 
-export function getOpsDashboard() {
-  return {
-    labs: db.prepare("SELECT * FROM labs WHERE status != 'archived' ORDER BY created_at DESC LIMIT 100").all().map(labFromRow),
-    labAttempts: db.prepare('SELECT id, lab_id AS labId, course_id AS courseId, user_id AS userId, status, score, started_at AS startedAt, submitted_at AS submittedAt FROM lab_attempts ORDER BY started_at DESC LIMIT 100').all(),
-    liveClassAttendance: db.prepare('SELECT id, live_class_id AS liveClassId, user_id AS userId, event, created_at AS createdAt FROM live_class_attendance ORDER BY created_at DESC LIMIT 100').all(),
-    documentAccessLogs: listDocumentAccessLogs(100),
-    systemHealth: {
-      status: 'ok',
-      store: 'sqlite',
-      labs: db.prepare("SELECT count(*) AS count FROM labs WHERE status != 'archived'").get().count,
-      activeAttempts: db.prepare("SELECT count(*) AS count FROM lab_attempts WHERE status = 'started'").get().count,
-      generatedAt: new Date().toISOString(),
-    },
-  }
-}
-
-export function listUpcomingLiveClasses(userId) {
-  return db.prepare(`
-    SELECT lc.*, c.title AS course_title
-    FROM live_classes lc
-    JOIN enrollments e ON e.course_id = lc.course_id AND e.user_id = ? AND e.status = 'active'
+export async function listUpcomingLiveClasses(userId) {
+  return queryMany(`
+    SELECT lc.*, c.title AS course_title FROM live_classes lc
+    JOIN enrollments e ON e.course_id = lc.course_id AND e.user_id = $1 AND e.status = 'active'
     JOIN courses c ON c.id = lc.course_id
-    WHERE lc.status = 'scheduled'
-      AND datetime(lc.scheduled_end) >= datetime('now')
+    WHERE lc.status = 'scheduled' AND lc.scheduled_end >= CURRENT_TIMESTAMP
       AND (lc.batch_id IS NULL OR lc.batch_id = e.batch_id)
-    ORDER BY lc.scheduled_start ASC
-    LIMIT 10
-  `).all(userId)
+    ORDER BY lc.scheduled_start ASC LIMIT 10
+  `, [userId])
 }
 
-export function listUpcomingLiveClassesForUser(userId) {
+export async function listUpcomingLiveClassesForUser(userId) {
   return listUpcomingLiveClasses(userId)
 }
 
@@ -847,103 +666,70 @@ function liveClassFromRow(row) {
   }
 }
 
-export function createLiveClass(input, actorId = null) {
+export async function createLiveClass(input, actorId = null) {
   const classId = input.id || id('live')
-  db.prepare(`
+  await execute(`
     INSERT INTO live_classes (id, course_id, batch_id, instructor_id, title, provider, join_url, embed_url, scheduled_start, scheduled_end, status)
-    VALUES (@id, @courseId, @batchId, @instructorId, @title, @provider, @joinUrl, @embedUrl, @scheduledStart, @scheduledEnd, @status)
-  `).run({
-    id: classId,
-    courseId: input.courseId,
-    batchId: input.batchId || null,
-    instructorId: input.instructorId || null,
-    title: input.title,
-    provider: input.provider || 'external',
-    joinUrl: input.joinUrl || null,
-    embedUrl: input.embedUrl || null,
-    scheduledStart: input.scheduledStart,
-    scheduledEnd: input.scheduledEnd,
-    status: input.status || 'scheduled',
-  })
-  recordAudit('live_class.create', actorId, 'live_class', classId, { courseId: input.courseId })
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+  `, [classId, input.courseId, input.batchId || null, input.instructorId || null, input.title, input.provider || 'external', input.joinUrl || null, input.embedUrl || null, input.scheduledStart, input.scheduledEnd, input.status || 'scheduled'])
+  await recordAudit('live_class.create', actorId, 'live_class', classId, { courseId: input.courseId })
   return getLiveClassById(classId)
 }
 
-export function updateLiveClass(liveClassId, updates, actorId = null) {
-  const allowed = {
-    title: 'title',
-    provider: 'provider',
-    joinUrl: 'join_url',
-    embedUrl: 'embed_url',
-    scheduledStart: 'scheduled_start',
-    scheduledEnd: 'scheduled_end',
-    status: 'status',
-  }
+export async function updateLiveClass(liveClassId, updates, actorId = null) {
+  const allowed = { title: 'title', provider: 'provider', joinUrl: 'join_url', embedUrl: 'embed_url', scheduledStart: 'scheduled_start', scheduledEnd: 'scheduled_end', status: 'status' }
+  const values = []
   const sets = []
-  const params = { id: liveClassId }
   for (const [key, column] of Object.entries(allowed)) {
-    if (updates[key] !== undefined) {
-      sets.push(`${column} = @${key}`)
-      params[key] = updates[key]
-    }
+    if (updates[key] !== undefined) sets.push(`${column} = ${parameter(values, updates[key])}`)
   }
   if (!sets.length) return getLiveClassById(liveClassId)
-  db.prepare(`UPDATE live_classes SET ${sets.join(', ')} WHERE id = @id`).run(params)
-  recordAudit('live_class.update', actorId, 'live_class', liveClassId, updates)
+  const liveParameter = parameter(values, liveClassId)
+  await execute(`UPDATE live_classes SET ${sets.join(', ')} WHERE id = ${liveParameter}`, values)
+  await recordAudit('live_class.update', actorId, 'live_class', liveClassId, updates)
   return getLiveClassById(liveClassId)
 }
 
-export function getLiveClassById(liveClassId) {
-  return liveClassFromRow(db.prepare(`
+export async function getLiveClassById(liveClassId) {
+  return liveClassFromRow(await queryOne(`
     SELECT lc.*, c.title AS course_title, u.name AS instructor_name, u.role AS instructor_title
-    FROM live_classes lc
-    JOIN courses c ON c.id = lc.course_id
-    LEFT JOIN users u ON u.id = lc.instructor_id
-    WHERE lc.id = ?
-  `).get(liveClassId))
+    FROM live_classes lc JOIN courses c ON c.id = lc.course_id LEFT JOIN users u ON u.id = lc.instructor_id
+    WHERE lc.id = $1
+  `, [liveClassId]))
 }
 
-export function listLiveClassesByCourse(courseId) {
-  return db.prepare(`
+export async function listLiveClassesByCourse(courseId) {
+  const rows = await queryMany(`
     SELECT lc.*, c.title AS course_title, u.name AS instructor_name, u.role AS instructor_title
-    FROM live_classes lc
-    JOIN courses c ON c.id = lc.course_id
-    LEFT JOIN users u ON u.id = lc.instructor_id
-    WHERE lc.course_id = ?
-    ORDER BY lc.scheduled_start ASC
-  `).all(courseId).map(liveClassFromRow)
+    FROM live_classes lc JOIN courses c ON c.id = lc.course_id LEFT JOIN users u ON u.id = lc.instructor_id
+    WHERE lc.course_id = $1 ORDER BY lc.scheduled_start ASC
+  `, [courseId])
+  return rows.map(liveClassFromRow)
 }
 
-export function recordLiveEvent(liveClassId, userId, event) {
-  const eventId = id('att')
-  db.prepare(`
+export async function recordLiveEvent(liveClassId, userId, event) {
+  return queryOne(`
     INSERT INTO live_class_attendance (id, live_class_id, user_id, event)
-    VALUES (?, ?, ?, ?)
-  `).run(eventId, liveClassId, userId, event)
-  return db.prepare(`
-    SELECT id, live_class_id AS liveClassId, user_id AS userId, event, created_at AS createdAt
-    FROM live_class_attendance WHERE id = ?
-  `).get(eventId)
+    VALUES ($1, $2, $3, $4)
+    RETURNING id, live_class_id AS "liveClassId", user_id AS "userId", event, created_at AS "createdAt"
+  `, [id('att'), liveClassId, userId, event])
 }
 
-export function getViewerCount(liveClassId) {
-  const joined = db.prepare(`
-    SELECT count(*) AS count FROM live_class_attendance WHERE live_class_id = ? AND event = 'join'
-  `).get(liveClassId).count
-  const left = db.prepare(`
-    SELECT count(*) AS count FROM live_class_attendance WHERE live_class_id = ? AND event = 'leave'
-  `).get(liveClassId).count
-  return Math.max(0, joined - left)
+export async function getViewerCount(liveClassId) {
+  const row = await queryOne(`
+    SELECT greatest(0,
+      count(*) FILTER (WHERE event = 'join') - count(*) FILTER (WHERE event = 'leave')
+    )::integer AS count FROM live_class_attendance WHERE live_class_id = $1
+  `, [liveClassId])
+  return Number(row?.count || 0)
 }
 
-export function listAttendance({ liveClassId }) {
-  return db.prepare(`
-    SELECT a.id, a.live_class_id AS liveClassId, a.user_id AS userId, u.email AS userEmail, a.event, a.created_at AS createdAt
-    FROM live_class_attendance a
-    JOIN users u ON u.id = a.user_id
-    WHERE a.live_class_id = ?
-    ORDER BY a.created_at DESC
-  `).all(liveClassId)
+export async function listAttendance({ liveClassId }) {
+  return queryMany(`
+    SELECT a.id, a.live_class_id AS "liveClassId", a.user_id AS "userId", u.email AS "userEmail", a.event, a.created_at AS "createdAt"
+    FROM live_class_attendance a JOIN users u ON u.id = a.user_id
+    WHERE a.live_class_id = $1 ORDER BY a.created_at DESC
+  `, [liveClassId])
 }
 
 function visitorFromRow(row) {
@@ -953,7 +739,7 @@ function visitorFromRow(row) {
     visitorId: row.visitor_id,
     firstSeenAt: row.first_seen_at,
     lastSeenAt: row.last_seen_at,
-    visits: row.visits,
+    visits: Number(row.visits || 0),
     consentAnalytics: Boolean(row.consent_analytics),
     consentMarketing: Boolean(row.consent_marketing),
   }
@@ -964,169 +750,127 @@ function hashIp(ipAddress = '') {
   return createHash('sha256').update(`${salt}:${ipAddress || ''}`).digest('hex')
 }
 
-export function recordVisitor({ visitorId, ipAddress, userAgent, consentAnalytics = false, consentMarketing = false }) {
+export async function recordVisitor({ visitorId, ipAddress, userAgent, consentAnalytics = false, consentMarketing = false }) {
   const safeVisitorId = visitorId || id('visitor')
-  const existing = db.prepare('SELECT * FROM visitor_analytics WHERE visitor_id = ?').get(safeVisitorId)
-  if (existing) {
-    db.prepare(`
-      UPDATE visitor_analytics
-      SET last_seen_at = datetime('now'),
-          visits = visits + 1,
-          consent_analytics = CASE WHEN @consentAnalytics = 1 THEN 1 ELSE consent_analytics END,
-          consent_marketing = CASE WHEN @consentMarketing = 1 THEN 1 ELSE consent_marketing END,
-          user_agent = @userAgent
-      WHERE visitor_id = @visitorId
-    `).run({
-      visitorId: safeVisitorId,
-      consentAnalytics: consentAnalytics ? 1 : 0,
-      consentMarketing: consentMarketing ? 1 : 0,
-      userAgent: userAgent || null,
-    })
-    return visitorFromRow(db.prepare('SELECT * FROM visitor_analytics WHERE visitor_id = ?').get(safeVisitorId))
-  }
-  db.prepare(`
+  const row = await queryOne(`
     INSERT INTO visitor_analytics (id, visitor_id, consent_analytics, consent_marketing, user_agent, ip_hash)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(id('vis'), safeVisitorId, consentAnalytics ? 1 : 0, consentMarketing ? 1 : 0, userAgent || null, hashIp(ipAddress))
-  return visitorFromRow(db.prepare('SELECT * FROM visitor_analytics WHERE visitor_id = ?').get(safeVisitorId))
+    VALUES ($1, $2, $3, $4, $5, $6)
+    ON CONFLICT (visitor_id) DO UPDATE SET
+      last_seen_at = CURRENT_TIMESTAMP,
+      visits = visitor_analytics.visits + 1,
+      consent_analytics = visitor_analytics.consent_analytics OR EXCLUDED.consent_analytics,
+      consent_marketing = visitor_analytics.consent_marketing OR EXCLUDED.consent_marketing,
+      user_agent = EXCLUDED.user_agent
+    RETURNING *
+  `, [id('vis'), safeVisitorId, Boolean(consentAnalytics), Boolean(consentMarketing), userAgent || null, hashIp(ipAddress)])
+  return visitorFromRow(row)
 }
 
-export function recordCookieConsent({ visitorId, necessary = true, analytics = false, marketing = false }) {
+export async function recordCookieConsent({ visitorId, necessary = true, analytics = false, marketing = false }) {
   if (!visitorId) throw new Error('visitorId is required')
-  recordVisitor({ visitorId, consentAnalytics: analytics, consentMarketing: marketing })
-  const existing = db.prepare('SELECT id FROM cookie_consents WHERE visitor_id = ?').get(visitorId)
-  if (existing) {
-    db.prepare(`
-      UPDATE cookie_consents
-      SET necessary = ?, analytics = ?, marketing = ?, updated_at = datetime('now')
-      WHERE visitor_id = ?
-    `).run(necessary ? 1 : 0, analytics ? 1 : 0, marketing ? 1 : 0, visitorId)
-    return existing.id
-  }
-  const consentId = id('consent')
-  db.prepare(`
+  await recordVisitor({ visitorId, consentAnalytics: analytics, consentMarketing: marketing })
+  const row = await queryOne(`
     INSERT INTO cookie_consents (id, visitor_id, necessary, analytics, marketing)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(consentId, visitorId, necessary ? 1 : 0, analytics ? 1 : 0, marketing ? 1 : 0)
-  return consentId
+    VALUES ($1, $2, $3, $4, $5)
+    ON CONFLICT (visitor_id) DO UPDATE SET
+      necessary = EXCLUDED.necessary, analytics = EXCLUDED.analytics,
+      marketing = EXCLUDED.marketing, updated_at = CURRENT_TIMESTAMP
+    RETURNING id
+  `, [id('consent'), visitorId, Boolean(necessary), Boolean(analytics), Boolean(marketing)])
+  return row.id
 }
 
-export function getVisitorStats() {
-  const one = (sql) => db.prepare(sql).get().count
-  return {
-    totalUniqueVisitors: one('SELECT count(*) AS count FROM visitor_analytics'),
-    visitorsToday: one("SELECT count(*) AS count FROM visitor_analytics WHERE first_seen_at >= date('now')"),
-    visitorsThisWeek: one("SELECT count(*) AS count FROM visitor_analytics WHERE first_seen_at >= datetime('now', '-7 days')"),
-    visitorsThisMonth: one("SELECT count(*) AS count FROM visitor_analytics WHERE first_seen_at >= datetime('now', '-30 days')"),
-  }
+export async function getVisitorStats() {
+  const row = await queryOne(`
+    SELECT
+      count(*)::integer AS total,
+      count(*) FILTER (WHERE first_seen_at >= CURRENT_DATE)::integer AS today,
+      count(*) FILTER (WHERE first_seen_at >= CURRENT_TIMESTAMP - INTERVAL '7 days')::integer AS week,
+      count(*) FILTER (WHERE first_seen_at >= CURRENT_TIMESTAMP - INTERVAL '30 days')::integer AS month
+    FROM visitor_analytics
+  `)
+  return { totalUniqueVisitors: row.total, visitorsToday: row.today, visitorsThisWeek: row.week, visitorsThisMonth: row.month }
 }
 
-export function getAdminAnalytics() {
-  const one = (sql) => db.prepare(sql).get().count
-  return {
-    users: one('SELECT count(*) AS count FROM users'),
-    courses: one("SELECT count(*) AS count FROM courses WHERE status = 'published'"),
-    enrollments: one("SELECT count(*) AS count FROM enrollments WHERE status = 'active'"),
-    materials: one('SELECT count(*) AS count FROM course_materials'),
-    documentAccesses: one('SELECT count(*) AS count FROM document_access_logs'),
-    leads: one('SELECT count(*) AS count FROM leads'),
-    visitors: getVisitorStats(),
-    payments: one('SELECT count(*) AS count FROM payment_intents'),
-    liveAttendanceEvents: one('SELECT count(*) AS count FROM live_class_attendance'),
-    labAttempts: one('SELECT count(*) AS count FROM lab_attempts'),
-    aiMessages: one('SELECT count(*) AS count FROM ai_chat_messages'),
-    analyticsEvents: one('SELECT count(*) AS count FROM analytics_events'),
-  }
+export async function getAdminAnalytics() {
+  const [counts, visitors] = await Promise.all([
+    queryOne(`
+      SELECT
+        (SELECT count(*) FROM users)::integer AS users,
+        (SELECT count(*) FROM courses WHERE status = 'published')::integer AS courses,
+        (SELECT count(*) FROM enrollments WHERE status = 'active')::integer AS enrollments,
+        (SELECT count(*) FROM course_materials)::integer AS materials,
+        (SELECT count(*) FROM document_access_logs)::integer AS "documentAccesses",
+        (SELECT count(*) FROM leads)::integer AS leads,
+        (SELECT count(*) FROM payment_intents)::integer AS payments,
+        (SELECT count(*) FROM live_class_attendance)::integer AS "liveAttendanceEvents",
+        (SELECT count(*) FROM lab_attempts)::integer AS "labAttempts",
+        (SELECT count(*) FROM ai_chat_messages)::integer AS "aiMessages",
+        (SELECT count(*) FROM analytics_events)::integer AS "analyticsEvents"
+    `),
+    getVisitorStats(),
+  ])
+  return { ...counts, visitors }
 }
 
-export function recordAnalyticsEvent({ event, userId = null, visitorId = null, path = '', properties = {} }) {
+export async function recordAnalyticsEvent({ event, userId = null, visitorId = null, path = '', properties = {} }) {
   const eventId = id('evt')
-  db.prepare(`
+  await execute(`
     INSERT INTO analytics_events (id, event, user_id, visitor_id, path, properties)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(
-    eventId,
-    event,
-    userId || null,
-    visitorId || null,
-    String(path || '').slice(0, 300),
-    JSON.stringify(properties)
-  )
+    VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+  `, [eventId, event, userId || null, visitorId || null, String(path || '').slice(0, 300), JSON.stringify(properties)])
   return { id: eventId, event }
 }
 
-export function recordAudit(action, actorId, entityType, entityId, metadata = {}) {
-  db.prepare(`
+export async function recordAudit(action, actorId, entityType, entityId, metadata = {}, client) {
+  await execute(`
     INSERT INTO audit_logs (id, actor_id, action, entity_type, entity_id, metadata)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(id('aud'), actorId || null, action, entityType, entityId || null, JSON.stringify(metadata))
+    VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+  `, [id('aud'), actorId || null, action, entityType, entityId || null, JSON.stringify(metadata)], client)
 }
 
-export function countAuditActionsSince(actorId, action, entityId, sinceIso) {
-  return db.prepare(`
-    SELECT count(*) AS count
-    FROM audit_logs
-    WHERE actor_id = ? AND action = ? AND entity_id = ? AND created_at >= ?
-  `).get(actorId, action, entityId, sinceIso).count
+export async function countAuditActionsSince(actorId, action, entityId, sinceIso) {
+  return countQuery('SELECT count(*) FROM audit_logs WHERE actor_id = $1 AND action = $2 AND entity_id = $3 AND created_at >= $4', [actorId, action, entityId, sinceIso])
 }
 
-export function createAiSession(userId, courseId, title = 'Course chat') {
+export async function createAiSession(userId, courseId, title = 'Course chat') {
   const sessionId = id('ais')
-  db.prepare(`
-    INSERT INTO ai_chat_sessions (id, user_id, course_id, title)
-    VALUES (?, ?, ?, ?)
-  `).run(sessionId, userId, courseId, title)
+  await execute('INSERT INTO ai_chat_sessions (id, user_id, course_id, title) VALUES ($1, $2, $3, $4)', [sessionId, userId, courseId, title])
   return getAiSession(sessionId, userId, courseId)
 }
 
-export function getAiSession(sessionId, userId, courseId) {
-  return db.prepare(`
-    SELECT id, user_id AS userId, course_id AS courseId, title, created_at AS createdAt, updated_at AS updatedAt
-    FROM ai_chat_sessions
-    WHERE id = ? AND user_id = ? AND course_id = ?
-  `).get(sessionId, userId, courseId)
+export async function getAiSession(sessionId, userId, courseId) {
+  return queryOne(`
+    SELECT id, user_id AS "userId", course_id AS "courseId", title, created_at AS "createdAt", updated_at AS "updatedAt"
+    FROM ai_chat_sessions WHERE id = $1 AND user_id = $2 AND course_id = $3
+  `, [sessionId, userId, courseId])
 }
 
-export function listAiSessions(userId, courseId) {
-  return db.prepare(`
-    SELECT id, user_id AS userId, course_id AS courseId, title, created_at AS createdAt, updated_at AS updatedAt
-    FROM ai_chat_sessions
-    WHERE user_id = ? AND course_id = ?
-    ORDER BY updated_at DESC
-  `).all(userId, courseId)
+export async function listAiSessions(userId, courseId) {
+  return queryMany(`
+    SELECT id, user_id AS "userId", course_id AS "courseId", title, created_at AS "createdAt", updated_at AS "updatedAt"
+    FROM ai_chat_sessions WHERE user_id = $1 AND course_id = $2 ORDER BY updated_at DESC
+  `, [userId, courseId])
 }
 
-export function addAiMessage(sessionId, userId, courseId, role, content, citations = []) {
-  const existingSession = getAiSession(sessionId, userId, courseId)
-  if (!existingSession) throw new Error('AI chat session not found')
+export async function addAiMessage(sessionId, userId, courseId, role, content, citations = []) {
+  if (!await getAiSession(sessionId, userId, courseId)) throw new Error('AI chat session not found')
   const messageId = id('aim')
-  db.prepare(`
+  const row = await queryOne(`
     INSERT INTO ai_chat_messages (id, session_id, user_id, course_id, role, content, citations)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(messageId, sessionId, userId, courseId, role, content, JSON.stringify(citations))
-  db.prepare("UPDATE ai_chat_sessions SET updated_at = datetime('now') WHERE id = ?").run(sessionId)
-  return {
-    id: messageId,
-    sessionId,
-    userId,
-    courseId,
-    role,
-    content,
-    citations,
-    createdAt: new Date().toISOString(),
-  }
+    VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
+    RETURNING created_at
+  `, [messageId, sessionId, userId, courseId, role, content, JSON.stringify(citations)])
+  await execute('UPDATE ai_chat_sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = $1', [sessionId])
+  return { id: messageId, sessionId, userId, courseId, role, content, citations, createdAt: row.created_at }
 }
 
-export function listAiMessages(sessionId, userId, courseId) {
-  return db.prepare(`
-    SELECT id, session_id AS sessionId, user_id AS userId, course_id AS courseId, role, content, citations, created_at AS createdAt
-    FROM ai_chat_messages
-    WHERE session_id = ? AND user_id = ? AND course_id = ?
-    ORDER BY created_at ASC
-  `).all(sessionId, userId, courseId).map(message => ({
-    ...message,
-    citations: parseJson(message.citations, []),
-  }))
+export async function listAiMessages(sessionId, userId, courseId) {
+  const rows = await queryMany(`
+    SELECT id, session_id AS "sessionId", user_id AS "userId", course_id AS "courseId", role, content, citations, created_at AS "createdAt"
+    FROM ai_chat_messages WHERE session_id = $1 AND user_id = $2 AND course_id = $3 ORDER BY created_at ASC
+  `, [sessionId, userId, courseId])
+  return rows.map(message => ({ ...message, citations: parseJson(message.citations, []) }))
 }
 
 function leadFromRow(row) {
@@ -1161,16 +905,9 @@ function normalizePhone(value) {
   return String(value || '').replace(/[^\d+]/g, '').slice(0, 18)
 }
 
-export function createLead({
-  name = '',
-  phone = '',
-  email,
-  message = '',
-  courseId = null,
-  source = 'landing_form',
-  visitorId = null,
-  ipAddress = null,
-  userAgent = null,
+export async function createLead({
+  name = '', phone = '', email, message = '', courseId = null, source = 'landing_form',
+  visitorId = null, ipAddress = null, userAgent = null,
 }) {
   const normalizedName = String(name || '').trim()
   if (normalizedName.length < 2) throw new Error('Name is required')
@@ -1184,179 +921,107 @@ export function createLead({
   if (safeMessage.length < 5) throw new Error('Message is required')
   if (safeMessage.length > 2000) throw new Error('Message must be 2000 characters or fewer')
   const safeSource = VALID_LEAD_SOURCES.includes(source) ? source : 'website'
-  const recentDuplicate = db.prepare(`
-    SELECT id
-    FROM leads
-    WHERE lower(email) = ?
-      AND phone = ?
-      AND source = ?
-      AND created_at >= datetime('now', '-15 minutes')
-    LIMIT 1
-  `).get(normalizedEmail, normalizedPhone, safeSource)
+  const recentDuplicate = await queryOne(`
+    SELECT id FROM leads WHERE lower(email) = $1 AND phone = $2 AND source = $3
+      AND created_at >= CURRENT_TIMESTAMP - INTERVAL '15 minutes' LIMIT 1
+  `, [normalizedEmail, normalizedPhone, safeSource])
   if (recentDuplicate) throw new Error('We already received this request recently. Please wait a few minutes before submitting again.')
   const leadId = id('lead')
-  db.prepare(`
+  await execute(`
     INSERT INTO leads (id, name, phone, email, message, course_id, source, visitor_id, ip_address, user_agent)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    leadId,
-    normalizedName,
-    normalizedPhone,
-    normalizedEmail,
-    safeMessage,
-    courseId || null,
-    safeSource,
-    visitorId || null,
-    ipAddress || null,
-    userAgent || null
-  )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+  `, [leadId, normalizedName, normalizedPhone, normalizedEmail, safeMessage, courseId || null, safeSource, visitorId || null, ipAddress || null, userAgent || null])
   return getLead(leadId)
 }
 
-export function getLead(leadId) {
-  return leadFromRow(db.prepare(`
-    SELECT l.*, c.title AS course_title
-    FROM leads l
-    LEFT JOIN courses c ON c.id = l.course_id
-    WHERE l.id = ?
-  `).get(leadId))
+export async function getLead(leadId) {
+  return leadFromRow(await queryOne(`
+    SELECT l.*, c.title AS course_title FROM leads l LEFT JOIN courses c ON c.id = l.course_id WHERE l.id = $1
+  `, [leadId]))
 }
 
-export function listLeads(filters = {}) {
+export async function listLeads(filters = {}) {
   const clauses = []
-  const params = {}
-  if (filters.courseId) {
-    clauses.push('l.course_id = @courseId')
-    params.courseId = filters.courseId
-  }
-  if (filters.ownerId) {
-    clauses.push('l.owner_id = @ownerId')
-    params.ownerId = filters.ownerId
-  }
-  if (filters.stage) {
-    clauses.push('l.stage = @stage')
-    params.stage = normalizeLeadStage(filters.stage)
-  }
-  if (filters.status) {
-    clauses.push('l.stage = @status')
-    params.status = normalizeLeadStage(filters.status)
-  }
-  if (filters.source) {
-    clauses.push('l.source = @source')
-    params.source = filters.source
-  }
-  if (filters.search) {
-    clauses.push('(lower(l.name) LIKE @search OR lower(l.email) LIKE @search OR l.phone LIKE @search)')
-    params.search = `%${String(filters.search).trim().toLowerCase()}%`
-  }
-  if (filters.name) {
-    clauses.push('lower(l.name) LIKE @name')
-    params.name = `%${String(filters.name).trim().toLowerCase()}%`
-  }
-  if (filters.email) {
-    clauses.push('lower(l.email) LIKE @email')
-    params.email = `%${String(filters.email).trim().toLowerCase()}%`
-  }
-  if (filters.phone) {
-    clauses.push('l.phone LIKE @phone')
-    params.phone = `%${normalizePhone(filters.phone)}%`
-  }
+  const values = []
+  const add = (sql, value) => clauses.push(sql.replace('$value', parameter(values, value)))
+  if (filters.courseId) add('l.course_id = $value', filters.courseId)
+  if (filters.ownerId) add('l.owner_id = $value', filters.ownerId)
+  if (filters.stage) add('l.stage = $value', normalizeLeadStage(filters.stage))
+  if (filters.status) add('l.stage = $value', normalizeLeadStage(filters.status))
+  if (filters.source) add('l.source = $value', filters.source)
+  if (filters.search) add("(lower(l.name) LIKE $value OR lower(l.email) LIKE $value OR l.phone LIKE $value)", `%${String(filters.search).trim().toLowerCase()}%`)
+  if (filters.name) add('lower(l.name) LIKE $value', `%${String(filters.name).trim().toLowerCase()}%`)
+  if (filters.email) add('lower(l.email) LIKE $value', `%${String(filters.email).trim().toLowerCase()}%`)
+  if (filters.phone) add('l.phone LIKE $value', `%${normalizePhone(filters.phone)}%`)
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''
-  return db.prepare(`
-    SELECT l.*, c.title AS course_title
-    FROM leads l
-    LEFT JOIN courses c ON c.id = l.course_id
-    ${where}
-    ORDER BY l.created_at DESC
-  `).all(params).map(leadFromRow)
+  const rows = await queryMany(`
+    SELECT l.*, c.title AS course_title FROM leads l LEFT JOIN courses c ON c.id = l.course_id
+    ${where} ORDER BY l.created_at DESC
+  `, values)
+  return rows.map(leadFromRow)
 }
 
-export function updateLead(leadId, updates, actorId = null) {
-  const allowed = {
-    name: 'name',
-    phone: 'phone',
-    email: 'email',
-    message: 'message',
-    courseId: 'course_id',
-    source: 'source',
-    stage: 'stage',
-    status: 'stage',
-    ownerId: 'owner_id',
-  }
+export async function updateLead(leadId, updates, actorId = null) {
+  const allowed = { name: 'name', phone: 'phone', email: 'email', message: 'message', courseId: 'course_id', source: 'source', stage: 'stage', status: 'stage', ownerId: 'owner_id' }
   const sets = []
-  const params = { id: leadId }
+  const values = []
   for (const [key, column] of Object.entries(allowed)) {
-    if (updates[key] !== undefined) {
-      sets.push(`${column} = @${key}`)
-      if (key === 'email') params[key] = String(updates[key]).trim().toLowerCase()
-      else if (key === 'phone') params[key] = normalizePhone(updates[key])
-      else if (key === 'stage' || key === 'status') params[key] = normalizeLeadStage(updates[key])
-      else params[key] = updates[key]
-    }
+    if (updates[key] === undefined) continue
+    let value = updates[key]
+    if (key === 'email') value = String(value).trim().toLowerCase()
+    if (key === 'phone') value = normalizePhone(value)
+    if (key === 'stage' || key === 'status') value = normalizeLeadStage(value)
+    sets.push(`${column} = ${parameter(values, value)}`)
   }
   if (!sets.length) return getLead(leadId)
-  sets.push("updated_at = datetime('now')")
-  db.prepare(`UPDATE leads SET ${sets.join(', ')} WHERE id = @id`).run(params)
-  recordAudit('lead.update', actorId, 'lead', leadId, updates)
+  sets.push('updated_at = CURRENT_TIMESTAMP')
+  const leadParameter = parameter(values, leadId)
+  await execute(`UPDATE leads SET ${sets.join(', ')} WHERE id = ${leadParameter}`, values)
+  await recordAudit('lead.update', actorId, 'lead', leadId, updates)
   return getLead(leadId)
 }
 
-export function addLeadNote(leadId, authorId, note) {
-  if (!getLead(leadId)) return null
+export async function addLeadNote(leadId, authorId, note) {
+  if (!await getLead(leadId)) return null
   const noteId = id('lnote')
-  db.prepare(`
-    INSERT INTO lead_notes (id, lead_id, author_id, note)
-    VALUES (?, ?, ?, ?)
-  `).run(noteId, leadId, authorId || null, note)
-  recordAudit('lead.note', authorId, 'lead', leadId, {})
-  return db.prepare(`
-    SELECT id, lead_id AS leadId, author_id AS authorId, note, created_at AS createdAt
-    FROM lead_notes WHERE id = ?
-  `).get(noteId)
+  const row = await queryOne(`
+    INSERT INTO lead_notes (id, lead_id, author_id, note) VALUES ($1, $2, $3, $4)
+    RETURNING id, lead_id AS "leadId", author_id AS "authorId", note, created_at AS "createdAt"
+  `, [noteId, leadId, authorId || null, note])
+  await recordAudit('lead.note', authorId, 'lead', leadId, {})
+  return row
 }
 
-export function createFollowUp(leadId, ownerId, dueAt, note = '') {
-  if (!getLead(leadId)) return null
+export async function createFollowUp(leadId, ownerId, dueAt, note = '') {
+  if (!await getLead(leadId)) return null
   const followUpId = id('fup')
-  db.prepare(`
-    INSERT INTO follow_ups (id, lead_id, owner_id, due_at, note)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(followUpId, leadId, ownerId || null, dueAt, note)
-  recordAudit('follow_up.create', ownerId, 'lead', leadId, { dueAt })
+  await execute('INSERT INTO follow_ups (id, lead_id, owner_id, due_at, note) VALUES ($1, $2, $3, $4, $5)', [followUpId, leadId, ownerId || null, dueAt, note])
+  await recordAudit('follow_up.create', ownerId, 'lead', leadId, { dueAt })
   return getFollowUp(followUpId)
 }
 
-export function getFollowUp(followUpId) {
-  return db.prepare(`
-    SELECT id, lead_id AS leadId, owner_id AS ownerId, due_at AS dueAt, note, status, created_at AS createdAt
-    FROM follow_ups WHERE id = ?
-  `).get(followUpId)
+export async function getFollowUp(followUpId) {
+  return queryOne(`
+    SELECT id, lead_id AS "leadId", owner_id AS "ownerId", due_at AS "dueAt", note, status, created_at AS "createdAt"
+    FROM follow_ups WHERE id = $1
+  `, [followUpId])
 }
 
-export function listFollowUps(filters = {}) {
-  const clauses = []
-  const params = {}
-  if (filters.status) {
-    clauses.push('status = @status')
-    params.status = filters.status
-  }
-  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''
-  return db.prepare(`
-    SELECT id, lead_id AS leadId, owner_id AS ownerId, due_at AS dueAt, note, status, created_at AS createdAt
-    FROM follow_ups
-    ${where}
-    ORDER BY due_at ASC
-  `).all(params)
+export async function listFollowUps(filters = {}) {
+  const values = []
+  const where = filters.status ? `WHERE status = ${parameter(values, filters.status)}` : ''
+  return queryMany(`
+    SELECT id, lead_id AS "leadId", owner_id AS "ownerId", due_at AS "dueAt", note, status, created_at AS "createdAt"
+    FROM follow_ups ${where} ORDER BY due_at ASC
+  `, values)
 }
 
-export function getAuditLogs(limit = 50) {
-  return db.prepare(`
-    SELECT a.*, u.email AS actor_email
-    FROM audit_logs a
-    LEFT JOIN users u ON u.id = a.actor_id
-    ORDER BY a.created_at DESC
-    LIMIT ?
-  `).all(limit).map(row => ({
+export async function getAuditLogs(limit = 50) {
+  const rows = await queryMany(`
+    SELECT a.*, u.email AS actor_email FROM audit_logs a LEFT JOIN users u ON u.id = a.actor_id
+    ORDER BY a.created_at DESC LIMIT $1
+  `, [Number(limit) || 50])
+  return rows.map(row => ({
     id: row.id,
     actorId: row.actor_id,
     actorEmail: row.actor_email,
@@ -1368,23 +1033,20 @@ export function getAuditLogs(limit = 50) {
   }))
 }
 
-export function listDocumentAccessLogs(limit = 100) {
-  return db.prepare(`
+export async function listDocumentAccessLogs(limit = 100) {
+  return queryMany(`
     SELECT dl.*, u.email AS user_email, c.title AS course_title, cm.title AS material_title
-    FROM document_access_logs dl
-    JOIN users u ON u.id = dl.user_id
-    JOIN courses c ON c.id = dl.course_id
-    JOIN course_materials cm ON cm.id = dl.material_id
-    ORDER BY dl.created_at DESC
-    LIMIT ?
-  `).all(limit)
+    FROM document_access_logs dl JOIN users u ON u.id = dl.user_id
+    JOIN courses c ON c.id = dl.course_id JOIN course_materials cm ON cm.id = dl.material_id
+    ORDER BY dl.created_at DESC LIMIT $1
+  `, [Number(limit) || 100])
 }
 
-export function recordDocumentAccess({ userId, courseId, materialId, event, ipAddress, userAgent }) {
-  db.prepare(`
+export async function recordDocumentAccess({ userId, courseId, materialId, event, ipAddress, userAgent }) {
+  await execute(`
     INSERT INTO document_access_logs (id, user_id, course_id, material_id, event, ip_address, user_agent)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(id('doclog'), userId, courseId, materialId, event, ipAddress || null, userAgent || null)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+  `, [id('doclog'), userId, courseId, materialId, event, ipAddress || null, userAgent || null])
 }
 
 function blogFromRow(row) {
@@ -1407,37 +1069,22 @@ function blogFromRow(row) {
   }
 }
 
-export function listPublishedBlogs() {
-  return db.prepare(`
-    SELECT * FROM blogs
-    WHERE status = 'published'
-    ORDER BY published_at DESC, created_at DESC
-  `).all().map(blogFromRow)
+export async function listPublishedBlogs() {
+  return (await queryMany("SELECT * FROM blogs WHERE status = 'published' ORDER BY published_at DESC, created_at DESC")).map(blogFromRow)
 }
 
-export function getPublishedBlogBySlug(slug) {
-  return blogFromRow(db.prepare(`
-    SELECT * FROM blogs
-    WHERE slug = ? AND status = 'published'
-  `).get(slug))
+export async function getPublishedBlogBySlug(slug) {
+  return blogFromRow(await queryOne("SELECT * FROM blogs WHERE slug = $1 AND status = 'published'", [slug]))
 }
 
-export function ingestRagSource(data, actorId = null) {
-  if (!getCourseById(data.courseId)) throw new Error('Course not found')
+export async function ingestRagSource(data, actorId = null) {
+  if (!await getCourseById(data.courseId)) throw new Error('Course not found')
   const materialId = id('rag')
-  db.prepare(`
+  await execute(`
     INSERT INTO course_materials (id, course_id, lesson_id, type, title, description, content, is_public, sort_order)
-    VALUES (?, ?, ?, 'text', ?, ?, ?, 0, ?)
-  `).run(
-    materialId,
-    data.courseId,
-    data.lessonId || null,
-    String(data.title).trim(),
-    'Course-specific knowledge source added through cliadm.',
-    String(data.content || '').slice(0, 100000),
-    Number(data.sortOrder || 999)
-  )
-  recordAudit('rag.ingest', actorId, 'course_material', materialId, { courseId: data.courseId })
+    VALUES ($1, $2, $3, 'text', $4, $5, $6, false, $7)
+  `, [materialId, data.courseId, data.lessonId || null, String(data.title).trim(), 'Course-specific knowledge source added through cliadm.', String(data.content || '').slice(0, 100000), Number(data.sortOrder || 999)])
+  await recordAudit('rag.ingest', actorId, 'course_material', materialId, { courseId: data.courseId })
   return { source: { id: materialId, courseId: data.courseId, title: data.title, type: 'text', status: 'ready' } }
 }
 
@@ -1456,12 +1103,6 @@ function labFromRow(row) {
   return { id: row.id, courseId: row.course_id, lessonId: row.lesson_id, title: row.title, description: row.description, points: Number(row.points || 0), hints: parseJson(row.hints, []), dockerReady: Boolean(row.docker_ready), unsafeCloudInfra: false, status: row.status, createdAt: row.created_at, updatedAt: row.updated_at }
 }
 
-function quizFromRow(row) {
-  if (!row) return null
-  const questions = db.prepare('SELECT * FROM quiz_questions WHERE quiz_id = ? ORDER BY sort_order ASC, rowid ASC').all(row.id).map(question => ({ id: question.id, prompt: question.prompt, choices: parseJson(question.choices, []), answer: question.answer }))
-  return { id: row.id, courseId: row.course_id, title: row.title, status: row.status, questions, createdAt: row.created_at }
-}
-
 function assignmentFromRow(row) {
   if (!row) return null
   return { id: row.id, courseId: row.course_id, title: row.title, description: row.description, status: row.status, dueAt: row.due_at, createdAt: row.created_at }
@@ -1472,70 +1113,92 @@ function certificateFromRow(row) {
   return { id: row.id, userId: row.user_id, courseId: row.course_id, code: row.verification_code, issuedBy: row.issued_by, status: row.status, issuedAt: row.issued_at, userName: row.user_name, courseTitle: row.course_title }
 }
 
-export function getBatchById(batchId) {
-  const row = db.prepare('SELECT * FROM batches WHERE id = ?').get(batchId)
+async function quizFromRow(row) {
+  if (!row) return null
+  const questions = await queryMany('SELECT * FROM quiz_questions WHERE quiz_id = $1 ORDER BY sort_order ASC, id ASC', [row.id])
+  return {
+    id: row.id,
+    courseId: row.course_id,
+    title: row.title,
+    status: row.status,
+    questions: questions.map(question => ({ id: question.id, prompt: question.prompt, choices: parseJson(question.choices, []), answer: question.answer })),
+    createdAt: row.created_at,
+  }
+}
+
+export async function getBatchById(batchId) {
+  const row = await queryOne('SELECT * FROM batches WHERE id = $1', [batchId])
   return row ? { id: row.id, courseId: row.course_id, name: row.name, status: row.status, startsAt: row.starts_at, endsAt: row.ends_at, createdAt: row.created_at } : null
 }
 
-export function hasBatchMembership(userId, courseId, batchId) {
-  return Boolean(db.prepare("SELECT 1 FROM enrollments WHERE user_id = ? AND course_id = ? AND batch_id = ? AND status = 'active'").get(userId, courseId, batchId))
+export async function hasBatchMembership(userId, courseId, batchId) {
+  return Boolean(await queryOne("SELECT 1 FROM enrollments WHERE user_id = $1 AND course_id = $2 AND batch_id = $3 AND status = 'active'", [userId, courseId, batchId]))
 }
 
-export function isInstructorAssigned(userId, courseId) {
-  return Boolean(db.prepare('SELECT 1 FROM courses WHERE id = ? AND instructor_id = ?').get(courseId, userId))
+export async function isInstructorAssigned(userId, courseId) {
+  return Boolean(await queryOne('SELECT 1 FROM courses WHERE id = $1 AND instructor_id = $2', [courseId, userId]))
 }
 
-export function listVideosByCourse(courseId) {
-  return db.prepare("SELECT * FROM course_videos WHERE course_id = ? AND status = 'active' ORDER BY sort_order ASC, created_at ASC").all(courseId).map(videoFromRow)
+export async function listVideosByCourse(courseId) {
+  return (await queryMany("SELECT * FROM course_videos WHERE course_id = $1 AND status = 'active' ORDER BY sort_order ASC, created_at ASC", [courseId])).map(videoFromRow)
 }
 
-export function registerVideo(data, actorId) {
-  if (!getCourseById(data.courseId)) throw new Error('Course not found')
+export async function registerVideo(data, actorId) {
+  if (!await getCourseById(data.courseId)) throw new Error('Course not found')
   const videoId = id('vid')
-  db.prepare('INSERT INTO course_videos (id, course_id, lesson_id, title, provider, embed_id, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)').run(videoId, data.courseId, data.lessonId || null, String(data.title).trim(), String(data.provider).trim(), String(data.embedId).trim(), Number(data.order || 0))
-  recordAudit('video.register', actorId, 'video', videoId, { courseId: data.courseId, provider: data.provider })
-  return videoFromRow(db.prepare('SELECT * FROM course_videos WHERE id = ?').get(videoId))
+  const row = await queryOne(`
+    INSERT INTO course_videos (id, course_id, lesson_id, title, provider, embed_id, sort_order)
+    VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *
+  `, [videoId, data.courseId, data.lessonId || null, String(data.title).trim(), String(data.provider).trim(), String(data.embedId).trim(), Number(data.order || 0)])
+  await recordAudit('video.register', actorId, 'video', videoId, { courseId: data.courseId, provider: data.provider })
+  return videoFromRow(row)
 }
 
-export function listDocumentsByCourse(courseId) {
-  return db.prepare("SELECT * FROM protected_documents WHERE course_id = ? AND status = 'active' ORDER BY created_at ASC").all(courseId).map(documentFromRow)
+export async function listDocumentsByCourse(courseId) {
+  return (await queryMany("SELECT * FROM protected_documents WHERE course_id = $1 AND status = 'active' ORDER BY created_at ASC", [courseId])).map(documentFromRow)
 }
 
-export function getDocumentById(documentId) {
-  return documentFromRow(db.prepare('SELECT * FROM protected_documents WHERE id = ?').get(documentId))
+export async function getDocumentById(documentId) {
+  return documentFromRow(await queryOne('SELECT * FROM protected_documents WHERE id = $1', [documentId]))
 }
 
-export function registerDocument(data, actorId) {
-  if (!getCourseById(data.courseId)) throw new Error('Course not found')
+export async function registerDocument(data, actorId) {
+  if (!await getCourseById(data.courseId)) throw new Error('Course not found')
   const documentId = id('doc')
-  db.prepare('INSERT INTO protected_documents (id, course_id, lesson_id, title, storage_key, page_count) VALUES (?, ?, ?, ?, ?, ?)').run(documentId, data.courseId, data.lessonId || null, String(data.title).trim(), String(data.storageKey).trim(), data.pageCount ? Number(data.pageCount) : null)
-  recordAudit('document.register', actorId, 'document', documentId, { courseId: data.courseId, title: data.title })
+  await execute(`
+    INSERT INTO protected_documents (id, course_id, lesson_id, title, storage_key, page_count)
+    VALUES ($1, $2, $3, $4, $5, $6)
+  `, [documentId, data.courseId, data.lessonId || null, String(data.title).trim(), String(data.storageKey).trim(), data.pageCount ? Number(data.pageCount) : null])
+  await recordAudit('document.register', actorId, 'document', documentId, { courseId: data.courseId, title: data.title })
   return getDocumentById(documentId)
 }
 
-export function logDocumentAccess(documentId, userId, metadata = {}) {
-  const document = getDocumentById(documentId)
+export async function logDocumentAccess(documentId, userId, metadata = {}) {
+  const document = await getDocumentById(documentId)
   if (!document) return null
   const eventId = id('docevt')
   const safeMetadata = { requestId: metadata.requestId || null, userAgent: String(metadata.userAgent || '').slice(0, 300) }
-  db.prepare('INSERT INTO protected_document_events (id, document_id, course_id, user_id, page, event, metadata) VALUES (?, ?, ?, ?, ?, ?, ?)').run(eventId, documentId, document.courseId, userId, Number(metadata.page || 1), metadata.event || 'view', JSON.stringify(safeMetadata))
-  recordAudit('document.access', userId, 'document', documentId, { courseId: document.courseId, page: Number(metadata.page || 1) })
+  await execute(`
+    INSERT INTO protected_document_events (id, document_id, course_id, user_id, page, event, metadata)
+    VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
+  `, [eventId, documentId, document.courseId, userId, Number(metadata.page || 1), metadata.event || 'view', JSON.stringify(safeMetadata)])
+  await recordAudit('document.access', userId, 'document', documentId, { courseId: document.courseId, page: Number(metadata.page || 1) })
   return { id: eventId, documentId, courseId: document.courseId, userId, page: Number(metadata.page || 1), createdAt: new Date().toISOString() }
 }
 
-export function listLabsByCourse(courseId) {
-  return db.prepare("SELECT * FROM labs WHERE course_id = ? AND status != 'archived' ORDER BY created_at ASC").all(courseId).map(labFromRow)
+export async function listLabsByCourse(courseId) {
+  return (await queryMany("SELECT * FROM labs WHERE course_id = $1 AND status != 'archived' ORDER BY created_at ASC", [courseId])).map(labFromRow)
 }
 
-export function getLabById(labId) {
-  return labFromRow(db.prepare('SELECT * FROM labs WHERE id = ?').get(labId))
+export async function getLabById(labId) {
+  return labFromRow(await queryOne('SELECT * FROM labs WHERE id = $1', [labId]))
 }
 
-export function assignLabToCourse(labId, courseId, actorId) {
-  if (!getCourseById(courseId)) throw new Error('Course not found')
-  const result = db.prepare("UPDATE labs SET course_id = ?, updated_at = datetime('now') WHERE id = ?").run(courseId, labId)
-  if (!result.changes) return null
-  recordAudit('lab.assign_course', actorId, 'lab', labId, { courseId })
+export async function assignLabToCourse(labId, courseId, actorId) {
+  if (!await getCourseById(courseId)) throw new Error('Course not found')
+  const result = await execute('UPDATE labs SET course_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id', [courseId, labId])
+  if (!result.rowCount) return null
+  await recordAudit('lab.assign_course', actorId, 'lab', labId, { courseId })
   return getLabById(labId)
 }
 
@@ -1543,73 +1206,101 @@ function hashLabFlag(value) {
   return createHash('sha256').update(`${process.env.LAB_FLAG_SALT || 'local-lab-flag-salt'}:${String(value || '').trim().toUpperCase()}`).digest('hex')
 }
 
-export function createLab(data, actorId) {
-  if (!getCourseById(data.courseId)) throw new Error('Course not found')
+export async function createLab(data, actorId) {
+  if (!await getCourseById(data.courseId)) throw new Error('Course not found')
   const labId = id('lab')
-  db.prepare('INSERT INTO labs (id, course_id, lesson_id, title, description, points, hints, docker_ready, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(labId, data.courseId, data.lessonId || null, String(data.title).trim(), String(data.description || ''), Number(data.points || 0), JSON.stringify(Array.isArray(data.hints) ? data.hints : []), data.dockerReady === false ? 0 : 1, data.status || 'draft')
-  if (data.flag) db.prepare('INSERT INTO lab_flags (id, lab_id, flag_hash, points) VALUES (?, ?, ?, ?)').run(id('flag'), labId, hashLabFlag(data.flag), Number(data.points || 0))
-  recordAudit('lab.create', actorId, 'lab', labId, { courseId: data.courseId, title: data.title })
+  await transaction(async client => {
+    await execute(`
+      INSERT INTO labs (id, course_id, lesson_id, title, description, points, hints, docker_ready, status)
+      VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9)
+    `, [labId, data.courseId, data.lessonId || null, String(data.title).trim(), String(data.description || ''), Number(data.points || 0), JSON.stringify(Array.isArray(data.hints) ? data.hints : []), data.dockerReady !== false, data.status || 'draft'], client)
+    if (data.flag) {
+      await execute('INSERT INTO lab_flags (id, lab_id, flag_hash, points) VALUES ($1, $2, $3, $4)', [id('flag'), labId, hashLabFlag(data.flag), Number(data.points || 0)], client)
+    }
+    await recordAudit('lab.create', actorId, 'lab', labId, { courseId: data.courseId, title: data.title }, client)
+  })
   return getLabById(labId)
 }
 
-export function launchLab(labId, userId) {
-  const lab = getLabById(labId)
+export async function launchLab(labId, userId) {
+  const lab = await getLabById(labId)
   if (!lab) return null
   const attemptId = id('labatt')
-  db.prepare('INSERT INTO lab_attempts (id, lab_id, course_id, user_id) VALUES (?, ?, ?, ?)').run(attemptId, labId, lab.courseId, userId)
-  recordAudit('lab.launch', userId, 'lab', labId, { attemptId })
-  return db.prepare('SELECT id, lab_id AS labId, course_id AS courseId, user_id AS userId, status, score, started_at AS startedAt, submitted_at AS submittedAt FROM lab_attempts WHERE id = ?').get(attemptId)
+  const row = await queryOne(`
+    INSERT INTO lab_attempts (id, lab_id, course_id, user_id) VALUES ($1, $2, $3, $4)
+    RETURNING id, lab_id AS "labId", course_id AS "courseId", user_id AS "userId", status, score, started_at AS "startedAt", submitted_at AS "submittedAt"
+  `, [attemptId, labId, lab.courseId, userId])
+  await recordAudit('lab.launch', userId, 'lab', labId, { attemptId })
+  return row
 }
 
-export function submitLabFlag(labId, userId, flag) {
-  const lab = getLabById(labId)
+export async function submitLabFlag(labId, userId, flag) {
+  const lab = await getLabById(labId)
   if (!lab) return null
-  const matched = db.prepare('SELECT points FROM lab_flags WHERE lab_id = ? AND flag_hash = ?').get(labId, hashLabFlag(flag))
+  const matched = await queryOne('SELECT points FROM lab_flags WHERE lab_id = $1 AND flag_hash = $2', [labId, hashLabFlag(flag)])
   const attemptId = id('labatt')
   const status = matched ? 'passed' : 'failed'
   const score = Number(matched?.points || 0)
-  db.prepare("INSERT INTO lab_attempts (id, lab_id, course_id, user_id, status, score, submitted_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))").run(attemptId, labId, lab.courseId, userId, status, score)
-  recordAudit('lab.submit_flag', userId, 'lab', labId, { passed: Boolean(matched), score })
-  return db.prepare('SELECT id, lab_id AS labId, course_id AS courseId, user_id AS userId, status, score, started_at AS startedAt, submitted_at AS submittedAt FROM lab_attempts WHERE id = ?').get(attemptId)
+  const row = await queryOne(`
+    INSERT INTO lab_attempts (id, lab_id, course_id, user_id, status, score, submitted_at)
+    VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+    RETURNING id, lab_id AS "labId", course_id AS "courseId", user_id AS "userId", status, score, started_at AS "startedAt", submitted_at AS "submittedAt"
+  `, [attemptId, labId, lab.courseId, userId, status, score])
+  await recordAudit('lab.submit_flag', userId, 'lab', labId, { passed: Boolean(matched), score })
+  return row
 }
 
-export function listLabAttempts(filter = {}) {
+export async function listLabAttempts(filter = {}) {
   const clauses = []
-  const params = {}
+  const values = []
   for (const [key, column] of Object.entries({ courseId: 'course_id', userId: 'user_id', labId: 'lab_id' })) {
-    if (filter[key]) { clauses.push(`${column} = @${key}`); params[key] = filter[key] }
+    if (filter[key]) clauses.push(`${column} = ${parameter(values, filter[key])}`)
   }
-  return db.prepare(`SELECT id, lab_id AS labId, course_id AS courseId, user_id AS userId, status, score, started_at AS startedAt, submitted_at AS submittedAt FROM lab_attempts ${clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''} ORDER BY started_at DESC`).all(params)
+  return queryMany(`
+    SELECT id, lab_id AS "labId", course_id AS "courseId", user_id AS "userId", status, score,
+      started_at AS "startedAt", submitted_at AS "submittedAt"
+    FROM lab_attempts ${clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''} ORDER BY started_at DESC
+  `, values)
 }
 
-export function createQuiz(data, actorId) {
-  if (!getCourseById(data.courseId)) throw new Error('Course not found')
+export async function createQuiz(data, actorId) {
+  if (!await getCourseById(data.courseId)) throw new Error('Course not found')
   const quizId = id('quiz')
-  db.prepare('INSERT INTO quizzes (id, course_id, title, status) VALUES (?, ?, ?, ?)').run(quizId, data.courseId, String(data.title).trim(), data.status || 'draft')
-  for (const question of Array.isArray(data.questions) ? data.questions : []) addQuizQuestion(quizId, question, actorId)
-  recordAudit('quiz.create', actorId, 'quiz', quizId, { courseId: data.courseId, title: data.title })
+  await transaction(async client => {
+    await execute('INSERT INTO quizzes (id, course_id, title, status) VALUES ($1, $2, $3, $4)', [quizId, data.courseId, String(data.title).trim(), data.status || 'draft'], client)
+    for (const question of Array.isArray(data.questions) ? data.questions : []) {
+      await addQuizQuestion(quizId, question, actorId, client)
+    }
+    await recordAudit('quiz.create', actorId, 'quiz', quizId, { courseId: data.courseId, title: data.title }, client)
+  })
   return getQuizById(quizId)
 }
 
-export function addQuizQuestion(quizId, question, actorId) {
-  if (!db.prepare('SELECT 1 FROM quizzes WHERE id = ?').get(quizId)) return null
-  if (!Array.isArray(question.choices) || question.choices.length < 2 || !question.choices.includes(question.answer)) throw new Error('Question choices must include the answer')
+export async function addQuizQuestion(quizId, question, actorId, client) {
+  if (!await queryOne('SELECT 1 FROM quizzes WHERE id = $1', [quizId], client)) return null
+  if (!Array.isArray(question.choices) || question.choices.length < 2 || !question.choices.includes(question.answer)) {
+    throw new Error('Question choices must include the answer')
+  }
   const questionId = id('qq')
-  db.prepare('INSERT INTO quiz_questions (id, quiz_id, prompt, choices, answer, sort_order) VALUES (?, ?, ?, ?, ?, ?)').run(questionId, quizId, String(question.prompt).trim(), JSON.stringify(question.choices), String(question.answer), Number(question.order || 0))
-  recordAudit('quiz.add_question', actorId, 'quiz', quizId, { questionId })
+  await execute(`
+    INSERT INTO quiz_questions (id, quiz_id, prompt, choices, answer, sort_order)
+    VALUES ($1, $2, $3, $4::jsonb, $5, $6)
+  `, [questionId, quizId, String(question.prompt).trim(), JSON.stringify(question.choices), String(question.answer), Number(question.order || 0)], client)
+  await recordAudit('quiz.add_question', actorId, 'quiz', quizId, { questionId }, client)
   return { id: questionId, prompt: question.prompt, choices: question.choices, answer: question.answer }
 }
 
-export function listQuizzesByCourse(courseId) {
-  return db.prepare('SELECT * FROM quizzes WHERE course_id = ? ORDER BY created_at ASC').all(courseId).map(quizFromRow)
+export async function listQuizzesByCourse(courseId) {
+  const rows = await queryMany('SELECT * FROM quizzes WHERE course_id = $1 ORDER BY created_at ASC', [courseId])
+  return Promise.all(rows.map(quizFromRow))
 }
 
-export function getQuizById(quizId) {
-  return quizFromRow(db.prepare('SELECT * FROM quizzes WHERE id = ?').get(quizId))
+export async function getQuizById(quizId) {
+  return quizFromRow(await queryOne('SELECT * FROM quizzes WHERE id = $1', [quizId]))
 }
 
-export function submitQuizAttempt(quizId, userId, answers = {}) {
-  const quiz = getQuizById(quizId)
+export async function submitQuizAttempt(quizId, userId, answers = {}) {
+  const quiz = await getQuizById(quizId)
   if (!quiz) return null
   const correct = quiz.questions.filter(question => answers[question.id] === question.answer).length
   const score = quiz.questions.length ? Math.round((correct / quiz.questions.length) * 100) : 0
@@ -1621,107 +1312,150 @@ export function submitQuizAttempt(quizId, userId, answers = {}) {
     correct: answers[question.id] === question.answer,
   }))
   const attemptId = id('qatt')
-  db.prepare('INSERT INTO quiz_attempts (id, quiz_id, course_id, user_id, answers, score) VALUES (?, ?, ?, ?, ?, ?)').run(attemptId, quizId, quiz.courseId, userId, JSON.stringify(answers), score)
-  recordAudit('quiz.submit', userId, 'quiz', quizId, { score })
+  await execute(`
+    INSERT INTO quiz_attempts (id, quiz_id, course_id, user_id, answers, score)
+    VALUES ($1, $2, $3, $4, $5::jsonb, $6)
+  `, [attemptId, quizId, quiz.courseId, userId, JSON.stringify(answers), score])
+  await recordAudit('quiz.submit', userId, 'quiz', quizId, { score })
   return { id: attemptId, quizId, courseId: quiz.courseId, userId, answers, results, score, submittedAt: new Date().toISOString() }
 }
 
-export function createAssignment(data, actorId) {
-  if (!getCourseById(data.courseId)) throw new Error('Course not found')
+export async function createAssignment(data, actorId) {
+  if (!await getCourseById(data.courseId)) throw new Error('Course not found')
   const assignmentId = id('asn')
-  db.prepare('INSERT INTO assignments (id, course_id, title, description, status, due_at) VALUES (?, ?, ?, ?, ?, ?)').run(assignmentId, data.courseId, String(data.title).trim(), String(data.description || ''), data.status || 'draft', data.dueAt || null)
-  recordAudit('assignment.create', actorId, 'assignment', assignmentId, { courseId: data.courseId })
+  await execute(`
+    INSERT INTO assignments (id, course_id, title, description, status, due_at)
+    VALUES ($1, $2, $3, $4, $5, $6)
+  `, [assignmentId, data.courseId, String(data.title).trim(), String(data.description || ''), data.status || 'draft', data.dueAt || null])
+  await recordAudit('assignment.create', actorId, 'assignment', assignmentId, { courseId: data.courseId })
   return getAssignmentById(assignmentId)
 }
 
-export function getAssignmentById(assignmentId) {
-  return assignmentFromRow(db.prepare('SELECT * FROM assignments WHERE id = ?').get(assignmentId))
+export async function getAssignmentById(assignmentId) {
+  return assignmentFromRow(await queryOne('SELECT * FROM assignments WHERE id = $1', [assignmentId]))
 }
 
-export function listAssignmentsByCourse(courseId) {
-  return db.prepare('SELECT * FROM assignments WHERE course_id = ? ORDER BY created_at ASC').all(courseId).map(assignmentFromRow)
+export async function listAssignmentsByCourse(courseId) {
+  return (await queryMany('SELECT * FROM assignments WHERE course_id = $1 ORDER BY created_at ASC', [courseId])).map(assignmentFromRow)
 }
 
-export function submitAssignment(assignmentId, userId, content) {
-  const assignment = getAssignmentById(assignmentId)
+const SUBMISSION_SELECT = `
+  SELECT id, assignment_id AS "assignmentId", course_id AS "courseId", user_id AS "userId", content,
+    status, score, feedback, reviewed_by AS "reviewedBy", submitted_at AS "submittedAt", reviewed_at AS "reviewedAt"
+  FROM assignment_submissions
+`
+
+export async function submitAssignment(assignmentId, userId, content) {
+  const assignment = await getAssignmentById(assignmentId)
   if (!assignment) return null
   const submissionId = id('sub')
-  db.prepare('INSERT INTO assignment_submissions (id, assignment_id, course_id, user_id, content) VALUES (?, ?, ?, ?, ?)').run(submissionId, assignmentId, assignment.courseId, userId, String(content).slice(0, 50000))
-  recordAudit('assignment.submit', userId, 'assignment', assignmentId, {})
-  return db.prepare('SELECT id, assignment_id AS assignmentId, course_id AS courseId, user_id AS userId, content, status, score, feedback, reviewed_by AS reviewedBy, submitted_at AS submittedAt, reviewed_at AS reviewedAt FROM assignment_submissions WHERE id = ?').get(submissionId)
+  await execute('INSERT INTO assignment_submissions (id, assignment_id, course_id, user_id, content) VALUES ($1, $2, $3, $4, $5)', [submissionId, assignmentId, assignment.courseId, userId, String(content).slice(0, 50000)])
+  await recordAudit('assignment.submit', userId, 'assignment', assignmentId, {})
+  return queryOne(`${SUBMISSION_SELECT} WHERE id = $1`, [submissionId])
 }
 
-export function reviewAssignment(submissionId, reviewerId, review) {
-  const result = db.prepare("UPDATE assignment_submissions SET status = 'reviewed', score = ?, feedback = ?, reviewed_by = ?, reviewed_at = datetime('now') WHERE id = ?").run(review.score === undefined ? null : Number(review.score), review.feedback || null, reviewerId, submissionId)
-  if (!result.changes) return null
-  recordAudit('assignment.review', reviewerId, 'submission', submissionId, { score: review.score })
-  return db.prepare('SELECT id, assignment_id AS assignmentId, course_id AS courseId, user_id AS userId, content, status, score, feedback, reviewed_by AS reviewedBy, submitted_at AS submittedAt, reviewed_at AS reviewedAt FROM assignment_submissions WHERE id = ?').get(submissionId)
+export async function reviewAssignment(submissionId, reviewerId, review) {
+  const result = await execute(`
+    UPDATE assignment_submissions SET status = 'reviewed', score = $1, feedback = $2,
+      reviewed_by = $3, reviewed_at = CURRENT_TIMESTAMP WHERE id = $4 RETURNING id
+  `, [review.score === undefined ? null : Number(review.score), review.feedback || null, reviewerId, submissionId])
+  if (!result.rowCount) return null
+  await recordAudit('assignment.review', reviewerId, 'submission', submissionId, { score: review.score })
+  return queryOne(`${SUBMISSION_SELECT} WHERE id = $1`, [submissionId])
 }
 
-export function getAssignmentSubmission(submissionId) {
-  return db.prepare('SELECT id, assignment_id AS assignmentId, course_id AS courseId, user_id AS userId, content, status, score, feedback, reviewed_by AS reviewedBy, submitted_at AS submittedAt, reviewed_at AS reviewedAt FROM assignment_submissions WHERE id = ?').get(submissionId)
+export async function getAssignmentSubmission(submissionId) {
+  return queryOne(`${SUBMISSION_SELECT} WHERE id = $1`, [submissionId])
 }
 
-export function getCourseProgress(userId, courseId) {
-  const row = db.prepare('SELECT * FROM user_progress WHERE user_id = ? AND course_id = ? AND lesson_id IS NULL ORDER BY updated_at DESC LIMIT 1').get(userId, courseId)
-  return row ? { id: row.id, userId: row.user_id, courseId: row.course_id, lessonProgress: row.lesson_progress, videoProgress: row.video_progress, documentProgress: row.document_progress, labProgress: row.lab_progress, quizProgress: row.quiz_progress, completionPercentage: row.completion_percentage, updatedAt: row.updated_at } : { id: null, userId, courseId, lessonProgress: 0, videoProgress: 0, documentProgress: 0, labProgress: 0, quizProgress: 0, completionPercentage: 0 }
+export async function getCourseProgress(userId, courseId) {
+  const row = await queryOne('SELECT * FROM user_progress WHERE user_id = $1 AND course_id = $2 AND lesson_id IS NULL ORDER BY updated_at DESC LIMIT 1', [userId, courseId])
+  return row
+    ? { id: row.id, userId: row.user_id, courseId: row.course_id, lessonProgress: row.lesson_progress, videoProgress: row.video_progress, documentProgress: row.document_progress, labProgress: row.lab_progress, quizProgress: row.quiz_progress, completionPercentage: row.completion_percentage, updatedAt: row.updated_at }
+    : { id: null, userId, courseId, lessonProgress: 0, videoProgress: 0, documentProgress: 0, labProgress: 0, quizProgress: 0, completionPercentage: 0 }
 }
 
-export function updateCourseProgress(userId, courseId, updates) {
-  const current = getCourseProgress(userId, courseId)
+export async function updateCourseProgress(userId, courseId, updates) {
+  const current = await getCourseProgress(userId, courseId)
   const values = {}
-  for (const key of ['lessonProgress', 'videoProgress', 'documentProgress', 'labProgress', 'quizProgress']) values[key] = Math.max(0, Math.min(100, Number(updates[key] ?? current[key] ?? 0)))
+  for (const key of ['lessonProgress', 'videoProgress', 'documentProgress', 'labProgress', 'quizProgress']) {
+    values[key] = Math.max(0, Math.min(100, Number(updates[key] ?? current[key] ?? 0)))
+  }
   const completion = Math.round(Object.values(values).reduce((sum, value) => sum + value, 0) / 5)
   if (current.id) {
-    db.prepare("UPDATE user_progress SET lesson_progress = ?, video_progress = ?, document_progress = ?, lab_progress = ?, quiz_progress = ?, completion_percentage = ?, updated_at = datetime('now') WHERE id = ?").run(values.lessonProgress, values.videoProgress, values.documentProgress, values.labProgress, values.quizProgress, completion, current.id)
+    await execute(`
+      UPDATE user_progress SET lesson_progress = $1, video_progress = $2, document_progress = $3,
+        lab_progress = $4, quiz_progress = $5, completion_percentage = $6, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $7
+    `, [values.lessonProgress, values.videoProgress, values.documentProgress, values.labProgress, values.quizProgress, completion, current.id])
   } else {
-    db.prepare('INSERT INTO user_progress (id, user_id, course_id, lesson_id, completion_percentage, lesson_progress, video_progress, document_progress, lab_progress, quiz_progress) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)').run(id('prg'), userId, courseId, completion, values.lessonProgress, values.videoProgress, values.documentProgress, values.labProgress, values.quizProgress)
+    await execute(`
+      INSERT INTO user_progress (id, user_id, course_id, lesson_id, completion_percentage, lesson_progress, video_progress, document_progress, lab_progress, quiz_progress)
+      VALUES ($1, $2, $3, NULL, $4, $5, $6, $7, $8, $9)
+    `, [id('prg'), userId, courseId, completion, values.lessonProgress, values.videoProgress, values.documentProgress, values.labProgress, values.quizProgress])
   }
-  recordAudit('progress.update', userId, 'course', courseId, { completionPercentage: completion })
+  await recordAudit('progress.update', userId, 'course', courseId, { completionPercentage: completion })
   return getCourseProgress(userId, courseId)
 }
 
-export function issueCertificate(data, actorId) {
-  if (!hasActiveEnrollment(data.userId, data.courseId)) throw new Error('Active enrollment required')
+export async function issueCertificate(data, actorId) {
+  if (!await hasActiveEnrollment(data.userId, data.courseId)) throw new Error('Active enrollment required')
   const certificateId = id('cert')
   const code = data.code || `CLI-${randomUUID().replace(/-/g, '').slice(0, 16).toUpperCase()}`
-  db.prepare('INSERT INTO certificates (id, user_id, course_id, verification_code, issued_by) VALUES (?, ?, ?, ?, ?)').run(certificateId, data.userId, data.courseId, code, actorId || null)
-  recordAudit('certificate.issue', actorId, 'certificate', certificateId, { userId: data.userId, courseId: data.courseId })
+  await execute('INSERT INTO certificates (id, user_id, course_id, verification_code, issued_by) VALUES ($1, $2, $3, $4, $5)', [certificateId, data.userId, data.courseId, code, actorId || null])
+  await recordAudit('certificate.issue', actorId, 'certificate', certificateId, { userId: data.userId, courseId: data.courseId })
   return verifyCertificate(code)
 }
 
-export function verifyCertificate(code) {
-  return certificateFromRow(db.prepare("SELECT cert.*, u.name AS user_name, c.title AS course_title FROM certificates cert JOIN users u ON u.id = cert.user_id JOIN courses c ON c.id = cert.course_id WHERE cert.verification_code = ? AND cert.status = 'issued'").get(code))
+export async function verifyCertificate(code) {
+  return certificateFromRow(await queryOne(`
+    SELECT cert.*, u.name AS user_name, c.title AS course_title FROM certificates cert
+    JOIN users u ON u.id = cert.user_id JOIN courses c ON c.id = cert.course_id
+    WHERE cert.verification_code = $1 AND cert.status = 'issued'
+  `, [code]))
 }
 
-export function listCertificates(filter = {}) {
+export async function listCertificates(filter = {}) {
   const clauses = []
-  const params = {}
-  if (filter.userId) { clauses.push('cert.user_id = @userId'); params.userId = filter.userId }
-  if (filter.courseId) { clauses.push('cert.course_id = @courseId'); params.courseId = filter.courseId }
-  return db.prepare(`SELECT cert.*, u.name AS user_name, c.title AS course_title FROM certificates cert JOIN users u ON u.id = cert.user_id JOIN courses c ON c.id = cert.course_id ${clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''} ORDER BY cert.issued_at DESC`).all(params).map(certificateFromRow)
+  const values = []
+  if (filter.userId) clauses.push(`cert.user_id = ${parameter(values, filter.userId)}`)
+  if (filter.courseId) clauses.push(`cert.course_id = ${parameter(values, filter.courseId)}`)
+  const rows = await queryMany(`
+    SELECT cert.*, u.name AS user_name, c.title AS course_title FROM certificates cert
+    JOIN users u ON u.id = cert.user_id JOIN courses c ON c.id = cert.course_id
+    ${clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''} ORDER BY cert.issued_at DESC
+  `, values)
+  return rows.map(certificateFromRow)
 }
 
-export function createPaymentOrder(data, actorId) {
+export async function createPaymentOrder(data, actorId) {
   const paymentId = id('pay')
-  db.prepare('INSERT INTO payment_intents (id, user_id, course_id, amount, currency, provider_order_id, status, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(paymentId, data.userId, data.courseId, Number(data.amount), data.currency || 'INR', data.providerOrderId, data.status || 'created', JSON.stringify(data.metadata || {}))
-  recordAudit('payment.create', actorId, 'payment', paymentId, { courseId: data.courseId, amount: Number(data.amount), providerOrderId: data.providerOrderId })
-  return db.prepare('SELECT id, user_id AS userId, course_id AS courseId, amount, currency, provider, provider_order_id AS providerOrderId, status, created_at AS createdAt FROM payment_intents WHERE id = ?').get(paymentId)
+  const row = await queryOne(`
+    INSERT INTO payment_intents (id, user_id, course_id, amount, currency, provider_order_id, status, metadata)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+    RETURNING id, user_id AS "userId", course_id AS "courseId", amount, currency, provider,
+      provider_order_id AS "providerOrderId", status, created_at AS "createdAt"
+  `, [paymentId, data.userId, data.courseId, Number(data.amount), data.currency || 'INR', data.providerOrderId, data.status || 'created', JSON.stringify(data.metadata || {})])
+  await recordAudit('payment.create', actorId, 'payment', paymentId, { courseId: data.courseId, amount: Number(data.amount), providerOrderId: data.providerOrderId })
+  return row
 }
 
-export function recordPaymentWebhook(eventId, payload) {
-  const existing = db.prepare('SELECT id FROM payment_events WHERE provider_event_id = ?').get(eventId)
-  if (existing) return { duplicate: true, eventId }
-  const eventType = String(payload?.event || 'received')
-  const paymentEntity = payload?.payload?.payment?.entity || {}
-  const processEvent = db.transaction(() => {
+export async function recordPaymentWebhook(eventId, payload) {
+  return transaction(async client => {
+    const existing = await queryOne('SELECT id FROM payment_events WHERE provider_event_id = $1', [eventId], client)
+    if (existing) return { duplicate: true, eventId }
+    const eventType = String(payload?.event || 'received')
+    const paymentEntity = payload?.payload?.payment?.entity || {}
     const paymentEventId = id('payevt')
-    db.prepare('INSERT INTO payment_events (id, provider_event_id, event_type, payload) VALUES (?, ?, ?, ?)').run(paymentEventId, eventId, eventType, JSON.stringify(payload || {}))
-    const intent = paymentEntity.order_id ? db.prepare('SELECT * FROM payment_intents WHERE provider_order_id = ?').get(paymentEntity.order_id) : null
-    if (intent) db.prepare("UPDATE payment_intents SET status = ?, updated_at = datetime('now') WHERE id = ?").run(eventType === 'payment.captured' ? 'paid' : eventType, intent.id)
-    if (eventType === 'payment.captured' && intent) enrollUser(intent.user_id, intent.course_id, 'razorpay')
-    recordAudit('payment.webhook', null, 'payment_event', paymentEventId, { eventId, eventType })
-    return { id: paymentEventId, providerEventId: eventId, eventType }
+    await execute('INSERT INTO payment_events (id, provider_event_id, event_type, payload) VALUES ($1, $2, $3, $4::jsonb)', [paymentEventId, eventId, eventType, JSON.stringify(payload || {})], client)
+    const intent = paymentEntity.order_id
+      ? await queryOne('SELECT * FROM payment_intents WHERE provider_order_id = $1', [paymentEntity.order_id], client)
+      : null
+    if (intent) {
+      await execute('UPDATE payment_intents SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [eventType === 'payment.captured' ? 'paid' : eventType, intent.id], client)
+    }
+    if (eventType === 'payment.captured' && intent) await enrollUser(intent.user_id, intent.course_id, 'razorpay', null, client)
+    await recordAudit('payment.webhook', null, 'payment_event', paymentEventId, { eventId, eventType }, client)
+    return { duplicate: false, payment: { id: paymentEventId, providerEventId: eventId, eventType } }
   })
-  return { duplicate: false, payment: processEvent() }
 }

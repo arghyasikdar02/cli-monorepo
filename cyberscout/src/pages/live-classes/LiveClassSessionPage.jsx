@@ -91,7 +91,7 @@ export default function LiveClassSessionPage() {
               <div className="text-center">
                 <span className="material-symbols-outlined text-[80px] text-slate-700 block mb-4">video_camera_front</span>
                 <p className="font-space-grotesk font-bold text-slate-500">{liveClass.instructor ?? 'Instructor'}</p>
-                <p className="text-xs text-slate-600 mt-1">Video provider URL is not configured for this session.</p>
+                <p className="text-xs text-slate-600 mt-1">This class does not have a viewing link yet. Contact your instructor if it should already be available.</p>
               </div>
             )}
             <div className="absolute top-4 left-4 flex items-center gap-2 bg-black/60 px-3 py-1.5 rounded-full">

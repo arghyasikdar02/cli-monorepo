@@ -24,7 +24,7 @@ export default function SignUpPage() {
 
   const handleGoogleAuth = () => {
     if (!googleEnabled) {
-      setError('Google sign-in is not configured for this environment. Use email access or add Google OAuth credentials.')
+      setError('Google sign-in is unavailable right now. Create your account with email and password instead.')
       return
     }
     const query = redirectTarget ? `?redirect=${encodeURIComponent(redirectTarget)}` : ''

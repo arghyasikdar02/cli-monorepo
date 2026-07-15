@@ -7,14 +7,14 @@ const router = Router()
 
 router.use(requireAuth)
 
-router.post('/', requireRole('admin', 'super_admin', 'instructor'), requireCourseManager, (req, res) => {
+router.post('/', requireRole('admin', 'super_admin', 'instructor'), requireCourseManager, async (req, res) => {
   const error = requireFields(req.body, ['courseId', 'title', 'provider', 'embedId'])
   if (error) return res.status(400).json({ error })
-  res.status(201).json({ video: registerVideo(req.body, req.user.id) })
+  res.status(201).json({ video: await registerVideo(req.body, req.user.id) })
 })
 
-router.get('/course/:courseId', requireCourseAccess({ allowRoles: ['admin', 'super_admin', 'ops', 'support'] }), (req, res) => {
-  res.json({ videos: listVideosByCourse(req.params.courseId) })
+router.get('/course/:courseId', requireCourseAccess({ allowRoles: ['admin', 'super_admin', 'ops', 'support'] }), async (req, res) => {
+  res.json({ videos: await listVideosByCourse(req.params.courseId) })
 })
 
 export default router

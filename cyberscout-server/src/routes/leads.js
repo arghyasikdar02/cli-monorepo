@@ -14,7 +14,7 @@ function ipHash(value) {
     .digest('hex')
 }
 
-router.post('/', leadLimiter, (req, res) => {
+router.post('/', leadLimiter, async (req, res) => {
   if (req.body?.website) return res.status(202).json({ accepted: true })
   const startedAt = Number(req.body?.startedAt || 0)
   if (startedAt && Date.now() - startedAt < 900) {
@@ -23,7 +23,7 @@ router.post('/', leadLimiter, (req, res) => {
   const error = requireFields(req.body, ['name', 'phone', 'email', 'message'])
   if (error) return res.status(400).json({ error })
   try {
-    const lead = createLead({
+    const lead = await createLead({
       ...req.body,
       visitorId: req.cookies?.cli_visitor_id || req.body.visitorId,
       ipAddress: ipHash(req.ip),
@@ -38,9 +38,9 @@ router.post('/', leadLimiter, (req, res) => {
 router.use(requireAuth)
 router.use(requireRole(...crmRoles))
 
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   res.json({
-    leads: listLeads({
+    leads: await listLeads({
       courseId: req.query.courseId,
       ownerId: req.query.ownerId,
       stage: req.query.stage,
@@ -54,28 +54,28 @@ router.get('/', (req, res) => {
   })
 })
 
-router.patch('/:leadId', (req, res) => {
-  const lead = updateLead(req.params.leadId, req.body, req.user.id)
+router.patch('/:leadId', async (req, res) => {
+  const lead = await updateLead(req.params.leadId, req.body, req.user.id)
   if (!lead) return res.status(404).json({ error: 'Lead not found' })
   res.json({ lead })
 })
 
-router.post('/:leadId/notes', (req, res) => {
+router.post('/:leadId/notes', async (req, res) => {
   const error = requireFields(req.body, ['note'])
   if (error) return res.status(400).json({ error })
-  const note = addLeadNote(req.params.leadId, req.user.id, req.body.note)
+  const note = await addLeadNote(req.params.leadId, req.user.id, req.body.note)
   if (!note) return res.status(404).json({ error: 'Lead not found' })
   res.status(201).json({ note })
 })
 
-router.get('/follow-ups/list', (req, res) => {
-  res.json({ followUps: listFollowUps({ status: req.query.status }) })
+router.get('/follow-ups/list', async (req, res) => {
+  res.json({ followUps: await listFollowUps({ status: req.query.status }) })
 })
 
-router.post('/:leadId/follow-ups', (req, res) => {
+router.post('/:leadId/follow-ups', async (req, res) => {
   const error = requireFields(req.body, ['dueAt'])
   if (error) return res.status(400).json({ error })
-  const followUp = createFollowUp(req.params.leadId, req.user.id, req.body.dueAt, req.body.note || '')
+  const followUp = await createFollowUp(req.params.leadId, req.user.id, req.body.dueAt, req.body.note || '')
   if (!followUp) return res.status(404).json({ error: 'Lead not found' })
   res.status(201).json({ followUp })
 })

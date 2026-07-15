@@ -56,7 +56,7 @@ export default function CyberCareerRoadmap() {
         <div>
           <p className="site-eyebrow">Beginner-to-role roadmap</p>
           <h2 id="career-roadmap-title">A cybersecurity path you can actually follow</h2>
-          <p>Start with the fundamentals, practise real workflows, then build toward the role that fits you.</p>
+          <p>Start with the fundamentals, practice real workflows, then build toward the role that fits you.</p>
         </div>
         <Link to="/learning-paths" className="site-text-link">Explore learning paths<SiteIcon name="arrow_forward" /></Link>
       </figcaption>
@@ -65,6 +65,18 @@ export default function CyberCareerRoadmap() {
 
       <div className="career-roadmap-map">
         <svg className="career-roadmap-connections" viewBox="0 0 1000 400" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="roadmap-connector-shared" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stopColor="#8b5cf6" />
+              <stop offset="0.58" stopColor="#22d3ee" />
+              <stop offset="1" stopColor="#7dd3fc" />
+            </linearGradient>
+            <linearGradient id="roadmap-connector-active" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stopColor="#f472b6" />
+              <stop offset="0.48" stopColor="#8b5cf6" />
+              <stop offset="1" stopColor="#22d3ee" />
+            </linearGradient>
+          </defs>
           <path className="career-roadmap-line is-shared" d="M190 200 H470" />
           {careerTracks.map((track, index) => {
             const y = 52 + (index * 98)
@@ -80,7 +92,8 @@ export default function CyberCareerRoadmap() {
         </section>
 
         <section className="career-roadmap-stage career-roadmap-core" aria-labelledby="roadmap-core-title">
-          <span className="career-roadmap-step">Practise</span>
+          <span className="career-roadmap-flow-indicator" aria-hidden="true"><span /></span>
+          <span className="career-roadmap-step">Practice</span>
           <h3 id="roadmap-core-title">Practical core</h3>
           <p>Inspect evidence, use tools responsibly and explain what you found.</p>
           <ul>{roadmapPracticalCore.map(item => <li key={item}>{item}</li>)}</ul>
@@ -118,7 +131,7 @@ export default function CyberCareerRoadmap() {
             tabIndex={0}
             onFocus={() => setManualSelection(true)}
           >
-            <div className="career-roadmap-detail-copy"><p>{activeTrack.description}</p><span>Build role-specific skills. Practise the workflow. Prepare evidence of skill.</span></div>
+            <div className="career-roadmap-detail-copy"><p>{activeTrack.description}</p><span>Build role-specific skills. Practice the workflow. Prepare evidence of skill.</span></div>
             <div><h4>Skills to develop</h4><ul>{activeTrack.skills.map(skill => <li key={skill}>{skill}</li>)}</ul></div>
             <div><h4>Role directions</h4><ul>{activeTrack.roles.map(role => <li key={role}>{role}</li>)}</ul></div>
           </div>
