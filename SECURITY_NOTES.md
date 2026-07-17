@@ -3,7 +3,7 @@
 ## Sessions and authentication
 
 - The backend signs JWTs with explicit algorithm, issuer, audience and expiry and stores them only in the HTTP-only `cli_session` cookie.
-- Production cookies use `Secure`, configurable `SameSite` and a root path. The recommended first-party Vercel API proxy permits `SameSite=Lax`.
+- Production cookies use `Secure`, configurable `SameSite` and a root path. The first-party Vercel `/api` proxy keeps browser cookies on `cyberlabin.com`, permits `SameSite=Lax`, and avoids direct third-party cookie dependence.
 - The frontend retrieves the user from `/api/auth/me`; it does not persist session tokens in browser storage.
 - Passwords use bcrypt with configurable cost. Registration, password change and CLI user creation share the same 12-to-128-character passphrase policy.
 - Password change increments `token_version` before issuing a new cookie, invalidating older sessions.
@@ -12,7 +12,7 @@
 
 ## CSRF and request controls
 
-- Cookie-authenticated unsafe methods require the double-submit `cli_csrf` token and an allowed Origin when supplied.
+- Browser unsafe methods, including login and registration, require the double-submit `cli_csrf` token and an allowed Origin when supplied. Bearer-authenticated server and CLI requests remain independent of browser CSRF controls.
 - Razorpay webhooks bypass CSRF but require the provider HMAC signature.
 - JSON bodies are capped at 256 KB by default.
 - Login, registration, leads, tutor requests and the general API have separate IP-based rate limits.
@@ -33,6 +33,7 @@
 - Express uses Helmet with CSP, HSTS in production, frame denial, no-sniff, referrer policy and a restrictive permissions policy.
 - Vercel applies equivalent public-site headers and noindex headers to account/dashboard routes.
 - CORS uses an explicit origin allowlist and credentials. Local preview origins are added only outside production.
+- CORS explicitly permits the methods and headers used by login, including `X-CSRF-Token`, and returns credentialed preflight responses with `Vary: Origin`.
 - Public course/blog reads receive short cache headers; private and dashboard responses use `no-store`.
 
 ## Secrets and production configuration

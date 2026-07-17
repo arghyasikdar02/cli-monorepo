@@ -4,10 +4,15 @@ Base URL for local development: `http://localhost:3001`
 
 ## Health
 
+- `GET /`
+- `GET /health`
 - `GET /api/health`
+
+Both health endpoints verify PostgreSQL connectivity and return `database: "connected"` only after a successful query.
 
 ## Auth
 
+- `GET /api/auth/csrf` — sets the HTTP-only `cli_csrf` cookie and returns the matching double-submit token.
 - `GET /api/auth/config`
 - `POST /api/auth/register`
 - `POST /api/auth/login`
@@ -15,6 +20,8 @@ Base URL for local development: `http://localhost:3001`
 - `GET /api/auth/google`
 - `GET /api/auth/google/callback`
 - `GET /api/auth/me`
+
+Browser `POST`, `PUT`, `PATCH`, and `DELETE` requests must include the `cli_csrf` cookie and matching `X-CSRF-Token` header. This includes login and registration. Session JWTs are stored only in the HTTP-only `cli_session` cookie.
 
 ## Users
 

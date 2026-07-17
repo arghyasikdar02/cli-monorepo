@@ -58,21 +58,60 @@ export function requestContext(req, res, next) {
   next()
 }
 
+function requestSecurityContext(req) {
+  return {
+    requestId: req.requestId,
+    origin: normalizeOrigin(req.headers.origin) || 'none',
+    protocol: req.protocol,
+    forwardedProtocol: forwardedProtocol(req),
+    secure: req.secure,
+    sessionCookiePresent: Boolean(req.cookies?.cli_session),
+    csrfCookiePresent: Boolean(req.cookies?.cli_csrf),
+    csrfHeaderPresent: Boolean(req.headers['x-csrf-token']),
+  }
+}
+
+function logCsrfRejection(req, reason) {
+  if (process.env.NODE_ENV === 'test') return
+  console.warn('csrf-rejected', { reason, ...requestSecurityContext(req), status: 403 })
+}
+
 export function csrfProtection(req, res, next) {
   if (SAFE_METHODS.has(req.method)) return next()
   if (req.path.startsWith('/api/webhooks') || req.path.startsWith('/api/payments/webhooks')) return next()
   if (req.headers.authorization?.startsWith('Bearer ')) return next()
-  if (!req.cookies?.cli_session) return next()
 
   const origin = req.headers.origin
   if (origin && !getAllowedOrigins().includes(normalizeOrigin(origin))) {
+    logCsrfRejection(req, 'origin_not_allowed')
     return res.status(403).json({ error: 'Request origin is not allowed' })
   }
 
   const cookieToken = req.cookies?.cli_csrf
   const headerToken = req.headers['x-csrf-token']
   if (!cookieToken || !headerToken || !safelyEqual(cookieToken, headerToken)) {
+    logCsrfRejection(req, !cookieToken ? 'cookie_missing' : !headerToken ? 'header_missing' : 'token_mismatch')
     return res.status(403).json({ error: 'CSRF validation failed' })
   }
   return next()
+}
+
+function forwardedProtocol(req) {
+  const value = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim().toLowerCase()
+  return ['http', 'https'].includes(value) ? value : 'unset'
+}
+
+export function authSecurityDiagnostics(event) {
+  return (req, res, next) => {
+    if (process.env.NODE_ENV !== 'test') {
+      res.once('finish', () => {
+        console.info('auth-security', {
+          event,
+          ...requestSecurityContext(req),
+          status: res.statusCode,
+        })
+      })
+    }
+    next()
+  }
 }

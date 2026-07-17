@@ -7,7 +7,7 @@ This folder contains developer handoff diagrams for the current Cyber Lab IN leg
 - `ER_DIAGRAM.md` - readable ERD sections, constraints, delete behavior, and database limitations.
 - `DFD.md` - context-level and Level 1 data flow diagrams.
 - `CLASS_COMPONENT_DIAGRAM.md` - React/Express component and service map.
-- `er-diagram.mmd` - complete Mermaid ERD source from the current SQLite migrations.
+- `er-diagram.mmd` - complete Mermaid ERD source from the current PostgreSQL migrations.
 - `context-dfd.mmd` - context DFD Mermaid source.
 - `level-1-dfd.mmd` - Level 1 DFD Mermaid source.
 - `class-component-diagram.mmd` - component/service diagram Mermaid source.
@@ -70,17 +70,16 @@ Create `docs/diagrams/puppeteer-config.json` only if needed:
 
 ## Known Limitations
 
-- SQLite is the current database. Supabase Postgres is planned but not active.
-- SQLite has no RLS. Production Supabase must add deny-by-default RLS policies.
-- Render free filesystem storage is not reliable for persistent SQLite production data.
-- `live_classes.batch_id` exists, but the current migrations do not include a `batches` table.
-- Course category relationships are slug-based and not FK-enforced in SQLite.
+- Supabase PostgreSQL is the active production database adapter.
+- Direct anon/authenticated table access is denied by `supabase/rls-policies.sql`; application authorization lives in Express.
+- Render is stateless and does not store application data on its filesystem.
+- Course category relationships remain slug-based rather than foreign-key enforced.
 - Some mounted advanced modules are still MVP/starter quality compared with the full PRD.
 
 ## Before Real Production Use
 
-- Migrate SQLite schema to Supabase Postgres.
-- Add Supabase RLS policies and verify course isolation with integration tests.
+- Apply tracked migrations and deny-by-default Supabase access controls.
+- Verify course isolation against the target Supabase project before cutover.
 - Add persistent storage for protected documents and any generated assets.
 - Replace starter payment, certificates, lab, and advanced RAG persistence with production tables and service integrations.
 - Re-run build, route smoke tests, and role/course isolation tests after migration.

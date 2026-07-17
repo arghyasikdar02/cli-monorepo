@@ -39,42 +39,34 @@ Authorized redirect URI:
 http://localhost:3001/api/auth/google/callback
 ```
 
-For deployment, add your real domains:
+For the current Vercel-to-Render deployment, add:
 
 Authorized JavaScript origins:
 
 ```text
-https://your-frontend-domain.com
-https://your-api-domain.com
+https://cyberlabin.com
 ```
 
 Authorized redirect URI:
 
 ```text
-https://your-api-domain.com/api/auth/google/callback
+https://cyberlabin.com/api/auth/google/callback
 ```
 
-Set frontend env:
-
-```env
-VITE_API_URL=https://your-api-domain.com
-```
+Do not set `VITE_API_URL` in Vercel. The browser uses the first-party `/api` rewrite configured in `vercel.json`.
 
 Set API env:
 
 ```env
 JWT_SECRET=use_a_real_random_secret_at_least_32_chars
-FRONTEND_URL=https://your-frontend-domain.com
-BACKEND_URL=https://your-api-domain.com
-CORS_ORIGINS=https://your-frontend-domain.com
+FRONTEND_URL=https://cyberlabin.com
+BACKEND_URL=https://cyberlabin.onrender.com
+CORS_ORIGINS=https://cyberlabin.com,https://www.cyberlabin.com
+COOKIE_SECURE=true
+COOKIE_SAME_SITE=lax
 GOOGLE_CLIENT_ID=your_google_client_id.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=your_google_client_secret
-```
-
-If your hosting provider exposes a different public callback URL than `BACKEND_URL`, set:
-
-```env
-GOOGLE_CALLBACK_URL=https://your-api-domain.com/api/auth/google/callback
+GOOGLE_CALLBACK_URL=https://cyberlabin.com/api/auth/google/callback
 ```
 
 The frontend calls `/api/auth/config`; Google buttons appear only when the backend has real Google credentials.

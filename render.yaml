@@ -16,6 +16,8 @@ services:
         value: https://cyberlabin.onrender.com
       - key: CORS_ORIGINS
         value: https://cyberlabin.com,https://www.cyberlabin.com
+      - key: GOOGLE_CALLBACK_URL
+        value: https://cyberlabin.com/api/auth/google/callback
       - key: COOKIE_SECURE
         value: "true"
       - key: COOKIE_SAME_SITE

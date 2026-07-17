@@ -5,7 +5,7 @@ Date: July 15, 2026
 ## Active Architecture
 
 - Frontend: Vite, React 19, React Router 6, Tailwind CSS 3.
-- Backend: Express with SQLite through `better-sqlite3`.
+- Backend: Express with Supabase PostgreSQL through a shared `pg` pool.
 - Authentication: JWT plus HTTP-only session cookie support, email/password, Google OAuth when configured.
 - Public data: courses, blogs, leads and visitor analytics are API/database backed.
 - Protected areas: student, admin, instructor, marketing and operations dashboards.

@@ -1,11 +1,10 @@
-const isProduction = process.env.NODE_ENV === 'production'
-
 function envBoolean(value, fallback) {
   if (value === undefined) return fallback
   return String(value).toLowerCase() === 'true'
 }
 
 function baseCookieOptions({ httpOnly = true, maxAge } = {}) {
+  const isProduction = process.env.NODE_ENV === 'production'
   const secure = envBoolean(process.env.COOKIE_SECURE, isProduction)
   const requestedSameSite = String(process.env.COOKIE_SAME_SITE || 'lax').toLowerCase()
   const sameSite = ['lax', 'strict', 'none'].includes(requestedSameSite) ? requestedSameSite : 'lax'

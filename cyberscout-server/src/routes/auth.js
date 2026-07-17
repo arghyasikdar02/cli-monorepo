@@ -18,7 +18,7 @@ import { signOAuthState, signToken, verifyOAuthState } from '../lib/jwt.js'
 import { requireAuth } from '../middleware/access.js'
 import { authCookieOptions, clearCookieOptions, csrfCookieOptions, oauthStateCookieOptions } from '../lib/cookies.js'
 import { validatePassword } from '../lib/validation.js'
-import { loginLimiter, registrationLimiter } from '../middleware/security.js'
+import { authSecurityDiagnostics, loginLimiter, registrationLimiter } from '../middleware/security.js'
 
 const router = Router()
 const trimTrailingSlash = (value) => value?.replace(/\/+$/, '')
@@ -130,7 +130,7 @@ router.get('/config', (req, res) => {
 })
 
 // GET /api/auth/csrf
-router.get('/csrf', (_req, res) => {
+router.get('/csrf', authSecurityDiagnostics('csrf.bootstrap'), (_req, res) => {
   const csrfToken = randomBytes(32).toString('hex')
   res.cookie('cli_csrf', csrfToken, csrfCookieOptions())
   res.json({ csrfToken })
@@ -159,7 +159,7 @@ router.post('/register', registrationLimiter, async (req, res) => {
 })
 
 // POST /api/auth/login
-router.post('/login', loginLimiter, async (req, res) => {
+router.post('/login', authSecurityDiagnostics('auth.login'), loginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' })
@@ -260,7 +260,7 @@ router.post('/change-password', loginLimiter, requireAuth, async (req, res) => {
 })
 
 // POST /api/auth/logout
-router.post('/logout', (_req, res) => {
+router.post('/logout', authSecurityDiagnostics('auth.logout'), (_req, res) => {
   clearAuthCookie(res)
   res.json({ ok: true })
 })

@@ -4,9 +4,8 @@ These DFDs describe the current restored legacy architecture:
 
 - Frontend: Vite React app in `cyberscout/`
 - Backend: Express API in `cyberscout-server/`
-- Current DB: SQLite through `better-sqlite3`
-- Planned production DB: Supabase Postgres
-- Planned deployment: Vercel frontend, Render backend, Supabase database
+- Current DB: Supabase PostgreSQL through a shared `pg` connection pool
+- Deployment: Vercel frontend, Render backend, Supabase database
 
 ## Context-Level DFD
 
@@ -24,12 +23,11 @@ flowchart LR
   subgraph Hosting["Deployment boundary"]
     Vercel["Vercel\nFrontend host"]
     Render["Render\nExpress API host"]
-    Supabase["Supabase Postgres\nplanned production DB"]
+    Supabase["Supabase PostgreSQL\nproduction database"]
   end
 
   Frontend["Cyber Lab IN web app\nVite React in cyberscout"]
   Backend["Cyber Lab IN API\nExpress in cyberscout-server"]
-  SQLite[("SQLite database\nbetter-sqlite3 current")]
   GoogleOAuth["Google OAuth\nPassport strategy"]
 
   PublicVisitor -->|"Browse landing, courses, blog"| Frontend
@@ -44,13 +42,10 @@ flowchart LR
   Render -. hosts .-> Backend
 
   Frontend -->|"HTTPS JSON API\ncredentials include cookies"| Backend
-  Backend -->|"SQL reads and writes"| SQLite
-  Backend -. "future production SQL" .-> Supabase
+  Backend -->|"Parameterized SQL through shared pg pool"| Supabase
   Backend -->|"OAuth redirect and profile callback"| GoogleOAuth
   GoogleOAuth -->|"profile and email"| Backend
 
-  classDef planned fill:#f8fafc,stroke:#64748b,stroke-dasharray:5 5,color:#334155
-  class Supabase planned
 ```
 
 ## Level 1 DFD
@@ -92,7 +87,7 @@ flowchart TB
     Repo["repository layer"]
   end
 
-  subgraph DB["SQLite now, Supabase Postgres planned"]
+  subgraph DB["Supabase PostgreSQL"]
     Users[("users")]
     Courses[("courses, modules,\nlessons, materials")]
     Enrollments[("enrollments")]

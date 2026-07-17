@@ -1,12 +1,16 @@
 # Cyber Lab IN ER Diagram
 
-This ERD is based on the actual SQLite migration files in `cyberscout-server/db/migrations`:
+This ERD is based on the actual PostgreSQL migration files in `cyberscout-server/db/migrations`:
 
 - `001_core_lms.sql`
 - `002_ai_chat_history.sql`
 - `003_crm_leads.sql`
 - `004_live_class_attendance.sql`
 - `005_saas_growth_features.sql`
+- `006_blog_metadata.sql`
+- `007_funnel_analytics.sql`
+- `008_persistent_learning_modules.sql`
+- `009_postgresql_constraints.sql`
 
 The complete single-file ERD source is available at `docs/diagrams/er-diagram.mmd`. The sections below split it into readable developer views.
 
@@ -481,16 +485,16 @@ erDiagram
 
 ## Current Implementation Notes
 
-- The running app uses SQLite through `better-sqlite3` in `cyberscout-server/src/db/index.js`.
+- The running app uses Supabase PostgreSQL through one shared `pg` pool in `cyberscout-server/src/db/index.js`.
 - The repository layer in `cyberscout-server/src/db/repositories.js` maps snake_case database rows to frontend-friendly camelCase objects.
-- Roles are stored as both `role` and JSON text `roles`; route guards read the parsed `roles` array.
-- Course category assignment is currently a logical slug relation from `courses.category_slug` to `course_categories.slug`; the SQLite migration does not enforce it with a foreign key.
+- Roles are stored as both `role` and JSONB `roles`; route guards read the parsed `roles` array.
+- Course category assignment is currently a logical slug relation from `courses.category_slug` to `course_categories.slug`; the migrations do not enforce it with a foreign key.
 - `live_classes.batch_id` and `enrollments.batch_id` are checked against the persisted `batches` table for batch-scoped access.
 - `cookie_consents.visitor_id` references `visitor_analytics(visitor_id)`, which is unique.
 
-## Planned/Future Production Notes
+## Production Notes
 
-- Supabase Postgres is the planned production database, but the current implementation is still SQLite.
-- Row Level Security is not available in SQLite. Supabase migration should add deny-by-default RLS policies for users, enrollments, materials, leads, analytics, and staff dashboards.
-- Render free filesystem storage is not reliable for persistent SQLite production data. Use Supabase Postgres before real production traffic.
-- RAG source/chunk storage and Supabase Storage metadata remain future production work. Learning modules, assessments, certificates, payments, and batch records are already persisted in SQLite.
+- Supabase PostgreSQL is the only production database. Render does not mount or write a local application database.
+- `schema_migrations` and an advisory lock make migration execution tracked and safe across concurrent starts.
+- The Express API remains the authorization boundary. `supabase/rls-policies.sql` enables RLS and revokes direct table grants from browser roles.
+- Supabase Storage metadata and expanded RAG source/chunk persistence remain future work. Learning modules, assessments, certificates, payments, and batch records are already persisted in PostgreSQL.

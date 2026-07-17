@@ -170,10 +170,10 @@ classDiagram
     liveAttendance
   }
   class DatabaseLayer {
-    betterSqlite3
+    sharedPgPool
     migrations
     seed
-    preparedStatements
+    parameterizedQueries
   }
   class JwtUtility {
     signToken

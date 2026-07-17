@@ -10,7 +10,7 @@ Do not restructure the app into a monorepo. Continue building inside:
 - Keep existing student auth and OAuth flow stable.
 - Add production environment validation.
 - Add backend route tests for auth, roles, and course access.
-- Replace dev-only in-memory store with durable local SQLite or PostgreSQL.
+- Validate the tracked PostgreSQL migrations against the production Supabase project before the first cutover.
 
 ## Phase 2: Course Access and Content
 

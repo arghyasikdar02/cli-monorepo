@@ -1,43 +1,23 @@
 # Backend Implementation Summary
 
-This project remains the restored legacy application:
+The active legacy architecture remains Vite React in `cyberscout/` and Express in `cyberscout-server/`. No monorepo or framework migration was introduced.
 
-- Frontend: `cyberscout/`
-- Backend: `cyberscout-server/`
-- Architecture: Vite React + Express
-- No monorepo was created.
+## Runtime
 
-## What Changed
+- One shared `pg` pool connects to Supabase PostgreSQL through `DATABASE_URL`.
+- Every repository query is asynchronous and parameterized with PostgreSQL placeholders.
+- Tracked migrations run transactionally under an advisory lock and record applied filenames.
+- Render runs migrations before start and never seeds or resets production records.
+- The health endpoint checks PostgreSQL readiness without exposing credentials.
 
-The Express backend now includes role-aware platform modules on top of the legacy auth flow.
+## Persisted modules
 
-Added systems:
+Authentication, roles, courses, modules, lessons, materials, enrollments, progress, batches, live classes, attendance, videos, protected documents, labs, quizzes, assignments, certificates, AI chat history, leads, analytics, payments and audit records are PostgreSQL-backed.
 
-- Auth role claims and role-based redirect hints
-- Demo users for student, admin, instructor, marketing, and ops access
-- Auth, role, dashboard, and course-enrollment middleware
-- Users, courses, enrollments, live classes, videos, documents, labs, quizzes, assignments, progress, leaderboards, certificates, AI/RAG, leads/CRM, analytics, payments, and audit routes
-- Protected document viewer starter that does not expose raw PDF URLs
-- Course-specific AI/RAG mock provider with usage limits
-- Razorpay starter order and webhook flow with idempotency protection
-- Backend-backed dashboard aggregate routes
+## Security boundary
 
-## Storage Status
+The Express API is the only application data boundary. Route middleware enforces authentication, role, instructor assignment, active enrollment and optional batch membership. The browser receives no database credential or service-role key. `supabase/rls-policies.sql` denies direct anon/authenticated table access.
 
-The current MVP store is `cyberscout-server/src/store/platformStore.js`.
+## Verification
 
-It is an in-memory dev-only store created to preserve the legacy architecture and avoid imposing Prisma/monorepo changes. `DATABASE_SCHEMA.md` documents the PostgreSQL-ready schema that should replace this store in production.
-
-## Security Controls Added
-
-- JWT auth middleware
-- Role middleware
-- Course enrollment middleware
-- Course-specific access checks for videos, live classes, PDFs, labs, quizzes, assignments, AI chats, progress, leaderboards, and certificates
-- Suspended user rejection
-- Admin/system audit logs
-- Protected PDF viewer starter with access logs and watermark metadata
-
-## Production Notes
-
-Before production deployment, replace the in-memory store with PostgreSQL or a SQLite-to-PostgreSQL compatible data layer, then apply the schema in `DATABASE_SCHEMA.md`.
+The integration suite runs against PostgreSQL 16 and covers session security, role dashboards, course isolation, live access, learning modules, leads, analytics and CLI mutation safeguards.

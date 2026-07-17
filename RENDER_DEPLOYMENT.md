@@ -46,7 +46,7 @@ Optional complete groups:
 ```text
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
-GOOGLE_CALLBACK_URL=https://cyberlabin.onrender.com/api/auth/google/callback
+GOOGLE_CALLBACK_URL=https://cyberlabin.com/api/auth/google/callback
 
 RAZORPAY_KEY_ID=
 RAZORPAY_KEY_SECRET=
@@ -54,6 +54,16 @@ RAZORPAY_WEBHOOK_SECRET=
 ```
 
 Configure every value in an optional group together or leave the group unset.
+
+## Browser session routing
+
+Production browser requests use `https://cyberlabin.com/api/*`. The Vercel rewrite in `cyberscout/vercel.json` forwards those requests to Render while the browser retains a first-party `cyberlabin.com` cookie. Keep `VITE_API_URL` unset in Vercel and remove any old value pointing directly to `https://cyberlabin.onrender.com`.
+
+This architecture intentionally uses host-only, HTTP-only, `Secure`, `SameSite=Lax` cookies without a `Domain` attribute. Login and every other browser state-changing request first obtain a double-submit token from `/api/auth/csrf`. Do not change the frontend to call Render directly and do not set `COOKIE_SAME_SITE=none` while the first-party proxy is active.
+
+Google OAuth must return through `https://cyberlabin.com/api/auth/google/callback`; add that exact URI in Google Cloud Console. This keeps the signed OAuth state cookie on the same browser origin throughout the flow.
+
+`api.cyberlabin.com` remains a suitable future custom Render domain. After Render verifies that domain, point `VITE_API_URL` to `https://api.cyberlabin.com`, update `BACKEND_URL`, retain `FRONTEND_URL=https://cyberlabin.com`, and keep both origins in the explicit CORS configuration. Both hosts are same-site, so `SameSite=Lax` remains appropriate.
 
 ## First deployment
 
@@ -81,6 +91,7 @@ Use an authenticated smoke test for `/api/auth/me`, dashboards, enrollment and l
 - `must use postgresql://`: a file URL or malformed database URL is configured.
 - TLS/certificate failure: keep `DATABASE_SSL=require` and confirm Render deployed the shared `src/db/config.js` configuration. Remove stale Render overrides such as `NODE_TLS_REJECT_UNAUTHORIZED`; they are neither needed nor permitted. Supply `DATABASE_SSL_CA` only when the database provider supplies a CA chain that should be verified.
 - CORS rejection: ensure the browser origin exactly matches an HTTPS origin in `CORS_ORIGINS`.
+- Secure-session failure: verify `/api/auth/csrf` through `cyberlabin.com` returns `200`, JSON containing `csrfToken`, and a `cli_csrf` cookie. Remove a direct Render `VITE_API_URL` from Vercel and redeploy the frontend.
 - Existing-schema compatibility failure: no tracked migration was applied. Back up Supabase and complete an explicit data migration; do not alter IDs or delete tables to force deployment.
 - Migration failure: note the migration filename in the log, take a backup, and correct the schema conflict. Do not delete `schema_migrations` or reset production tables.
 - Connection saturation: lower `DATABASE_POOL_MAX` or use the Supabase pooler URL recommended for long-running application servers.
@@ -91,6 +102,8 @@ Use an authenticated smoke test for `/api/auth/me`, dashboards, enrollment and l
 - [ ] `DATABASE_URL` entered as a Render secret.
 - [ ] Four independent application secrets generated and entered.
 - [ ] Production HTTPS origins configured.
+- [ ] Vercel `VITE_API_URL` is unset so the first-party `/api` proxy is used.
+- [ ] Google OAuth redirect URI is `https://cyberlabin.com/api/auth/google/callback` when OAuth is enabled.
 - [ ] No `DATABASE_PATH`, Render disk, or file URL configured.
 - [ ] Node is selected from the `22.x` package engine.
 - [ ] Start command is `npm run db:migrate && npm start`.

@@ -73,6 +73,10 @@ export function createApp() {
       return cb(error)
     },
     credentials: true,
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Accept', 'Authorization', 'Content-Type', 'X-CSRF-Token', 'X-Request-Id'],
+    exposedHeaders: ['X-Request-Id'],
+    optionsSuccessStatus: 204,
   }))
   app.use(express.json({
     limit: process.env.JSON_BODY_LIMIT || '256kb',
@@ -122,10 +126,11 @@ export function createApp() {
   app.use('/api/dashboards', dashboardsRouter)
   app.use('/api', (_req, res) => res.status(404).json({ error: 'API route not found' }))
   app.use((err, req, res, _next) => {
-    const summary = { requestId: req.requestId, method: req.method, path: req.path, message: err.message }
-    if (process.env.NODE_ENV === 'production') console.error(summary)
-    else console.error(err)
-    res.status(err.status || 500).json({ error: err.publicMessage || 'Internal server error', requestId: req.requestId })
+    const status = err.status || 500
+    const summary = { requestId: req.requestId, method: req.method, path: req.path, message: err.message, status }
+    if (status >= 500) console.error(process.env.NODE_ENV === 'production' ? summary : err)
+    else if (process.env.NODE_ENV === 'production') console.warn(summary)
+    res.status(status).json({ error: err.publicMessage || 'Internal server error', requestId: req.requestId })
   })
   return app
 }

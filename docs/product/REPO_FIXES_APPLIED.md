@@ -37,6 +37,6 @@ No monorepo was created and `archived/failed-monorepo-migration/` was not modifi
 
 ## Remaining Production Notes
 
-- Current backend storage is SQLite. This is acceptable for local testing and lightweight staging, but production should migrate to Supabase Postgres.
+- Backend persistence now uses PostgreSQL through a shared `pg` pool; production points `DATABASE_URL` at Supabase.
 - A dedicated 1200x630 Open Graph image should be created before serious SEO/social launch.
 - Future course pages should receive full validated curriculum, fee and enrolment data before being promoted.

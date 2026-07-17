@@ -9,28 +9,49 @@ process.env.JWT_SECRET = 'test_secret_at_least_32_chars_1234567890'
 process.env.CLIADM_ADMIN_TOKEN = 'test_admin_token'
 process.env.BCRYPT_COST = '4'
 process.env.SEED_DEVELOPMENT_USERS = '1'
+process.env.CORS_ORIGINS = 'https://cyberlabin.com'
 
 let server
 let baseUrl
 let database
 
 async function request(pathname, options = {}) {
-  const unsafeCookieRequest = options.token && String(options.token).startsWith('cli_session=') && !['GET', 'HEAD', 'OPTIONS'].includes(options.method || 'GET')
+  const {
+    token,
+    skipCsrf = false,
+    headers: suppliedHeaders = {},
+    ...fetchOptions
+  } = options
+  const method = String(fetchOptions.method || 'GET').toUpperCase()
+  const cookieToken = token && String(token).startsWith('cli_session=') ? String(token) : ''
+  const bearerToken = token && !cookieToken ? String(token) : ''
+  const unsafeBrowserRequest = !skipCsrf
+    && !['GET', 'HEAD', 'OPTIONS'].includes(method)
+    && !bearerToken
+    && !pathname.startsWith('/api/webhooks')
+    && !pathname.startsWith('/api/payments/webhooks')
   let csrfHeaders = {}
-  if (unsafeCookieRequest) {
-    const csrfResponse = await fetch(`${baseUrl}/api/auth/csrf`)
+  if (unsafeBrowserRequest) {
+    const csrfResponse = await fetch(`${baseUrl}/api/auth/csrf`, {
+      headers: suppliedHeaders.Origin ? { Origin: suppliedHeaders.Origin } : {},
+    })
     const csrfBody = await csrfResponse.json()
     const csrfCookie = cookieFrom(csrfResponse, 'cli_csrf')
-    csrfHeaders = { Cookie: `${options.token}; ${csrfCookie}`, 'X-CSRF-Token': csrfBody.csrfToken }
+    const existingCookie = suppliedHeaders.Cookie || cookieToken
+    csrfHeaders = {
+      Cookie: [existingCookie, csrfCookie].filter(Boolean).join('; '),
+      'X-CSRF-Token': csrfBody.csrfToken,
+    }
   }
   const response = await fetch(`${baseUrl}${pathname}`, {
+    ...fetchOptions,
     headers: {
       'Content-Type': 'application/json',
-      ...(options.token ? (String(options.token).startsWith('cli_session=') ? { Cookie: options.token } : { Authorization: `Bearer ${options.token}` }) : {}),
+      ...(cookieToken ? { Cookie: cookieToken } : {}),
+      ...(bearerToken ? { Authorization: `Bearer ${bearerToken}` } : {}),
       ...csrfHeaders,
-      ...(options.headers || {}),
+      ...suppliedHeaders,
     },
-    ...options,
   })
   const body = await response.json().catch(() => ({}))
   return { response, body }
@@ -121,6 +142,14 @@ describe('Cyber Lab IN database-backed LMS flow', () => {
   })
 
   it('uses an HTTP-only cookie session and enforces CSRF on cookie-authenticated writes', async () => {
+    const missingBootstrap = await request('/api/auth/login', {
+      method: 'POST',
+      skipCsrf: true,
+      body: JSON.stringify({ email: 'student@cyberlabin.com', password: 'password123' }),
+    })
+    assert.equal(missingBootstrap.response.status, 403)
+    assert.equal(missingBootstrap.body.error, 'CSRF validation failed')
+
     const loginResult = await request('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email: 'student@cyberlabin.com', password: 'password123' }),
@@ -135,6 +164,7 @@ describe('Cyber Lab IN database-backed LMS flow', () => {
 
     const denied = await request('/api/auth/change-password', {
       method: 'POST',
+      skipCsrf: true,
       headers: { Cookie: sessionCookie },
       body: JSON.stringify({ currentPassword: 'password123', newPassword: 'a-long-test-passphrase' }),
     })
@@ -153,6 +183,106 @@ describe('Cyber Lab IN database-backed LMS flow', () => {
     })
     assert.equal(logout.response.status, 200)
     assert.equal(logout.body.ok, true)
+  })
+
+  it('supports production CORS, secure cookies, trusted proxy requests, and stateless sessions', async () => {
+    const allowed = await fetch(`${baseUrl}/api/health`, { headers: { Origin: 'https://cyberlabin.com' } })
+    assert.equal(allowed.status, 200)
+    assert.equal(allowed.headers.get('access-control-allow-origin'), 'https://cyberlabin.com')
+    assert.equal(allowed.headers.get('access-control-allow-credentials'), 'true')
+    assert.match(allowed.headers.get('vary') || '', /Origin/i)
+
+    const preflight = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'OPTIONS',
+      headers: {
+        Origin: 'https://cyberlabin.com',
+        'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Headers': 'content-type,x-csrf-token',
+      },
+    })
+    assert.equal(preflight.status, 204)
+    assert.equal(preflight.headers.get('access-control-allow-origin'), 'https://cyberlabin.com')
+    assert.equal(preflight.headers.get('access-control-allow-credentials'), 'true')
+    assert.match(preflight.headers.get('access-control-allow-headers') || '', /X-CSRF-Token/i)
+
+    const blocked = await fetch(`${baseUrl}/api/health`, { headers: { Origin: 'https://untrusted.example' } })
+    assert.equal(blocked.status, 403)
+
+    const previousSecure = process.env.COOKIE_SECURE
+    const previousSameSite = process.env.COOKIE_SAME_SITE
+    process.env.COOKIE_SECURE = 'true'
+    process.env.COOKIE_SAME_SITE = 'lax'
+    try {
+      const csrf = await fetch(`${baseUrl}/api/auth/csrf`, {
+        headers: { Origin: 'https://cyberlabin.com', 'X-Forwarded-Proto': 'https' },
+      })
+      assert.equal(csrf.status, 200)
+      const csrfBody = await csrf.json()
+      const csrfSetCookie = csrf.headers.get('set-cookie') || ''
+      assert.match(csrfSetCookie, /cli_csrf=/)
+      assert.match(csrfSetCookie, /HttpOnly/i)
+      assert.match(csrfSetCookie, /Secure/i)
+      assert.match(csrfSetCookie, /SameSite=Lax/i)
+      assert.match(csrfSetCookie, /Path=\//i)
+
+      const csrfCookie = cookieFrom(csrf, 'cli_csrf')
+      const loginResponse = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          Origin: 'https://cyberlabin.com',
+          'X-Forwarded-Proto': 'https',
+          'Content-Type': 'application/json',
+          Cookie: csrfCookie,
+          'X-CSRF-Token': csrfBody.csrfToken,
+        },
+        body: JSON.stringify({ email: 'student@cyberlabin.com', password: 'password123' }),
+      })
+      assert.equal(loginResponse.status, 200)
+      const productionSession = cookieFrom(loginResponse, 'cli_session')
+      const authSetCookie = loginResponse.headers.get('set-cookie') || ''
+      assert.ok(productionSession)
+      assert.match(authSetCookie, /HttpOnly/i)
+      assert.match(authSetCookie, /Secure/i)
+      assert.match(authSetCookie, /SameSite=Lax/i)
+
+      const { app } = await import('../src/index.js')
+      const secondServer = app.listen(0)
+      await new Promise(resolve => secondServer.once('listening', resolve))
+      try {
+        const secondBaseUrl = `http://127.0.0.1:${secondServer.address().port}`
+        const me = await fetch(`${secondBaseUrl}/api/auth/me`, {
+          headers: { Cookie: productionSession, 'X-Forwarded-Proto': 'https' },
+        })
+        assert.equal(me.status, 200)
+        assert.equal((await me.json()).user.email, 'student@cyberlabin.com')
+      } finally {
+        secondServer.closeAllConnections?.()
+        await new Promise(resolve => secondServer.close(resolve))
+      }
+
+      const logoutCsrf = await fetch(`${baseUrl}/api/auth/csrf`)
+      const logoutCsrfBody = await logoutCsrf.json()
+      const logout = await fetch(`${baseUrl}/api/auth/logout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `${productionSession}; ${cookieFrom(logoutCsrf, 'cli_csrf')}`,
+          'X-CSRF-Token': logoutCsrfBody.csrfToken,
+        },
+      })
+      assert.equal(logout.status, 200)
+      const clearCookie = logout.headers.get('set-cookie') || ''
+      assert.match(clearCookie, /cli_session=/)
+      assert.match(clearCookie, /Max-Age=0|Expires=/i)
+      assert.match(clearCookie, /Secure/i)
+      assert.match(clearCookie, /SameSite=Lax/i)
+      assert.match(clearCookie, /Path=\//i)
+    } finally {
+      if (previousSecure === undefined) delete process.env.COOKIE_SECURE
+      else process.env.COOKIE_SECURE = previousSecure
+      if (previousSameSite === undefined) delete process.env.COOKIE_SAME_SITE
+      else process.env.COOKIE_SAME_SITE = previousSameSite
+    }
   })
 
   it('sets production-oriented API security headers', async () => {

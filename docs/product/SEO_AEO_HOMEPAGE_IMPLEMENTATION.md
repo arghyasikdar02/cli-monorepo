@@ -57,6 +57,6 @@ The dedicated course positioning remains on:
 - Future course URLs are valid but clearly marked as roadmap pages until course details are ready.
 - The homepage does not add HowTo, Review, AggregateRating or fake testimonial schema.
 - The canonical homepage URL remains `https://cyberlabin.com/`.
-- Homepage latest resources now come from the existing blog API and SQLite database.
+- Homepage latest resources now come from the existing blog API and Supabase PostgreSQL database.
 - The instructor profile page uses Person and ProfilePage schema.
-- `cyberscout-server` still uses SQLite locally/currently; Supabase Postgres remains the production database migration target.
+- `cyberscout-server` uses the same PostgreSQL data layer locally and in production; production points `DATABASE_URL` at Supabase.

@@ -1,34 +1,76 @@
-export const API_BASE = (import.meta.env.VITE_API_URL || (import.meta.env.PROD ? window.location.origin : 'http://localhost:3001')).replace(/\/+$/, '')
+function isCyberLabOrigin(url) {
+  return url.hostname === 'cyberlabin.com' || url.hostname.endsWith('.cyberlabin.com')
+}
+
+function resolveApiBase() {
+  const configured = String(import.meta.env.VITE_API_URL || '').trim()
+  if (!import.meta.env.PROD) return (configured || 'http://localhost:3001').replace(/\/+$/, '')
+
+  const browserOrigin = window.location.origin
+  if (!configured) return browserOrigin
+
+  try {
+    const target = new URL(configured, browserOrigin)
+    const current = new URL(browserOrigin)
+    return (target.origin === current.origin || (isCyberLabOrigin(target) && isCyberLabOrigin(current)))
+      ? target.origin
+      : browserOrigin
+  } catch {
+    return browserOrigin
+  }
+}
+
+export const API_BASE = resolveApiBase()
 let csrfToken = ''
+let csrfTokenPromise = null
 
 function isUnsafeMethod(method) {
   return !['GET', 'HEAD', 'OPTIONS'].includes(method)
 }
 
 async function loadCsrfToken() {
-  const res = await fetch(`${API_BASE}/api/auth/csrf`, {
-    credentials: 'include',
-    headers: { Accept: 'application/json' },
-  })
-  if (!res.ok) throw new Error('Could not establish a secure request session')
-  const body = await res.json()
-  csrfToken = body.csrfToken || ''
-  return csrfToken
+  if (csrfToken) return csrfToken
+  if (csrfTokenPromise) return csrfTokenPromise
+
+  csrfTokenPromise = (async () => {
+    const res = await fetch(`${API_BASE}/api/auth/csrf`, {
+      credentials: 'include',
+      headers: { Accept: 'application/json' },
+    })
+    if (!res.ok) {
+      const error = new Error('Could not establish a secure request session')
+      error.status = res.status
+      throw error
+    }
+    const body = await res.json().catch(() => ({}))
+    if (!/^[a-f0-9]{64}$/i.test(String(body.csrfToken || ''))) {
+      throw new Error('Could not establish a secure request session')
+    }
+    csrfToken = body.csrfToken
+    return csrfToken
+  })()
+
+  try {
+    return await csrfTokenPromise
+  } finally {
+    csrfTokenPromise = null
+  }
 }
 
 async function request(path, options = {}, allowCsrfRetry = true) {
   const method = String(options.method || 'GET').toUpperCase()
   if (isUnsafeMethod(method) && !csrfToken) await loadCsrfToken()
   const hasBody = options.body !== undefined && options.body !== null
+  const { headers: optionHeaders, ...fetchOptions } = options
   const res = await fetch(`${API_BASE}${path}`, {
+    ...fetchOptions,
     credentials: 'include',
     headers: {
       Accept: 'application/json',
       ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
       ...(isUnsafeMethod(method) && csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
-      ...options.headers,
+      ...optionHeaders,
     },
-    ...options,
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }))

@@ -176,10 +176,10 @@ classDiagram
     liveAttendance
   }
   class DatabaseLayer {
-    betterSqlite3
+    sharedPgPool
     migrations
     seed
-    preparedStatements
+    parameterizedQueries
   }
   class JwtUtility {
     signToken
@@ -296,5 +296,5 @@ classDiagram
 
 ## Current Versus Planned
 
-- Current: Vite React, Express, SQLite, JWT/cookie auth, role dashboards, database-backed leads/blogs/visitors/courses/enrollments.
-- Planned: Supabase Postgres, Supabase RLS, Supabase Storage, and production RAG source/chunk persistence. Batch, lab, assessment, certificate, payment, and audit flows are database-backed in the current SQLite runtime.
+- Current: Vite React, Express, Supabase PostgreSQL through `pg`, JWT/cookie auth, role dashboards, and database-backed LMS, CRM, analytics, assessment, payment, and audit flows.
+- Planned: Supabase Storage for protected assets and expanded production RAG source/chunk persistence. Direct browser table access remains revoked; the Express API is the authorization boundary.
