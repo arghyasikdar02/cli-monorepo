@@ -16,6 +16,7 @@ import dashboardsRouter from './routes/dashboards.js'
 import documentsRouter from './routes/documents.js'
 import enrollmentsRouter from './routes/enrollments.js'
 import healthRouter from './routes/health.js'
+import googleIntegrationsRouter from './routes/googleIntegrations.js'
 import labsRouter from './routes/labs.js'
 import leaderboardsRouter from './routes/leaderboards.js'
 import leadsRouter from './routes/leads.js'
@@ -108,6 +109,7 @@ export function createApp() {
   app.use('/api/blogs', blogsRouter)
   app.use('/api/visitors', visitorsRouter)
   app.use('/api/enrollments', enrollmentsRouter)
+  app.use('/api/integrations/google', googleIntegrationsRouter)
   app.use('/api/live-classes', liveClassesRouter)
   app.use('/api/videos', videosRouter)
   app.use('/api/documents', documentsRouter)

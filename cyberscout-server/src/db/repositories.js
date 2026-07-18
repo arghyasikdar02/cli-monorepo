@@ -202,12 +202,22 @@ export async function createUser({ name, email, username, passwordHash, googleId
 export async function updateUser(userId, updates, client) {
   const allowed = {
     name: 'name', username: 'username', email: 'email', googleId: 'google_id', passwordHash: 'password_hash',
-    status: 'status', lastLogin: 'last_login_at', tokenVersion: 'token_version', passwordUpdatedAt: 'password_updated_at',
+    role: 'role', roles: 'roles', status: 'status', lastLogin: 'last_login_at', tokenVersion: 'token_version', passwordUpdatedAt: 'password_updated_at',
   }
   const values = []
   const sets = []
   for (const [key, column] of Object.entries(allowed)) {
     if (updates[key] === undefined) continue
+    if (key === 'role') {
+      if (!VALID_ROLES.includes(updates[key])) continue
+      sets.push(`${column} = ${parameter(values, updates[key])}`)
+      continue
+    }
+    if (key === 'roles') {
+      const safeRoles = Array.from(new Set((updates[key] || []).filter(item => VALID_ROLES.includes(item))))
+      sets.push(`${column} = ${parameter(values, JSON.stringify(safeRoles))}::jsonb`)
+      continue
+    }
     const value = key === 'email' || key === 'username' ? String(updates[key]).trim().toLowerCase() : updates[key]
     sets.push(`${column} = ${parameter(values, value)}`)
   }
@@ -656,38 +666,135 @@ function liveClassFromRow(row) {
     instructor: row.instructor_name || 'Cyber Lab IN Instructor',
     instructorTitle: row.instructor_title || 'Instructor',
     title: row.title,
+    description: row.description || '',
+    agenda: row.agenda || '',
     provider: row.provider,
     joinUrl: row.join_url,
     embedUrl: row.embed_url,
+    meetingUrl: row.meeting_url || row.join_url,
+    googleConnectionId: row.google_connection_id,
+    googleSpaceName: row.google_space_name,
+    googleMeetingCode: row.google_meeting_code,
+    timezone: row.timezone || 'Asia/Kolkata',
+    recordingUrl: row.recording_url,
     scheduledStart: row.scheduled_start,
     scheduledEnd: row.scheduled_end,
+    startAt: row.start_at || row.scheduled_start,
+    endAt: row.end_at || row.scheduled_end,
     status: row.status,
     createdAt: row.created_at,
+    updatedAt: row.updated_at,
   }
 }
 
 export async function createLiveClass(input, actorId = null) {
   const classId = input.id || id('live')
   await execute(`
-    INSERT INTO live_classes (id, course_id, batch_id, instructor_id, title, provider, join_url, embed_url, scheduled_start, scheduled_end, status)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-  `, [classId, input.courseId, input.batchId || null, input.instructorId || null, input.title, input.provider || 'external', input.joinUrl || null, input.embedUrl || null, input.scheduledStart, input.scheduledEnd, input.status || 'scheduled'])
+    INSERT INTO live_classes (
+      id, course_id, batch_id, cohort_id, instructor_id, title, description, agenda, provider, join_url, embed_url,
+      meeting_url, scheduled_start, scheduled_end, start_at, end_at, timezone, status
+    )
+    VALUES ($1, $2, $3, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $12, $13, $14, $15)
+  `, [
+    classId, input.courseId, input.batchId || input.cohortId || null, input.instructorId || actorId || null,
+    input.title, input.description || null, input.agenda || null, input.provider || 'manual',
+    input.joinUrl || input.meetingUrl || null, input.embedUrl || null, input.meetingUrl || input.joinUrl || null,
+    input.scheduledStart || input.startAt, input.scheduledEnd || input.endAt, input.timezone || 'Asia/Kolkata',
+    input.status || 'scheduled',
+  ])
   await recordAudit('live_class.create', actorId, 'live_class', classId, { courseId: input.courseId })
   return getLiveClassById(classId)
 }
 
 export async function updateLiveClass(liveClassId, updates, actorId = null) {
-  const allowed = { title: 'title', provider: 'provider', joinUrl: 'join_url', embedUrl: 'embed_url', scheduledStart: 'scheduled_start', scheduledEnd: 'scheduled_end', status: 'status' }
+  const allowed = {
+    title: 'title', description: 'description', agenda: 'agenda', provider: 'provider', joinUrl: 'join_url',
+    embedUrl: 'embed_url', meetingUrl: 'meeting_url', scheduledStart: 'scheduled_start', scheduledEnd: 'scheduled_end',
+    startAt: 'start_at', endAt: 'end_at', timezone: 'timezone', status: 'status', recordingUrl: 'recording_url',
+    googleConnectionId: 'google_connection_id', googleSpaceName: 'google_space_name', googleMeetingCode: 'google_meeting_code',
+  }
   const values = []
   const sets = []
   for (const [key, column] of Object.entries(allowed)) {
     if (updates[key] !== undefined) sets.push(`${column} = ${parameter(values, updates[key])}`)
   }
   if (!sets.length) return getLiveClassById(liveClassId)
+  sets.push('updated_at = CURRENT_TIMESTAMP')
   const liveParameter = parameter(values, liveClassId)
   await execute(`UPDATE live_classes SET ${sets.join(', ')} WHERE id = ${liveParameter}`, values)
   await recordAudit('live_class.update', actorId, 'live_class', liveClassId, updates)
   return getLiveClassById(liveClassId)
+}
+
+function googleConnectionFromRow(row) {
+  if (!row) return null
+  return {
+    id: row.id,
+    userId: row.user_id,
+    googleSubject: row.google_subject,
+    googleEmail: row.google_email,
+    googleName: row.google_name,
+    googleAvatarUrl: row.google_avatar_url,
+    encryptedAccessToken: row.encrypted_access_token,
+    encryptedRefreshToken: row.encrypted_refresh_token,
+    tokenExpiry: row.token_expiry,
+    grantedScopes: parseJson(row.granted_scopes, []),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    revokedAt: row.revoked_at,
+  }
+}
+
+export async function getGoogleConnectionByUserId(userId) {
+  return googleConnectionFromRow(await queryOne('SELECT * FROM google_connections WHERE user_id = $1 AND revoked_at IS NULL', [userId]))
+}
+
+export async function getGoogleConnectionBySubject(subject) {
+  return googleConnectionFromRow(await queryOne('SELECT * FROM google_connections WHERE google_subject = $1 AND revoked_at IS NULL', [subject]))
+}
+
+export async function upsertGoogleConnection(input, actorId = null) {
+  const connectionId = input.id || id('gcon')
+  const row = await queryOne(`
+    INSERT INTO google_connections (
+      id, user_id, google_subject, google_email, google_name, google_avatar_url,
+      encrypted_access_token, encrypted_refresh_token, token_expiry, granted_scopes, revoked_at
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, NULL)
+    ON CONFLICT(user_id) DO UPDATE SET
+      google_subject = excluded.google_subject,
+      google_email = excluded.google_email,
+      google_name = excluded.google_name,
+      google_avatar_url = excluded.google_avatar_url,
+      encrypted_access_token = excluded.encrypted_access_token,
+      encrypted_refresh_token = COALESCE(excluded.encrypted_refresh_token, google_connections.encrypted_refresh_token),
+      token_expiry = excluded.token_expiry,
+      granted_scopes = excluded.granted_scopes,
+      revoked_at = NULL,
+      updated_at = CURRENT_TIMESTAMP
+    RETURNING *
+  `, [
+    connectionId, input.userId, input.googleSubject, input.googleEmail, input.googleName || null, input.googleAvatarUrl || null,
+    input.encryptedAccessToken || null, input.encryptedRefreshToken || null, input.tokenExpiry || null,
+    JSON.stringify(input.grantedScopes || []),
+  ])
+  await recordAudit('google.connection_upsert', actorId || input.userId, 'user', input.userId, { googleSubject: input.googleSubject })
+  return googleConnectionFromRow(row)
+}
+
+export async function updateGoogleConnectionTokens(connectionId, updates) {
+  const row = await queryOne(`
+    UPDATE google_connections SET encrypted_access_token = $1, encrypted_refresh_token = COALESCE($2, encrypted_refresh_token),
+      token_expiry = $3, granted_scopes = $4::jsonb, updated_at = CURRENT_TIMESTAMP
+    WHERE id = $5 RETURNING *
+  `, [updates.encryptedAccessToken, updates.encryptedRefreshToken || null, updates.tokenExpiry, JSON.stringify(updates.grantedScopes || []), connectionId])
+  return googleConnectionFromRow(row)
+}
+
+export async function disconnectGoogleConnection(userId, actorId = null) {
+  const row = await queryOne('UPDATE google_connections SET revoked_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE user_id = $1 AND revoked_at IS NULL RETURNING *', [userId])
+  if (row) await recordAudit('google.disconnect', actorId || userId, 'user', userId, {})
+  return googleConnectionFromRow(row)
 }
 
 export async function getLiveClassById(liveClassId) {

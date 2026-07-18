@@ -1,17 +1,36 @@
 import { useEffect, useState } from 'react'
 import StaffDashboardShell from '../../components/layout/StaffDashboardShell'
 import DashboardMetric from '../../components/ui/DashboardMetric'
-import { api } from '../../lib/api'
+import { api, API_BASE } from '../../lib/api'
 
 export default function InstructorDashboardPage() {
   const [dashboard, setDashboard] = useState(null)
+  const [google, setGoogle] = useState(null)
   const [error, setError] = useState('')
+  const [googleError, setGoogleError] = useState('')
 
   useEffect(() => {
     api.dashboard('instructor')
       .then(({ dashboard }) => setDashboard(dashboard))
       .catch(err => setError(err.message || 'Unable to load instructor dashboard'))
+    api.googleStatus()
+      .then(({ google }) => setGoogle(google))
+      .catch(err => setGoogleError(err.message || 'Unable to load Google Meet status'))
   }, [])
+
+  const connectGoogle = () => {
+    window.location.href = `${API_BASE}/api/integrations/google/connect?redirect=${encodeURIComponent('/instructor/dashboard')}`
+  }
+
+  const disconnectGoogle = async () => {
+    setGoogleError('')
+    try {
+      const { google } = await api.disconnectGoogle()
+      setGoogle(google)
+    } catch (err) {
+      setGoogleError(err.message || 'Google account could not be disconnected')
+    }
+  }
 
   return (
     <StaffDashboardShell
@@ -24,6 +43,33 @@ export default function InstructorDashboardPage() {
         <div className="rounded-xl border border-slate-200 bg-white p-8 text-slate-500">Loading instructor workspace...</div>
       ) : (
         <div className="space-y-6">
+          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-violet-600">Google Meet integration</p>
+                <h2 className="mt-1 font-space-grotesk text-lg font-bold">Create live-class meeting spaces</h2>
+                <p className="mt-2 max-w-2xl text-sm text-slate-600">
+                  Connect your Google account to let Cyber Lab IN create Google Meet spaces for scheduled classes. Students join Meet in a new tab while the LMS keeps class details, notes and attendance separate.
+                </p>
+                {googleError && <p className="mt-2 text-sm font-semibold text-red-600">{googleError}</p>}
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm lg:min-w-72">
+                <p className="font-bold text-slate-900">{google?.connected ? google.googleEmail : 'No Google account connected'}</p>
+                <p className="mt-1 text-slate-500">{google?.meetScopeGranted ? 'Meet creation permission granted' : 'Meet permission not granted yet'}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button type="button" onClick={connectGoogle} className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800">
+                    {google?.connected ? 'Reauthorize' : 'Connect Google Account'}
+                  </button>
+                  {google?.connected && (
+                    <button type="button" onClick={disconnectGoogle} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-white">
+                      Disconnect
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
+
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <DashboardMetric label="Assigned courses" value={dashboard.assignedCourses.length} helper="Instructor-owned" />
             <DashboardMetric label="Students" value={dashboard.students.length} helper="Course enrollments" />

@@ -60,13 +60,17 @@ Set API env:
 ```env
 JWT_SECRET=use_a_real_random_secret_at_least_32_chars
 FRONTEND_URL=https://cyberlabin.com
-BACKEND_URL=https://cyberlabin.onrender.com
+BACKEND_URL=https://cli-hq1i.onrender.com
 CORS_ORIGINS=https://cyberlabin.com,https://www.cyberlabin.com
 COOKIE_SECURE=true
-COOKIE_SAME_SITE=lax
-GOOGLE_CLIENT_ID=your_google_client_id.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=your_google_client_secret
-GOOGLE_CALLBACK_URL=https://cyberlabin.com/api/auth/google/callback
+COOKIE_SAME_SITE=none
+VITE_API_URL=https://cli-hq1i.onrender.com
+GOOGLE_CLOUD_PROJECT_ID=cyber-lab-in
+GOOGLE_CLOUD_PROJECT_NUMBER=854487433792
+GOOGLE_CLIENT_ID=854487433792-1ntj74qq2qta3fei0a7qhhj650n2p5cv.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=<Render secret only>
+GOOGLE_REDIRECT_URI=https://cli-hq1i.onrender.com/api/auth/google/callback
+GOOGLE_TOKEN_ENCRYPTION_KEY=<Render secret only>
 ```
 
 The frontend calls `/api/auth/config`; Google buttons appear only when the backend has real Google credentials.

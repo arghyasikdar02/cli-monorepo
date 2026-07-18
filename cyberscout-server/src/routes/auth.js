@@ -1,43 +1,40 @@
 import { Router } from 'express'
 import bcrypt from 'bcrypt'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
-import passport from 'passport'
-import { Strategy as GoogleStrategy } from 'passport-google-oauth20'
 import {
   createUser,
   findUserByEmail,
   findUserByGoogleId,
   findUserById,
   findUserByUsername,
+  getGoogleConnectionBySubject,
+  getGoogleConnectionByUserId,
   publicUser,
   recordAudit,
   updateUser,
   updateUserPassword,
+  upsertGoogleConnection,
+  userHasRole,
 } from '../db/repositories.js'
 import { signOAuthState, signToken, verifyOAuthState } from '../lib/jwt.js'
 import { requireAuth } from '../middleware/access.js'
 import { authCookieOptions, clearCookieOptions, csrfCookieOptions, oauthStateCookieOptions } from '../lib/cookies.js'
 import { validatePassword } from '../lib/validation.js'
 import { authSecurityDiagnostics, loginLimiter, registrationLimiter } from '../middleware/security.js'
+import {
+  buildGoogleAuthUrl,
+  createPkceVerifier,
+  encryptedTokenPayload,
+  exchangeGoogleCode,
+  fetchGoogleIdentity,
+  hasGoogleOAuthCredentials,
+} from '../services/google.js'
 
 const router = Router()
 const trimTrailingSlash = (value) => value?.replace(/\/+$/, '')
 const FRONTEND_URL = trimTrailingSlash(process.env.FRONTEND_URL) || 'http://localhost:5173'
 const BACKEND_URL = trimTrailingSlash(process.env.BACKEND_URL) || `http://localhost:${process.env.PORT || 3001}`
-const GOOGLE_CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL || `${BACKEND_URL}/api/auth/google/callback`
-function hasGoogleOAuthCredentials() {
-  const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } = process.env
-  const clientId = GOOGLE_CLIENT_ID?.trim()
-  const clientSecret = GOOGLE_CLIENT_SECRET?.trim()
-  return Boolean(
-    clientId &&
-    clientSecret &&
-    clientId !== 'dummy' &&
-    clientSecret !== 'dummy' &&
-    !clientId.startsWith('your_') &&
-    !clientSecret.startsWith('your_')
-  )
-}
+const GOOGLE_CALLBACK_URL = process.env.GOOGLE_REDIRECT_URI || process.env.GOOGLE_CALLBACK_URL || `${BACKEND_URL}/api/auth/google/callback`
 
 function dashboardPathForUser(user) {
   const roles = user.roles || [user.role]
@@ -48,9 +45,9 @@ function dashboardPathForUser(user) {
   return '/dashboard'
 }
 
-function safeRelativeRedirect(value) {
-  if (!value || typeof value !== 'string') return ''
-  if (!value.startsWith('/') || value.startsWith('//')) return ''
+function safeRelativeRedirect(value, fallback = '') {
+  if (!value || typeof value !== 'string') return fallback
+  if (!value.startsWith('/') || value.startsWith('//')) return fallback
   return value
 }
 
@@ -79,46 +76,7 @@ function safelyEqual(left, right) {
 }
 
 export function setupPassport() {
-  if (!hasGoogleOAuthCredentials()) return
-
-  passport.use(new GoogleStrategy(
-    {
-      clientID: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: GOOGLE_CALLBACK_URL,
-    },
-    async (_accessToken, _refreshToken, profile, done) => {
-      try {
-        let user = await findUserByGoogleId(profile.id)
-        if (!user) {
-          const email = String(profile.emails?.[0]?.value || '').trim().toLowerCase()
-          if (!email) return done(new Error('Google account did not provide an email address'))
-          const existingUser = await findUserByEmail(email)
-          user = existingUser
-            ? await updateUser(existingUser.id, { googleId: profile.id })
-            : await createUser({
-                googleId: profile.id,
-                name: profile.displayName,
-                email,
-                passwordHash: null,
-                role: 'student',
-                roles: ['student'],
-              })
-        }
-        return done(null, user)
-      } catch (error) {
-        return done(error)
-      }
-    }
-  ))
-  passport.serializeUser((user, done) => done(null, user.id))
-  passport.deserializeUser(async (id, done) => {
-    try {
-      done(null, await findUserById(id))
-    } catch (error) {
-      done(error)
-    }
-  })
+  return null
 }
 
 // GET /api/auth/config
@@ -185,21 +143,20 @@ router.get('/google', (req, res, next) => {
     return res.redirect(`${FRONTEND_URL}/login?error=oauth_unconfigured`)
   }
   const redirect = safeRelativeRedirect(req.query.redirect)
+  const { verifier, challenge } = createPkceVerifier()
   const state = signOAuthState({
+    flow: 'login',
     nonce: randomBytes(24).toString('hex'),
     redirect,
+    verifier,
   })
   res.cookie('cli_oauth_state', state, oauthStateCookieOptions())
-  return passport.authenticate('google', {
-    scope: ['profile', 'email'],
-    session: false,
-    state,
-  })(req, res, next)
+  return res.redirect(buildGoogleAuthUrl({ state, codeChallenge: challenge }))
 })
 
 // GET /api/auth/google/callback
-router.get('/google/callback',
-  (req, res, next) => {
+router.get('/google/callback', async (req, res) => {
+  try {
     if (!hasGoogleOAuthCredentials()) {
       return res.redirect(`${FRONTEND_URL}/login?error=oauth_unconfigured`)
     }
@@ -216,21 +173,61 @@ router.get('/google/callback',
       return res.redirect(`${FRONTEND_URL}/login?error=oauth_state`)
     }
     res.clearCookie('cli_oauth_state', clearCookieOptions(oauthStateCookieOptions()))
-    return passport.authenticate('google', {
-      session: false,
-      failureRedirect: `${FRONTEND_URL}/login?error=oauth_failed`,
-    })(req, res, next)
-  },
-  async (req, res) => {
-    const token = signUserToken(req.user)
+    if (!['login', 'meet_connect'].includes(req.oauthState?.flow)) return res.redirect(`${FRONTEND_URL}/login?error=oauth_state`)
+    const code = String(req.query.code || '')
+    if (!code) return res.redirect(`${FRONTEND_URL}/login?error=oauth_cancelled`)
+    const tokens = await exchangeGoogleCode(code, req.oauthState.verifier)
+    const profile = await fetchGoogleIdentity(tokens.access_token)
+    if (req.oauthState.flow === 'meet_connect') {
+      const user = await findUserById(req.oauthState.userId)
+      if (!user || !userHasRole(user, ['admin', 'super_admin', 'instructor'])) {
+        return res.redirect(`${FRONTEND_URL}/login?error=oauth_forbidden`)
+      }
+      const linkedUser = await findUserByGoogleId(profile.subject)
+      const linkedConnection = await getGoogleConnectionBySubject(profile.subject)
+      if ((linkedUser && linkedUser.id !== user.id) || (linkedConnection && linkedConnection.userId !== user.id)) {
+        return res.redirect(`${FRONTEND_URL}${safeRelativeRedirect(req.oauthState.redirect, '/instructor/dashboard')}?google=identity_in_use`)
+      }
+      const existingConnection = await getGoogleConnectionByUserId(user.id)
+      const tokenPayload = encryptedTokenPayload(tokens, existingConnection?.encryptedRefreshToken || null)
+      await upsertGoogleConnection({
+        userId: user.id,
+        googleSubject: profile.subject,
+        googleEmail: profile.email,
+        googleName: profile.name,
+        googleAvatarUrl: profile.avatarUrl,
+        ...tokenPayload,
+      }, user.id)
+      if (!user.googleId) await updateUser(user.id, { googleId: profile.subject })
+      await recordAudit('google.meet_connect', user.id, 'user', user.id, { scopes: tokenPayload.grantedScopes })
+      return res.redirect(`${FRONTEND_URL}${safeRelativeRedirect(req.oauthState.redirect, '/instructor/dashboard')}?google=connected`)
+    }
+    let user = await findUserByGoogleId(profile.subject)
+    if (!user) {
+      const existingUser = await findUserByEmail(profile.email)
+      if (existingUser) return res.redirect(`${FRONTEND_URL}/login?error=oauth_link_required`)
+      user = await createUser({
+        googleId: profile.subject,
+        name: profile.name,
+        email: profile.email,
+        passwordHash: null,
+        role: 'student',
+        roles: ['student'],
+      })
+    }
+    if (user.status === 'suspended') return res.redirect(`${FRONTEND_URL}/login?error=account_suspended`)
+    const token = signUserToken(user)
     setAuthCookie(res, token)
-    await updateUser(req.user.id, { lastLogin: new Date().toISOString() })
-    await recordAudit('auth.oauth_login', req.user.id, 'user', req.user.id, { provider: 'google' })
+    await updateUser(user.id, { lastLogin: new Date().toISOString() })
+    await recordAudit('auth.oauth_login', user.id, 'user', user.id, { provider: 'google' })
     const redirect = safeRelativeRedirect(req.oauthState?.redirect)
     const redirectQuery = redirect ? `?redirect=${encodeURIComponent(redirect)}` : ''
     res.redirect(`${FRONTEND_URL}/oauth/callback${redirectQuery}`)
+  } catch {
+    clearAuthCookie(res)
+    res.redirect(`${FRONTEND_URL}/login?error=oauth_failed`)
   }
-)
+})
 
 // GET /api/auth/me
 router.get('/me', requireAuth, (req, res) => {

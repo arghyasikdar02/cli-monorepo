@@ -3,6 +3,7 @@ import { requireAuth, requireCourseAccess, requireCourseManager, requireRole } f
 import {
   createLiveClass,
   getLiveClassById,
+  getGoogleConnectionByUserId,
   getViewerCount,
   hasActiveEnrollment,
   isInstructorAssigned,
@@ -10,11 +11,19 @@ import {
   listLiveClassesByCourse,
   listUpcomingLiveClassesForUser,
   recordLiveEvent,
+  recordAudit,
+  updateGoogleConnectionTokens,
   updateLiveClass,
   userHasRole,
 } from '../db/repositories.js'
 import { canJoinLiveClass } from '../services/authorization.js'
 import { requireFields } from '../lib/validation.js'
+import {
+  createGoogleMeetSpace,
+  decryptAccessToken as decryptGoogleAccessToken,
+  GOOGLE_MEET_SCOPE,
+  refreshGoogleAccessToken,
+} from '../services/google.js'
 
 const router = Router()
 const managerRoles = ['admin', 'super_admin', 'instructor', 'ops', 'lab_creator', 'support']
@@ -86,6 +95,47 @@ router.patch('/:liveClassId', requireRole(...managerRoles), async (req, res) => 
   res.json({ liveClass: publicLiveClass(liveClass, true) })
 })
 
+router.post('/:liveClassId/google-meet', requireRole('admin', 'super_admin', 'instructor'), async (req, res) => {
+  const liveClass = await getLiveClassById(req.params.liveClassId)
+  if (!liveClass) return res.status(404).json({ error: 'Live class not found' })
+  if (!userHasRole(req.user, monitorRoles) && !await isInstructorAssigned(req.user.id, liveClass.courseId)) {
+    return res.status(403).json({ error: 'Live class access denied' })
+  }
+  if (liveClass.googleSpaceName && liveClass.meetingUrl) {
+    return res.json({ liveClass: publicLiveClass(liveClass, true), googleMeet: { meetingUrl: liveClass.meetingUrl, meetingCode: liveClass.googleMeetingCode } })
+  }
+  const connection = await getGoogleConnectionByUserId(req.user.id)
+  if (!connection) return res.status(409).json({ error: 'Connect Google Meet before creating a Google Meet class.' })
+  if (!connection.grantedScopes.includes(GOOGLE_MEET_SCOPE)) return res.status(403).json({ error: 'Google Meet permission is missing. Reauthorize Google Meet.' })
+
+  let activeConnection = connection
+  const expiresSoon = !connection.tokenExpiry || new Date(connection.tokenExpiry).getTime() - Date.now() < 60_000
+  if (expiresSoon) {
+    try {
+      const refreshed = await refreshGoogleAccessToken(connection)
+      activeConnection = await updateGoogleConnectionTokens(connection.id, refreshed)
+    } catch {
+      return res.status(409).json({ error: 'Google Meet authorization expired. Reconnect Google Meet.' })
+    }
+  }
+
+  try {
+    const meet = await createGoogleMeetSpace(decryptGoogleAccessToken(activeConnection))
+    const updated = await updateLiveClass(liveClass.id, {
+      provider: 'google_meet',
+      googleConnectionId: activeConnection.id,
+      googleSpaceName: meet.spaceName,
+      googleMeetingCode: meet.meetingCode,
+      meetingUrl: meet.meetingUri,
+      joinUrl: meet.meetingUri,
+    }, req.user.id)
+    await recordAudit('live_class.google_meet_create', req.user.id, 'live_class', liveClass.id, { googleSpaceName: meet.spaceName })
+    return res.json({ liveClass: publicLiveClass(updated, true), googleMeet: { meetingUrl: updated.meetingUrl, meetingCode: updated.googleMeetingCode } })
+  } catch {
+    return res.status(502).json({ error: 'Google Meet could not be created. Use a manual meeting URL or try again.' })
+  }
+})
+
 router.get('/:liveClassId/validate', async (req, res) => {
   const liveClass = await getLiveClassById(req.params.liveClassId)
   if (!liveClass) return res.status(404).json({ error: 'Live class not found' })
@@ -108,6 +158,15 @@ router.post('/:liveClassId/leave', async (req, res) => {
   if (!await canAccessLiveClass(req.user, liveClass)) return res.status(403).json({ error: 'Live class access denied' })
   const attendance = await recordLiveEvent(liveClass.id, req.user.id, 'leave')
   res.json({ attendance, viewerCount: await getViewerCount(liveClass.id) })
+})
+
+router.post('/:liveClassId/check-in', async (req, res) => {
+  const liveClass = await getLiveClassById(req.params.liveClassId)
+  if (!liveClass) return res.status(404).json({ error: 'Live class not found' })
+  if (!await canAccessLiveClass(req.user, liveClass)) return res.status(403).json({ error: 'Live class access denied' })
+  const attendance = await recordLiveEvent(liveClass.id, req.user.id, 'check_in')
+  await recordAudit('live_class.check_in', req.user.id, 'live_class', liveClass.id, { source: 'lms' })
+  res.json({ attendance, status: 'checked_in' })
 })
 
 router.get('/:liveClassId/attendance', requireRole(...managerRoles), async (req, res) => {

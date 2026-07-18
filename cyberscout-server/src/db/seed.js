@@ -7,6 +7,7 @@ import {
   enrollUser,
   findUserByEmail,
   getCourseById,
+  updateUser,
 } from './repositories.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -58,8 +59,17 @@ async function insertMaterial(material, client) {
 
 async function ensureUser({ name, email, role, roles }) {
   const existing = await findUserByEmail(email)
-  if (existing) return existing
   const passwordHash = await bcrypt.hash(PASSWORD, COST)
+  if (existing) {
+    return updateUser(existing.id, {
+      name,
+      passwordHash,
+      role,
+      roles,
+      status: 'active',
+      passwordUpdatedAt: new Date().toISOString(),
+    })
+  }
   return createUser({
     name,
     email,

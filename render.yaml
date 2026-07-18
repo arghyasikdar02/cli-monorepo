@@ -13,15 +13,25 @@ services:
       - key: FRONTEND_URL
         value: https://cyberlabin.com
       - key: BACKEND_URL
-        value: https://cyberlabin.onrender.com
+        value: https://cli-hq1i.onrender.com
       - key: CORS_ORIGINS
         value: https://cyberlabin.com,https://www.cyberlabin.com
-      - key: GOOGLE_CALLBACK_URL
-        value: https://cyberlabin.com/api/auth/google/callback
+      - key: GOOGLE_CLOUD_PROJECT_ID
+        value: cyber-lab-in
+      - key: GOOGLE_CLOUD_PROJECT_NUMBER
+        value: "854487433792"
+      - key: GOOGLE_CLIENT_ID
+        value: 854487433792-1ntj74qq2qta3fei0a7qhhj650n2p5cv.apps.googleusercontent.com
+      - key: GOOGLE_REDIRECT_URI
+        value: https://cli-hq1i.onrender.com/api/auth/google/callback
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_TOKEN_ENCRYPTION_KEY
+        sync: false
       - key: COOKIE_SECURE
         value: "true"
       - key: COOKIE_SAME_SITE
-        value: lax
+        value: none
       - key: BCRYPT_COST
         value: "12"
       - key: DATABASE_URL

@@ -23,10 +23,10 @@ Enter secret values in the Render dashboard. Do not store them in `render.yaml` 
 ```text
 NODE_ENV=production
 FRONTEND_URL=https://cyberlabin.com
-BACKEND_URL=https://cyberlabin.onrender.com
+BACKEND_URL=https://cli-hq1i.onrender.com
 CORS_ORIGINS=https://cyberlabin.com,https://www.cyberlabin.com
 COOKIE_SECURE=true
-COOKIE_SAME_SITE=lax
+COOKIE_SAME_SITE=none
 BCRYPT_COST=12
 DATABASE_SSL=require
 
@@ -44,9 +44,12 @@ Generate independent secrets with `openssl rand -hex 32`. `DATABASE_URL` must be
 Optional complete groups:
 
 ```text
-GOOGLE_CLIENT_ID=
+GOOGLE_CLOUD_PROJECT_ID=cyber-lab-in
+GOOGLE_CLOUD_PROJECT_NUMBER=854487433792
+GOOGLE_CLIENT_ID=854487433792-1ntj74qq2qta3fei0a7qhhj650n2p5cv.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=
-GOOGLE_CALLBACK_URL=https://cyberlabin.com/api/auth/google/callback
+GOOGLE_REDIRECT_URI=https://cli-hq1i.onrender.com/api/auth/google/callback
+GOOGLE_TOKEN_ENCRYPTION_KEY=<random 32+ characters>
 
 RAZORPAY_KEY_ID=
 RAZORPAY_KEY_SECRET=
@@ -57,13 +60,13 @@ Configure every value in an optional group together or leave the group unset.
 
 ## Browser session routing
 
-Production browser requests use `https://cyberlabin.com/api/*`. The Vercel rewrite in `cyberscout/vercel.json` forwards those requests to Render while the browser retains a first-party `cyberlabin.com` cookie. Keep `VITE_API_URL` unset in Vercel and remove any old value pointing directly to `https://cyberlabin.onrender.com`.
+Production browser requests should use the configured Render API origin while Google Cloud is returning OAuth callbacks to Render. Set the Vercel frontend variable `VITE_API_URL=https://cli-hq1i.onrender.com`.
 
-This architecture intentionally uses host-only, HTTP-only, `Secure`, `SameSite=Lax` cookies without a `Domain` attribute. Login and every other browser state-changing request first obtain a double-submit token from `/api/auth/csrf`. Do not change the frontend to call Render directly and do not set `COOKIE_SAME_SITE=none` while the first-party proxy is active.
+This current architecture uses host-only, HTTP-only, `Secure`, `SameSite=None` cookies without a `Domain` attribute because `cyberlabin.com` and `onrender.com` are different registrable domains. Login and every other browser state-changing request first obtain a double-submit token from `/api/auth/csrf`.
 
-Google OAuth must return through `https://cyberlabin.com/api/auth/google/callback`; add that exact URI in Google Cloud Console. This keeps the signed OAuth state cookie on the same browser origin throughout the flow.
+Google OAuth currently returns through `https://cli-hq1i.onrender.com/api/auth/google/callback`, matching the configured Google Cloud redirect URI. Keep `BACKEND_URL` and `GOOGLE_REDIRECT_URI` configurable for a future `api.cyberlabin.com` migration.
 
-`api.cyberlabin.com` remains a suitable future custom Render domain. After Render verifies that domain, point `VITE_API_URL` to `https://api.cyberlabin.com`, update `BACKEND_URL`, retain `FRONTEND_URL=https://cyberlabin.com`, and keep both origins in the explicit CORS configuration. Both hosts are same-site, so `SameSite=Lax` remains appropriate.
+`api.cyberlabin.com` remains the recommended final custom Render domain. After Render verifies that domain and Google Cloud has the new callback URI, point `VITE_API_URL` to `https://api.cyberlabin.com`, update `BACKEND_URL` and `GOOGLE_REDIRECT_URI`, retain `FRONTEND_URL=https://cyberlabin.com`, and keep both origins in the explicit CORS configuration. Both hosts are then same-site, so `SameSite=Lax` becomes appropriate again.
 
 ## First deployment
 
@@ -71,7 +74,7 @@ Google OAuth must return through `https://cyberlabin.com/api/auth/google/callbac
 2. Enter all required Render variables, especially `DATABASE_URL`.
 3. Deploy from the root `render.yaml` or enter the service settings above.
 4. Confirm the logs show each new PostgreSQL migration and `database=postgresql`.
-5. Verify `https://cyberlabin.onrender.com/health` returns HTTP 200.
+5. Verify `https://cli-hq1i.onrender.com/health` returns HTTP 200.
 6. If the public catalogue is absent, run `npm run db:seed` once from a protected Render shell. Re-running it is safe because inserts use stable identifiers and `ON CONFLICT DO NOTHING`.
 
 Do not set `SEED_DEVELOPMENT_USERS=1` in production.
@@ -79,8 +82,8 @@ Do not set `SEED_DEVELOPMENT_USERS=1` in production.
 ## Verification
 
 ```bash
-curl -fsS https://cyberlabin.onrender.com/health
-curl -fsS https://cyberlabin.onrender.com/api/courses
+curl -fsS https://cli-hq1i.onrender.com/health
+curl -fsS https://cli-hq1i.onrender.com/api/courses
 ```
 
 Use an authenticated smoke test for `/api/auth/me`, dashboards, enrollment and lead persistence. Check Supabase table records to confirm that writes are landing in PostgreSQL.

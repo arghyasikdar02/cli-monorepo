@@ -8,6 +8,7 @@ export default function LiveClassSessionPage() {
   const [viewerCount, setViewerCount] = useState(0)
   const [muted, setMuted] = useState(false)
   const [handRaised, setHandRaised] = useState(false)
+  const [checkedIn, setCheckedIn] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -80,13 +81,17 @@ export default function LiveClassSessionPage() {
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 flex flex-col">
           <div className="flex-1 bg-slate-900 flex items-center justify-center relative">
-            {liveClass.embedUrl ? (
-              <iframe
-                title={liveClass.title}
-                src={liveClass.embedUrl}
-                className="h-full w-full border-0"
-                allow="camera; microphone; fullscreen; display-capture"
-              />
+            {liveClass.meetingUrl ? (
+              <div className="max-w-lg px-6 text-center">
+                <span className="material-symbols-outlined text-[72px] text-slate-600 block mb-4">video_chat</span>
+                <h1 className="font-space-grotesk text-2xl font-black text-white">Join the Google Meet session</h1>
+                <p className="mt-3 text-sm leading-6 text-slate-400">
+                  Google Meet opens in a new tab. Keep this Cyber Lab IN class workspace open for agenda, notes and attendance.
+                </p>
+                <a href={liveClass.meetingUrl} target="_blank" rel="noreferrer" className="mt-6 inline-flex rounded-lg bg-white px-5 py-3 text-sm font-bold text-slate-950 hover:bg-slate-100">
+                  Open Google Meet
+                </a>
+              </div>
             ) : (
               <div className="text-center">
                 <span className="material-symbols-outlined text-[80px] text-slate-700 block mb-4">video_camera_front</span>
@@ -127,8 +132,25 @@ export default function LiveClassSessionPage() {
             </div>
             <div className="rounded-lg border border-slate-800 bg-slate-950 p-4">
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Access</p>
-              <p className="mt-1">Your join event has been recorded for attendance.</p>
+              <p className="mt-1">Your join click has been recorded. Check in when your instructor asks you to confirm attendance.</p>
+              <button
+                type="button"
+                disabled={checkedIn}
+                onClick={async () => {
+                  await api.checkInLiveClass(liveClass.id)
+                  setCheckedIn(true)
+                }}
+                className="mt-3 rounded-lg border border-slate-700 px-3 py-2 text-xs font-bold text-slate-200 hover:bg-slate-800 disabled:cursor-default disabled:opacity-60"
+              >
+                {checkedIn ? 'Checked in' : 'Check in'}
+              </button>
             </div>
+            {liveClass.agenda && (
+              <div className="rounded-lg border border-slate-800 bg-slate-950 p-4">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Agenda</p>
+                <p className="mt-1 whitespace-pre-wrap">{liveClass.agenda}</p>
+              </div>
+            )}
           </div>
         </aside>
       </div>

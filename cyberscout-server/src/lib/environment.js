@@ -189,8 +189,11 @@ export function validateEnvironment(env = process.env) {
     errors.push('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET: configure both values together or leave both unset')
   } else if (hasGoogleClient) {
     if (isPlaceholder(env.GOOGLE_CLIENT_ID)) errors.push('GOOGLE_CLIENT_ID: replace the placeholder with the Google OAuth client ID')
+    if (env.GOOGLE_CLOUD_PROJECT_ID && env.GOOGLE_CLOUD_PROJECT_ID !== 'cyber-lab-in') errors.push('GOOGLE_CLOUD_PROJECT_ID: must match the configured Google Cloud project')
+    if (env.GOOGLE_CLOUD_PROJECT_NUMBER && env.GOOGLE_CLOUD_PROJECT_NUMBER !== '854487433792') errors.push('GOOGLE_CLOUD_PROJECT_NUMBER: must match the configured Google Cloud project number')
     validateSecret(env, 'GOOGLE_CLIENT_SECRET', 16, errors)
-    validateHttpsUrl(env, 'GOOGLE_CALLBACK_URL', errors)
+    validateSecret(env, 'GOOGLE_TOKEN_ENCRYPTION_KEY', 32, errors)
+    validateHttpsUrl(env, env.GOOGLE_REDIRECT_URI ? 'GOOGLE_REDIRECT_URI' : 'GOOGLE_CALLBACK_URL', errors)
   }
 
   const razorpayNames = ['RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET', 'RAZORPAY_WEBHOOK_SECRET']

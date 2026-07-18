@@ -114,6 +114,11 @@ export default function LiveClassDetailPage() {
               <Link to="/live-classes" className="block w-full text-center py-2.5 border border-slate-200 text-slate-600 text-sm font-space-grotesk rounded-xl hover:bg-slate-50 transition-colors">
                 View Full Schedule
               </Link>
+              {liveClass.meetingUrl && (
+                <a href={liveClass.meetingUrl} target="_blank" rel="noreferrer" className="block w-full text-center py-2.5 border border-violet-200 text-violet-700 text-sm font-space-grotesk rounded-xl hover:bg-violet-50 transition-colors">
+                  Open Google Meet
+                </a>
+              )}
             </div>
           </div>
         </div>

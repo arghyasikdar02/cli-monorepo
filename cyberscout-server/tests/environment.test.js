@@ -6,7 +6,7 @@ import { getAllowedOrigins, validateEnvironment } from '../src/lib/environment.j
 const validProductionEnvironment = {
   NODE_ENV: 'production',
   FRONTEND_URL: 'https://cyberlabin.com/',
-  BACKEND_URL: 'https://cyberlabin.onrender.com/',
+  BACKEND_URL: 'https://cli-hq1i.onrender.com/',
   CORS_ORIGINS: 'https://cyberlabin.com/, https://www.cyberlabin.com',
   DATABASE_URL: 'postgresql://postgres:production-db-secret@db.project.supabase.co:5432/postgres?sslmode=require',
   JWT_SECRET: 'j'.repeat(64),
@@ -22,7 +22,7 @@ describe('production environment validation', () => {
   it('accepts and normalizes a valid Render configuration', () => {
     const result = validateEnvironment({ ...validProductionEnvironment })
     assert.equal(result.frontendUrl, 'https://cyberlabin.com')
-    assert.equal(result.backendUrl, 'https://cyberlabin.onrender.com')
+    assert.equal(result.backendUrl, 'https://cli-hq1i.onrender.com')
     assert.equal(result.databaseUrl, validProductionEnvironment.DATABASE_URL)
     assert.deepEqual(result.allowedOrigins, ['https://cyberlabin.com', 'https://www.cyberlabin.com'])
   })
@@ -83,7 +83,7 @@ describe('production environment validation', () => {
         LAB_FLAG_SALT: 'placeholder',
         GOOGLE_CLIENT_ID: '',
         GOOGLE_CLIENT_SECRET: '',
-        GOOGLE_CALLBACK_URL: '',
+        GOOGLE_REDIRECT_URI: '',
         RAZORPAY_KEY_ID: '',
         RAZORPAY_KEY_SECRET: '',
         RAZORPAY_WEBHOOK_SECRET: '',

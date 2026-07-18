@@ -2,6 +2,10 @@ function isCyberLabOrigin(url) {
   return url.hostname === 'cyberlabin.com' || url.hostname.endsWith('.cyberlabin.com')
 }
 
+function isConfiguredRenderApi(url) {
+  return url.origin === 'https://cli-hq1i.onrender.com'
+}
+
 function resolveApiBase() {
   const configured = String(import.meta.env.VITE_API_URL || '').trim()
   if (!import.meta.env.PROD) return (configured || 'http://localhost:3001').replace(/\/+$/, '')
@@ -12,7 +16,7 @@ function resolveApiBase() {
   try {
     const target = new URL(configured, browserOrigin)
     const current = new URL(browserOrigin)
-    return (target.origin === current.origin || (isCyberLabOrigin(target) && isCyberLabOrigin(current)))
+    return (target.origin === current.origin || isConfiguredRenderApi(target) || (isCyberLabOrigin(target) && isCyberLabOrigin(current)))
       ? target.origin
       : browserOrigin
   } catch {
@@ -120,4 +124,8 @@ export const api = {
   saveCookieConsent: (consent) => request('/api/visitors/consent', { method: 'POST', body: JSON.stringify(consent) }),
   visitorStats: () => request('/api/visitors/stats'),
   trackEvent: (event, properties = {}) => request('/api/analytics/events', { method: 'POST', body: JSON.stringify({ event, path: window.location.pathname, properties }) }),
+  googleStatus: () => request('/api/integrations/google/status'),
+  disconnectGoogle: () => request('/api/integrations/google/disconnect', { method: 'POST' }),
+  createGoogleMeet: (liveClassId) => request(`/api/live-classes/${liveClassId}/google-meet`, { method: 'POST' }),
+  checkInLiveClass: (liveClassId) => request(`/api/live-classes/${liveClassId}/check-in`, { method: 'POST' }),
 }
