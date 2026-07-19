@@ -39,6 +39,8 @@ CLIADM_ADMIN_TOKEN=<random 32+ characters>
 
 Generate independent secrets with `openssl rand -hex 32`. `DATABASE_URL` must begin with `postgresql://` or `postgres://` and include the database password. Use the Supabase connection string appropriate for a persistent server; use the direct connection for migrations when network support permits, or a Supabase pooler connection documented as DDL-compatible.
 
+`BACKEND_URL` must be the public HTTPS origin assigned to the active Render service. Environment validation rejects localhost, HTTP, credentials, paths, queries and fragments, but it does not hardcode a Render hostname. Google uses the separately validated `GOOGLE_REDIRECT_URI`, so changing the backend service origin cannot change the browser-facing OAuth callback.
+
 `DATABASE_SSL=require` enables TLS for the PostgreSQL connection and uses connection-scoped compatibility for the provider-managed certificate chain. URL parameters such as `sslmode`, `sslcert`, `sslkey`, and `sslrootcert` are removed before `pg` creates the connection so they cannot override the shared policy. To require CA verification instead, configure `DATABASE_SSL_CA` with the provider's PEM CA chain. The application never disables TLS verification globally.
 
 Optional complete groups:

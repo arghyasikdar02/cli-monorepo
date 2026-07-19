@@ -27,6 +27,14 @@ describe('production environment validation', () => {
     assert.deepEqual(result.allowedOrigins, ['https://cyberlabin.com', 'https://www.cyberlabin.com'])
   })
 
+  it('accepts the configured public HTTPS backend origin without coupling it to the OAuth callback host', () => {
+    const result = validateEnvironment({
+      ...validProductionEnvironment,
+      BACKEND_URL: 'https://cyberlabin.onrender.com',
+    })
+    assert.equal(result.backendUrl, 'https://cyberlabin.onrender.com')
+  })
+
   it('requires the first-party proxy cookie and Google callback configuration', () => {
     const googleEnvironment = {
       ...validProductionEnvironment,

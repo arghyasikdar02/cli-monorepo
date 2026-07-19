@@ -1,7 +1,6 @@
 const PLACEHOLDER_PATTERN = /change[_-]?me|replace(?:[_-]|\s+)(?:me|with)|your[_-]|placeholder|dummy|password123|test[_-]?secret/i
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1'])
 const PRODUCTION_FRONTEND_ORIGIN = 'https://cyberlabin.com'
-const PRODUCTION_BACKEND_ORIGIN = 'https://cli-hq1i.onrender.com'
 const PRODUCTION_GOOGLE_CALLBACK = 'https://cyberlabin.com/api/auth/google/callback'
 const PRODUCTION_CORS_ORIGINS = new Set([PRODUCTION_FRONTEND_ORIGIN, 'https://www.cyberlabin.com'])
 
@@ -140,9 +139,6 @@ export function validateEnvironment(env = process.env) {
   const backendUrl = validateHttpsOrigin(env, 'BACKEND_URL', errors)
   if (frontendUrl && frontendUrl !== PRODUCTION_FRONTEND_ORIGIN) {
     errors.push(`FRONTEND_URL: must be ${PRODUCTION_FRONTEND_ORIGIN} for this deployment`)
-  }
-  if (backendUrl && backendUrl !== PRODUCTION_BACKEND_ORIGIN) {
-    errors.push(`BACKEND_URL: must be ${PRODUCTION_BACKEND_ORIGIN} for this deployment`)
   }
   const allowedOrigins = getAllowedOrigins(env)
   const rawCorsOrigins = String(env.CORS_ORIGINS || env.FRONTEND_URL || '').split(',').map(value => value.trim()).filter(Boolean)
