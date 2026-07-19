@@ -1,5 +1,9 @@
 const PLACEHOLDER_PATTERN = /change[_-]?me|replace(?:[_-]|\s+)(?:me|with)|your[_-]|placeholder|dummy|password123|test[_-]?secret/i
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1'])
+const PRODUCTION_FRONTEND_ORIGIN = 'https://cyberlabin.com'
+const PRODUCTION_BACKEND_ORIGIN = 'https://cli-hq1i.onrender.com'
+const PRODUCTION_GOOGLE_CALLBACK = 'https://cyberlabin.com/api/auth/google/callback'
+const PRODUCTION_CORS_ORIGINS = new Set([PRODUCTION_FRONTEND_ORIGIN, 'https://www.cyberlabin.com'])
 
 function isPlaceholder(value) {
   return !value || PLACEHOLDER_PATTERN.test(String(value))
@@ -134,6 +138,12 @@ export function validateEnvironment(env = process.env) {
 
   const frontendUrl = validateHttpsOrigin(env, 'FRONTEND_URL', errors)
   const backendUrl = validateHttpsOrigin(env, 'BACKEND_URL', errors)
+  if (frontendUrl && frontendUrl !== PRODUCTION_FRONTEND_ORIGIN) {
+    errors.push(`FRONTEND_URL: must be ${PRODUCTION_FRONTEND_ORIGIN} for this deployment`)
+  }
+  if (backendUrl && backendUrl !== PRODUCTION_BACKEND_ORIGIN) {
+    errors.push(`BACKEND_URL: must be ${PRODUCTION_BACKEND_ORIGIN} for this deployment`)
+  }
   const allowedOrigins = getAllowedOrigins(env)
   const rawCorsOrigins = String(env.CORS_ORIGINS || env.FRONTEND_URL || '').split(',').map(value => value.trim()).filter(Boolean)
   if (!rawCorsOrigins.length) {
@@ -159,6 +169,8 @@ export function validateEnvironment(env = process.env) {
         parsed.hash
       ) {
         errors.push(`CORS_ORIGINS: entry ${index + 1} must be a public HTTPS origin`)
+      } else if (!PRODUCTION_CORS_ORIGINS.has(normalized)) {
+        errors.push(`CORS_ORIGINS: entry ${index + 1} is not an approved Cyber Lab IN frontend origin`)
       }
     })
   }
@@ -175,8 +187,8 @@ export function validateEnvironment(env = process.env) {
     errors.push('COOKIE_SECURE: must be true in production')
   }
   const sameSite = String(env.COOKIE_SAME_SITE || 'lax').toLowerCase()
-  if (!['lax', 'strict', 'none'].includes(sameSite)) {
-    errors.push('COOKIE_SAME_SITE: must be lax, strict or none')
+  if (sameSite !== 'lax') {
+    errors.push('COOKIE_SAME_SITE: must be lax when browser API traffic uses the cyberlabin.com /api proxy')
   }
   const bcryptCost = Number(env.BCRYPT_COST || 12)
   if (!Number.isInteger(bcryptCost) || bcryptCost < 10 || bcryptCost > 15) {
@@ -193,7 +205,11 @@ export function validateEnvironment(env = process.env) {
     if (env.GOOGLE_CLOUD_PROJECT_NUMBER && env.GOOGLE_CLOUD_PROJECT_NUMBER !== '854487433792') errors.push('GOOGLE_CLOUD_PROJECT_NUMBER: must match the configured Google Cloud project number')
     validateSecret(env, 'GOOGLE_CLIENT_SECRET', 16, errors)
     validateSecret(env, 'GOOGLE_TOKEN_ENCRYPTION_KEY', 32, errors)
-    validateHttpsUrl(env, env.GOOGLE_REDIRECT_URI ? 'GOOGLE_REDIRECT_URI' : 'GOOGLE_CALLBACK_URL', errors)
+    const redirectName = env.GOOGLE_REDIRECT_URI ? 'GOOGLE_REDIRECT_URI' : 'GOOGLE_CALLBACK_URL'
+    const googleRedirect = validateHttpsUrl(env, redirectName, errors)
+    if (googleRedirect && googleRedirect !== PRODUCTION_GOOGLE_CALLBACK) {
+      errors.push(`GOOGLE_REDIRECT_URI: must be ${PRODUCTION_GOOGLE_CALLBACK}`)
+    }
   }
 
   const razorpayNames = ['RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET', 'RAZORPAY_WEBHOOK_SECRET']

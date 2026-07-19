@@ -26,7 +26,7 @@ FRONTEND_URL=https://cyberlabin.com
 BACKEND_URL=https://cli-hq1i.onrender.com
 CORS_ORIGINS=https://cyberlabin.com,https://www.cyberlabin.com
 COOKIE_SECURE=true
-COOKIE_SAME_SITE=none
+COOKIE_SAME_SITE=lax
 BCRYPT_COST=12
 DATABASE_SSL=require
 
@@ -48,7 +48,7 @@ GOOGLE_CLOUD_PROJECT_ID=cyber-lab-in
 GOOGLE_CLOUD_PROJECT_NUMBER=854487433792
 GOOGLE_CLIENT_ID=854487433792-1ntj74qq2qta3fei0a7qhhj650n2p5cv.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=
-GOOGLE_REDIRECT_URI=https://cli-hq1i.onrender.com/api/auth/google/callback
+GOOGLE_REDIRECT_URI=https://cyberlabin.com/api/auth/google/callback
 GOOGLE_TOKEN_ENCRYPTION_KEY=<random 32+ characters>
 
 RAZORPAY_KEY_ID=
@@ -60,13 +60,13 @@ Configure every value in an optional group together or leave the group unset.
 
 ## Browser session routing
 
-Production browser requests should use the configured Render API origin while Google Cloud is returning OAuth callbacks to Render. Set the Vercel frontend variable `VITE_API_URL=https://cli-hq1i.onrender.com`.
+Production browser requests use relative `/api/*` URLs on `https://cyberlabin.com`. Vercel forwards those requests to Render with the external rewrite in `cyberscout/vercel.json`. Leave `VITE_API_URL` unset in Vercel.
 
-This current architecture uses host-only, HTTP-only, `Secure`, `SameSite=None` cookies without a `Domain` attribute because `cyberlabin.com` and `onrender.com` are different registrable domains. Login and every other browser state-changing request first obtain a double-submit token from `/api/auth/csrf`.
+The browser receives host-only, HTTP-only, `Secure`, `SameSite=Lax` cookies from the proxied `cyberlabin.com` response. No cookie carries a `Domain` attribute. Login and every other browser state-changing request first obtain a double-submit token from `/api/auth/csrf`.
 
-Google OAuth currently returns through `https://cli-hq1i.onrender.com/api/auth/google/callback`, matching the configured Google Cloud redirect URI. Keep `BACKEND_URL` and `GOOGLE_REDIRECT_URI` configurable for a future `api.cyberlabin.com` migration.
+Google OAuth returns through `https://cyberlabin.com/api/auth/google/callback`; Vercel forwards that request to the existing Express callback on Render. `BACKEND_URL` remains the Render service origin for server identity and diagnostics. It is not used as the browser-facing callback when `GOOGLE_REDIRECT_URI` is configured.
 
-`api.cyberlabin.com` remains the recommended final custom Render domain. After Render verifies that domain and Google Cloud has the new callback URI, point `VITE_API_URL` to `https://api.cyberlabin.com`, update `BACKEND_URL` and `GOOGLE_REDIRECT_URI`, retain `FRONTEND_URL=https://cyberlabin.com`, and keep both origins in the explicit CORS configuration. Both hosts are then same-site, so `SameSite=Lax` becomes appropriate again.
+Do not configure `api.cyberlabin.com` for this deployment. The Vercel rewrite is the public API boundary.
 
 ## First deployment
 
@@ -95,6 +95,7 @@ Use an authenticated smoke test for `/api/auth/me`, dashboards, enrollment and l
 - TLS/certificate failure: keep `DATABASE_SSL=require` and confirm Render deployed the shared `src/db/config.js` configuration. Remove stale Render overrides such as `NODE_TLS_REJECT_UNAUTHORIZED`; they are neither needed nor permitted. Supply `DATABASE_SSL_CA` only when the database provider supplies a CA chain that should be verified.
 - CORS rejection: ensure the browser origin exactly matches an HTTPS origin in `CORS_ORIGINS`.
 - Secure-session failure: verify `/api/auth/csrf` through `cyberlabin.com` returns `200`, JSON containing `csrfToken`, and a `cli_csrf` cookie. Remove a direct Render `VITE_API_URL` from Vercel and redeploy the frontend.
+- Render `404` with `x-render-routing: no-server`: the `cli-hq1i.onrender.com` hostname is not attached to a running Render web service. Deploy or restore that exact service URL before testing the Vercel `/api` proxy; do not point browser code at a different backend as a workaround.
 - Existing-schema compatibility failure: no tracked migration was applied. Back up Supabase and complete an explicit data migration; do not alter IDs or delete tables to force deployment.
 - Migration failure: note the migration filename in the log, take a backup, and correct the schema conflict. Do not delete `schema_migrations` or reset production tables.
 - Connection saturation: lower `DATABASE_POOL_MAX` or use the Supabase pooler URL recommended for long-running application servers.
@@ -106,6 +107,7 @@ Use an authenticated smoke test for `/api/auth/me`, dashboards, enrollment and l
 - [ ] Four independent application secrets generated and entered.
 - [ ] Production HTTPS origins configured.
 - [ ] Vercel `VITE_API_URL` is unset so the first-party `/api` proxy is used.
+- [ ] Vercel has been redeployed after the `vercel.json` rewrite change.
 - [ ] Google OAuth redirect URI is `https://cyberlabin.com/api/auth/google/callback` when OAuth is enabled.
 - [ ] No `DATABASE_PATH`, Render disk, or file URL configured.
 - [ ] Node is selected from the `22.x` package engine.

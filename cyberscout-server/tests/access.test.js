@@ -10,6 +10,12 @@ process.env.CLIADM_ADMIN_TOKEN = 'test_admin_token'
 process.env.BCRYPT_COST = '4'
 process.env.SEED_DEVELOPMENT_USERS = '1'
 process.env.CORS_ORIGINS = 'https://cyberlabin.com'
+process.env.FRONTEND_URL = 'https://cyberlabin.com'
+process.env.BACKEND_URL = 'https://cli-hq1i.onrender.com'
+process.env.GOOGLE_CLIENT_ID = '854487433792-1ntj74qq2qta3fei0a7qhhj650n2p5cv.apps.googleusercontent.com'
+process.env.GOOGLE_CLIENT_SECRET = 'test_google_client_secret_123456'
+process.env.GOOGLE_REDIRECT_URI = 'https://cyberlabin.com/api/auth/google/callback'
+process.env.GOOGLE_TOKEN_ENCRYPTION_KEY = 'test_google_token_key_at_least_32_chars_1234567890'
 
 let server
 let baseUrl
@@ -120,6 +126,11 @@ describe('Cyber Lab IN database-backed LMS flow', () => {
     assert.equal(afterSeed.count, before.count)
   })
 
+  it('has applied the Google OAuth and Meet migration', async () => {
+    const migration = await database.queryOne('SELECT name FROM schema_migrations WHERE name = $1', ['010_google_oauth_meet.sql'])
+    assert.equal(migration.name, '010_google_oauth_meet.sql')
+  })
+
   it('registers a real user, hashes the password, and returns a working session', async () => {
     const email = `learner-${Date.now()}@cyberlabin.com`
     const signup = await request('/api/auth/register', {
@@ -224,6 +235,7 @@ describe('Cyber Lab IN database-backed LMS flow', () => {
       assert.match(csrfSetCookie, /Secure/i)
       assert.match(csrfSetCookie, /SameSite=Lax/i)
       assert.match(csrfSetCookie, /Path=\//i)
+      assert.doesNotMatch(csrfSetCookie, /Domain=/i)
 
       const csrfCookie = cookieFrom(csrf, 'cli_csrf')
       const loginResponse = await fetch(`${baseUrl}/api/auth/login`, {
@@ -244,6 +256,7 @@ describe('Cyber Lab IN database-backed LMS flow', () => {
       assert.match(authSetCookie, /HttpOnly/i)
       assert.match(authSetCookie, /Secure/i)
       assert.match(authSetCookie, /SameSite=Lax/i)
+      assert.doesNotMatch(authSetCookie, /Domain=/i)
 
       const { app } = await import('../src/index.js')
       const secondServer = app.listen(0)
@@ -277,11 +290,112 @@ describe('Cyber Lab IN database-backed LMS flow', () => {
       assert.match(clearCookie, /Secure/i)
       assert.match(clearCookie, /SameSite=Lax/i)
       assert.match(clearCookie, /Path=\//i)
+      assert.doesNotMatch(clearCookie, /Domain=/i)
     } finally {
       if (previousSecure === undefined) delete process.env.COOKIE_SECURE
       else process.env.COOKIE_SECURE = previousSecure
       if (previousSameSite === undefined) delete process.env.COOKIE_SAME_SITE
       else process.env.COOKIE_SAME_SITE = previousSameSite
+    }
+  })
+
+  it('uses first-party state and PKCE cookies for the Google callback and rejects unsafe redirects', async () => {
+    const previousSecure = process.env.COOKIE_SECURE
+    const previousSameSite = process.env.COOKIE_SAME_SITE
+    process.env.COOKIE_SECURE = 'true'
+    process.env.COOKIE_SAME_SITE = 'lax'
+    try {
+      const initiation = await fetch(`${baseUrl}/api/auth/google?redirect=${encodeURIComponent('//untrusted.example/path')}`, {
+        redirect: 'manual',
+        headers: {
+          Origin: 'https://cyberlabin.com',
+          'X-Forwarded-Proto': 'https',
+        },
+      })
+      assert.equal(initiation.status, 302)
+      const googleLocation = new URL(initiation.headers.get('location'))
+      assert.equal(googleLocation.origin, 'https://accounts.google.com')
+      assert.equal(googleLocation.searchParams.get('redirect_uri'), 'https://cyberlabin.com/api/auth/google/callback')
+
+      const state = googleLocation.searchParams.get('state')
+      const stateCookie = cookieFrom(initiation, 'cli_oauth_state')
+      const pkceCookie = cookieFrom(initiation, 'cli_oauth_pkce')
+      assert.ok(state)
+      assert.ok(stateCookie)
+      assert.ok(pkceCookie)
+      const setCookies = initiation.headers.get('set-cookie') || ''
+      assert.match(setCookies, /HttpOnly/i)
+      assert.match(setCookies, /Secure/i)
+      assert.match(setCookies, /SameSite=Lax/i)
+      assert.doesNotMatch(setCookies, /Domain=/i)
+
+      const { verifyOAuthState } = await import('../src/lib/jwt.js')
+      const decodedState = verifyOAuthState(state)
+      assert.equal(decodedState.redirect, '')
+      assert.equal(decodedState.verifier, undefined)
+
+      const rejected = await fetch(`${baseUrl}/api/auth/google/callback?code=unused&state=invalid`, {
+        redirect: 'manual',
+        headers: {
+          Cookie: `${stateCookie}; ${pkceCookie}`,
+          'X-Forwarded-Proto': 'https',
+        },
+      })
+      assert.equal(rejected.status, 302)
+      assert.equal(rejected.headers.get('location'), 'https://cyberlabin.com/login?error=oauth_state')
+    } finally {
+      if (previousSecure === undefined) delete process.env.COOKIE_SECURE
+      else process.env.COOKIE_SECURE = previousSecure
+      if (previousSameSite === undefined) delete process.env.COOKIE_SAME_SITE
+      else process.env.COOKIE_SAME_SITE = previousSameSite
+    }
+  })
+
+  it('completes Google login through the cyberlabin.com callback using the PKCE cookie', async () => {
+    const nativeFetch = globalThis.fetch
+    const initiation = await nativeFetch(`${baseUrl}/api/auth/google?redirect=${encodeURIComponent('/courses')}`, { redirect: 'manual' })
+    const googleLocation = new URL(initiation.headers.get('location'))
+    const state = googleLocation.searchParams.get('state')
+    const oauthCookies = `${cookieFrom(initiation, 'cli_oauth_state')}; ${cookieFrom(initiation, 'cli_oauth_pkce')}`
+    let receivedVerifier = ''
+
+    globalThis.fetch = async (input, options = {}) => {
+      const url = String(input)
+      if (url === 'https://oauth2.googleapis.com/token') {
+        receivedVerifier = String(options.body?.get('code_verifier') || '')
+        return new Response(JSON.stringify({
+          access_token: 'test-access-token',
+          expires_in: 3600,
+          scope: 'openid email profile',
+          token_type: 'Bearer',
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      if (url === 'https://openidconnect.googleapis.com/v1/userinfo') {
+        return new Response(JSON.stringify({
+          sub: `google-test-${Date.now()}`,
+          email: `google-test-${Date.now()}@example.com`,
+          email_verified: true,
+          name: 'Google Test Learner',
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      return nativeFetch(input, options)
+    }
+
+    try {
+      const callback = await nativeFetch(`${baseUrl}/api/auth/google/callback?code=test-code&state=${encodeURIComponent(state)}`, {
+        redirect: 'manual',
+        headers: { Cookie: oauthCookies, 'X-Forwarded-Proto': 'https' },
+      })
+      assert.equal(callback.status, 302)
+      assert.equal(callback.headers.get('location'), 'https://cyberlabin.com/oauth/callback?redirect=%2Fcourses')
+      assert.ok(receivedVerifier.length >= 43)
+      const sessionCookie = cookieFrom(callback, 'cli_session')
+      assert.ok(sessionCookie)
+      const me = await nativeFetch(`${baseUrl}/api/auth/me`, { headers: { Cookie: sessionCookie } })
+      assert.equal(me.status, 200)
+      assert.equal((await me.json()).user.name, 'Google Test Learner')
+    } finally {
+      globalThis.fetch = nativeFetch
     }
   })
 

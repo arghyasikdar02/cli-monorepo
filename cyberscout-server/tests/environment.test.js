@@ -27,6 +27,25 @@ describe('production environment validation', () => {
     assert.deepEqual(result.allowedOrigins, ['https://cyberlabin.com', 'https://www.cyberlabin.com'])
   })
 
+  it('requires the first-party proxy cookie and Google callback configuration', () => {
+    const googleEnvironment = {
+      ...validProductionEnvironment,
+      GOOGLE_CLIENT_ID: '854487433792-1ntj74qq2qta3fei0a7qhhj650n2p5cv.apps.googleusercontent.com',
+      GOOGLE_CLIENT_SECRET: 'g'.repeat(32),
+      GOOGLE_TOKEN_ENCRYPTION_KEY: 'e'.repeat(64),
+      GOOGLE_REDIRECT_URI: 'https://cyberlabin.com/api/auth/google/callback',
+    }
+    assert.doesNotThrow(() => validateEnvironment(googleEnvironment))
+    assert.throws(
+      () => validateEnvironment({ ...googleEnvironment, GOOGLE_REDIRECT_URI: 'https://cli-hq1i.onrender.com/api/auth/google/callback' }),
+      /GOOGLE_REDIRECT_URI: must be https:\/\/cyberlabin\.com\/api\/auth\/google\/callback/,
+    )
+    assert.throws(
+      () => validateEnvironment({ ...googleEnvironment, COOKIE_SAME_SITE: 'none' }),
+      /COOKIE_SAME_SITE: must be lax/,
+    )
+  })
+
   it('returns every actionable failure without exposing supplied secret values', () => {
     const invalid = {
       ...validProductionEnvironment,

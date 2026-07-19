@@ -12,6 +12,20 @@ function callbackUrl() {
   return process.env.GOOGLE_REDIRECT_URI || process.env.GOOGLE_CALLBACK_URL || `${String(process.env.BACKEND_URL || 'http://localhost:3001').replace(/\/+$/, '')}/api/auth/google/callback`
 }
 
+export function googleOAuthConfigurationStatus(env = process.env) {
+  if (!env.GOOGLE_CLIENT_ID) return { enabled: false, reason: 'missing_client_id' }
+  if (!env.GOOGLE_CLIENT_SECRET) return { enabled: false, reason: 'missing_client_secret' }
+  const redirectUri = env.GOOGLE_REDIRECT_URI || env.GOOGLE_CALLBACK_URL
+  if (!redirectUri) return { enabled: false, reason: 'missing_redirect_uri' }
+  try {
+    const url = new URL(redirectUri)
+    if (!['http:', 'https:'].includes(url.protocol)) return { enabled: false, reason: 'invalid_redirect_uri' }
+  } catch {
+    return { enabled: false, reason: 'invalid_redirect_uri' }
+  }
+  return { enabled: true, reason: 'configured' }
+}
+
 function clientConfig() {
   const clientId = process.env.GOOGLE_CLIENT_ID
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET
@@ -20,7 +34,15 @@ function clientConfig() {
 }
 
 export function hasGoogleOAuthCredentials() {
-  return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
+  return googleOAuthConfigurationStatus().enabled
+}
+
+export function googleOAuthFailureReason(error) {
+  const message = String(error?.message || '')
+  if (/token exchange/i.test(message) || /invalid_grant/i.test(message)) return 'token_exchange_failed'
+  if (/identity/i.test(message)) return 'identity_verification_failed'
+  if (/not configured/i.test(message)) return 'configuration_missing'
+  return 'provider_request_failed'
 }
 
 export function createPkceVerifier() {

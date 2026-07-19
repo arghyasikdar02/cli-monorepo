@@ -63,13 +63,12 @@ FRONTEND_URL=https://cyberlabin.com
 BACKEND_URL=https://cli-hq1i.onrender.com
 CORS_ORIGINS=https://cyberlabin.com,https://www.cyberlabin.com
 COOKIE_SECURE=true
-COOKIE_SAME_SITE=none
-VITE_API_URL=https://cli-hq1i.onrender.com
+COOKIE_SAME_SITE=lax
 GOOGLE_CLOUD_PROJECT_ID=cyber-lab-in
 GOOGLE_CLOUD_PROJECT_NUMBER=854487433792
 GOOGLE_CLIENT_ID=854487433792-1ntj74qq2qta3fei0a7qhhj650n2p5cv.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=<Render secret only>
-GOOGLE_REDIRECT_URI=https://cli-hq1i.onrender.com/api/auth/google/callback
+GOOGLE_REDIRECT_URI=https://cyberlabin.com/api/auth/google/callback
 GOOGLE_TOKEN_ENCRYPTION_KEY=<Render secret only>
 ```
 

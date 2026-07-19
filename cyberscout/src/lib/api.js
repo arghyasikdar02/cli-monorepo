@@ -1,27 +1,7 @@
-function isCyberLabOrigin(url) {
-  return url.hostname === 'cyberlabin.com' || url.hostname.endsWith('.cyberlabin.com')
-}
-
-function isConfiguredRenderApi(url) {
-  return url.origin === 'https://cli-hq1i.onrender.com'
-}
-
 function resolveApiBase() {
   const configured = String(import.meta.env.VITE_API_URL || '').trim()
-  if (!import.meta.env.PROD) return (configured || 'http://localhost:3001').replace(/\/+$/, '')
-
-  const browserOrigin = window.location.origin
-  if (!configured) return browserOrigin
-
-  try {
-    const target = new URL(configured, browserOrigin)
-    const current = new URL(browserOrigin)
-    return (target.origin === current.origin || isConfiguredRenderApi(target) || (isCyberLabOrigin(target) && isCyberLabOrigin(current)))
-      ? target.origin
-      : browserOrigin
-  } catch {
-    return browserOrigin
-  }
+  if (import.meta.env.PROD) return ''
+  return (configured || 'http://localhost:3001').replace(/\/+$/, '')
 }
 
 export const API_BASE = resolveApiBase()

@@ -1,13 +1,13 @@
 import { describe, it, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { encryptToken, decryptToken } from '../src/lib/tokenCrypto.js'
-import { buildGoogleAuthUrl, GOOGLE_MEET_SCOPE } from '../src/services/google.js'
+import { buildGoogleAuthUrl, googleOAuthConfigurationStatus, GOOGLE_MEET_SCOPE } from '../src/services/google.js'
 
 describe('Google OAuth and Meet support', () => {
   beforeEach(() => {
     process.env.GOOGLE_CLIENT_ID = '854487433792-1ntj74qq2qta3fei0a7qhhj650n2p5cv.apps.googleusercontent.com'
     process.env.GOOGLE_CLIENT_SECRET = 'test_google_client_secret_123456'
-    process.env.GOOGLE_REDIRECT_URI = 'https://cli-hq1i.onrender.com/api/auth/google/callback'
+    process.env.GOOGLE_REDIRECT_URI = 'https://cyberlabin.com/api/auth/google/callback'
     process.env.GOOGLE_TOKEN_ENCRYPTION_KEY = 'test_google_token_key_at_least_32_chars_1234567890'
   })
 
@@ -38,5 +38,12 @@ describe('Google OAuth and Meet support', () => {
     assert.equal(url.searchParams.get('access_type'), 'offline')
     assert.equal(url.searchParams.get('prompt'), 'consent')
     assert.ok(url.searchParams.get('scope').includes(GOOGLE_MEET_SCOPE))
+  })
+
+  it('reports a sanitized reason when Google OAuth configuration is incomplete', () => {
+    assert.deepEqual(googleOAuthConfigurationStatus({
+      GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+      GOOGLE_REDIRECT_URI: process.env.GOOGLE_REDIRECT_URI,
+    }), { enabled: false, reason: 'missing_client_secret' })
   })
 })

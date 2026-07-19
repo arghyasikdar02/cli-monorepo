@@ -18,7 +18,7 @@ import {
 } from '../db/repositories.js'
 import { signOAuthState, signToken, verifyOAuthState } from '../lib/jwt.js'
 import { requireAuth } from '../middleware/access.js'
-import { authCookieOptions, clearCookieOptions, csrfCookieOptions, oauthStateCookieOptions } from '../lib/cookies.js'
+import { authCookieOptions, clearCookieOptions, csrfCookieOptions, oauthPkceCookieOptions, oauthStateCookieOptions } from '../lib/cookies.js'
 import { validatePassword } from '../lib/validation.js'
 import { authSecurityDiagnostics, loginLimiter, registrationLimiter } from '../middleware/security.js'
 import {
@@ -27,6 +27,8 @@ import {
   encryptedTokenPayload,
   exchangeGoogleCode,
   fetchGoogleIdentity,
+  googleOAuthConfigurationStatus,
+  googleOAuthFailureReason,
   hasGoogleOAuthCredentials,
 } from '../services/google.js'
 
@@ -69,6 +71,21 @@ function clearAuthCookie(res) {
   res.clearCookie('cli_session', clearCookieOptions(authCookieOptions()))
 }
 
+function clearOAuthCookies(res) {
+  res.clearCookie('cli_oauth_state', clearCookieOptions(oauthStateCookieOptions()))
+  res.clearCookie('cli_oauth_pkce', clearCookieOptions(oauthPkceCookieOptions()))
+}
+
+function logGoogleUnavailable(req, flow) {
+  const status = googleOAuthConfigurationStatus()
+  console.warn('google-oauth-unavailable', {
+    requestId: req.requestId,
+    flow,
+    reason: status.reason,
+    status: 503,
+  })
+}
+
 function safelyEqual(left, right) {
   const leftBuffer = Buffer.from(String(left || ''))
   const rightBuffer = Buffer.from(String(right || ''))
@@ -81,9 +98,11 @@ export function setupPassport() {
 
 // GET /api/auth/config
 router.get('/config', (req, res) => {
+  const google = googleOAuthConfigurationStatus()
+  if (!google.enabled && process.env.NODE_ENV !== 'test') logGoogleUnavailable(req, 'config')
   res.json({
     googleCallbackUrl: GOOGLE_CALLBACK_URL,
-    googleEnabled: hasGoogleOAuthCredentials(),
+    googleEnabled: google.enabled,
   })
 })
 
@@ -138,8 +157,9 @@ router.post('/login', authSecurityDiagnostics('auth.login'), loginLimiter, async
 })
 
 // GET /api/auth/google
-router.get('/google', (req, res, next) => {
+router.get('/google', (req, res) => {
   if (!hasGoogleOAuthCredentials()) {
+    logGoogleUnavailable(req, 'login_start')
     return res.redirect(`${FRONTEND_URL}/login?error=oauth_unconfigured`)
   }
   const redirect = safeRelativeRedirect(req.query.redirect)
@@ -148,9 +168,9 @@ router.get('/google', (req, res, next) => {
     flow: 'login',
     nonce: randomBytes(24).toString('hex'),
     redirect,
-    verifier,
   })
   res.cookie('cli_oauth_state', state, oauthStateCookieOptions())
+  res.cookie('cli_oauth_pkce', verifier, oauthPkceCookieOptions())
   return res.redirect(buildGoogleAuthUrl({ state, codeChallenge: challenge }))
 })
 
@@ -158,25 +178,28 @@ router.get('/google', (req, res, next) => {
 router.get('/google/callback', async (req, res) => {
   try {
     if (!hasGoogleOAuthCredentials()) {
+      logGoogleUnavailable(req, 'callback')
       return res.redirect(`${FRONTEND_URL}/login?error=oauth_unconfigured`)
     }
     const state = String(req.query.state || '')
     const storedState = String(req.cookies?.cli_oauth_state || '')
+    const codeVerifier = String(req.cookies?.cli_oauth_pkce || '')
     if (!state || !storedState || !safelyEqual(state, storedState)) {
-      clearAuthCookie(res)
+      clearOAuthCookies(res)
       return res.redirect(`${FRONTEND_URL}/login?error=oauth_state`)
     }
     try {
       req.oauthState = verifyOAuthState(state)
     } catch {
-      clearAuthCookie(res)
+      clearOAuthCookies(res)
       return res.redirect(`${FRONTEND_URL}/login?error=oauth_state`)
     }
-    res.clearCookie('cli_oauth_state', clearCookieOptions(oauthStateCookieOptions()))
+    clearOAuthCookies(res)
+    if (!codeVerifier) return res.redirect(`${FRONTEND_URL}/login?error=oauth_state`)
     if (!['login', 'meet_connect'].includes(req.oauthState?.flow)) return res.redirect(`${FRONTEND_URL}/login?error=oauth_state`)
     const code = String(req.query.code || '')
     if (!code) return res.redirect(`${FRONTEND_URL}/login?error=oauth_cancelled`)
-    const tokens = await exchangeGoogleCode(code, req.oauthState.verifier)
+    const tokens = await exchangeGoogleCode(code, codeVerifier)
     const profile = await fetchGoogleIdentity(tokens.access_token)
     if (req.oauthState.flow === 'meet_connect') {
       const user = await findUserById(req.oauthState.userId)
@@ -223,8 +246,15 @@ router.get('/google/callback', async (req, res) => {
     const redirect = safeRelativeRedirect(req.oauthState?.redirect)
     const redirectQuery = redirect ? `?redirect=${encodeURIComponent(redirect)}` : ''
     res.redirect(`${FRONTEND_URL}/oauth/callback${redirectQuery}`)
-  } catch {
-    clearAuthCookie(res)
+  } catch (error) {
+    console.warn('google-oauth-callback-failed', {
+      requestId: req.requestId,
+      flow: req.oauthState?.flow || 'unknown',
+      reason: googleOAuthFailureReason(error),
+      status: 502,
+    })
+    clearOAuthCookies(res)
+    if (req.oauthState?.flow !== 'meet_connect') clearAuthCookie(res)
     res.redirect(`${FRONTEND_URL}/login?error=oauth_failed`)
   }
 })

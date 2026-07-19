@@ -30,6 +30,10 @@ export function oauthStateCookieOptions() {
   return baseCookieOptions({ maxAge: 10 * 60 * 1000 })
 }
 
+export function oauthPkceCookieOptions() {
+  return baseCookieOptions({ maxAge: 10 * 60 * 1000 })
+}
+
 export function visitorCookieOptions() {
   return baseCookieOptions({ maxAge: 365 * 24 * 60 * 60 * 1000 })
 }

@@ -23,7 +23,7 @@ services:
       - key: GOOGLE_CLIENT_ID
         value: 854487433792-1ntj74qq2qta3fei0a7qhhj650n2p5cv.apps.googleusercontent.com
       - key: GOOGLE_REDIRECT_URI
-        value: https://cli-hq1i.onrender.com/api/auth/google/callback
+        value: https://cyberlabin.com/api/auth/google/callback
       - key: GOOGLE_CLIENT_SECRET
         sync: false
       - key: GOOGLE_TOKEN_ENCRYPTION_KEY
@@ -31,7 +31,7 @@ services:
       - key: COOKIE_SECURE
         value: "true"
       - key: COOKIE_SAME_SITE
-        value: none
+        value: lax
       - key: BCRYPT_COST
         value: "12"
       - key: DATABASE_URL
