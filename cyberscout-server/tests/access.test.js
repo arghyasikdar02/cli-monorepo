@@ -11,7 +11,7 @@ process.env.BCRYPT_COST = '4'
 process.env.SEED_DEVELOPMENT_USERS = '1'
 process.env.CORS_ORIGINS = 'https://cyberlabin.com'
 process.env.FRONTEND_URL = 'https://cyberlabin.com'
-process.env.BACKEND_URL = 'https://cli-hq1i.onrender.com'
+process.env.BACKEND_URL = 'https://cyberlabin.onrender.com'
 process.env.GOOGLE_CLIENT_ID = '854487433792-1ntj74qq2qta3fei0a7qhhj650n2p5cv.apps.googleusercontent.com'
 process.env.GOOGLE_CLIENT_SECRET = 'test_google_client_secret_123456'
 process.env.GOOGLE_REDIRECT_URI = 'https://cyberlabin.com/api/auth/google/callback'
@@ -438,6 +438,16 @@ describe('Cyber Lab IN database-backed LMS flow', () => {
     assert.equal(rootHealth.body.service, 'cyberlabin-api')
     assert.equal(blogs.response.status, 200)
     assert.ok(blogs.body.blogs.some(blog => blog.slug === 'what-is-cybersecurity'))
+  })
+
+  it('returns safe public Google authentication configuration', async () => {
+    const { response, body } = await request('/api/auth/config')
+    assert.equal(response.status, 200)
+    assert.deepEqual(body, {
+      googleCallbackUrl: 'https://cyberlabin.com/api/auth/google/callback',
+      googleEnabled: true,
+    })
+    assert.equal(JSON.stringify(body).includes(process.env.GOOGLE_CLIENT_SECRET), false)
   })
 
   it('logs in seeded dashboard roles with role-aware redirects', async () => {

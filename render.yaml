@@ -13,9 +13,9 @@ services:
       - key: FRONTEND_URL
         value: https://cyberlabin.com
       - key: BACKEND_URL
-        value: https://cli-hq1i.onrender.com
+        value: https://cyberlabin.onrender.com
       - key: CORS_ORIGINS
-        value: https://cyberlabin.com,https://www.cyberlabin.com
+        value: https://cyberlabin.com
       - key: GOOGLE_CLOUD_PROJECT_ID
         value: cyber-lab-in
       - key: GOOGLE_CLOUD_PROJECT_NUMBER

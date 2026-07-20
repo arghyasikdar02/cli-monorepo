@@ -6,8 +6,8 @@ import { getAllowedOrigins, validateEnvironment } from '../src/lib/environment.j
 const validProductionEnvironment = {
   NODE_ENV: 'production',
   FRONTEND_URL: 'https://cyberlabin.com/',
-  BACKEND_URL: 'https://cli-hq1i.onrender.com/',
-  CORS_ORIGINS: 'https://cyberlabin.com/, https://www.cyberlabin.com',
+  BACKEND_URL: 'https://cyberlabin.onrender.com/',
+  CORS_ORIGINS: 'https://cyberlabin.com',
   DATABASE_URL: 'postgresql://postgres:production-db-secret@db.project.supabase.co:5432/postgres?sslmode=require',
   JWT_SECRET: 'j'.repeat(64),
   VISITOR_HASH_SALT: 'v'.repeat(64),
@@ -22,17 +22,34 @@ describe('production environment validation', () => {
   it('accepts and normalizes a valid Render configuration', () => {
     const result = validateEnvironment({ ...validProductionEnvironment })
     assert.equal(result.frontendUrl, 'https://cyberlabin.com')
-    assert.equal(result.backendUrl, 'https://cli-hq1i.onrender.com')
+    assert.equal(result.backendUrl, 'https://cyberlabin.onrender.com')
     assert.equal(result.databaseUrl, validProductionEnvironment.DATABASE_URL)
-    assert.deepEqual(result.allowedOrigins, ['https://cyberlabin.com', 'https://www.cyberlabin.com'])
+    assert.deepEqual(result.allowedOrigins, ['https://cyberlabin.com'])
   })
 
   it('accepts the configured public HTTPS backend origin without coupling it to the OAuth callback host', () => {
     const result = validateEnvironment({
       ...validProductionEnvironment,
-      BACKEND_URL: 'https://cyberlabin.onrender.com',
+      BACKEND_URL: 'https://another-public-service.example',
     })
-    assert.equal(result.backendUrl, 'https://cyberlabin.onrender.com')
+    assert.equal(result.backendUrl, 'https://another-public-service.example')
+  })
+
+  it('rejects unsafe production backend origins', () => {
+    const invalidOrigins = [
+      'http://public.example.com',
+      'https://localhost:3001',
+      'https://user:password@public.example.com',
+      'https://public.example.com/api',
+      'https://public.example.com?mode=api',
+      'https://public.example.com#api',
+    ]
+    for (const BACKEND_URL of invalidOrigins) {
+      assert.throws(
+        () => validateEnvironment({ ...validProductionEnvironment, BACKEND_URL }),
+        /BACKEND_URL:/,
+      )
+    }
   })
 
   it('requires the first-party proxy cookie and Google callback configuration', () => {
@@ -45,7 +62,7 @@ describe('production environment validation', () => {
     }
     assert.doesNotThrow(() => validateEnvironment(googleEnvironment))
     assert.throws(
-      () => validateEnvironment({ ...googleEnvironment, GOOGLE_REDIRECT_URI: 'https://cli-hq1i.onrender.com/api/auth/google/callback' }),
+      () => validateEnvironment({ ...googleEnvironment, GOOGLE_REDIRECT_URI: 'https://cyberlabin.onrender.com/api/auth/google/callback' }),
       /GOOGLE_REDIRECT_URI: must be https:\/\/cyberlabin\.com\/api\/auth\/google\/callback/,
     )
     assert.throws(
@@ -123,6 +140,16 @@ describe('production environment validation', () => {
       () => validateEnvironment({ ...validProductionEnvironment, CORS_ORIGINS: 'https://cyberlabin.com/app' }),
       /CORS_ORIGINS: entry 1 must be a public HTTPS origin/,
     )
+  })
+
+  it('supports both the current single CORS origin and an explicit comma-separated allowlist', () => {
+    const single = validateEnvironment({ ...validProductionEnvironment, CORS_ORIGINS: 'https://cyberlabin.com' })
+    const multiple = validateEnvironment({
+      ...validProductionEnvironment,
+      CORS_ORIGINS: 'https://cyberlabin.com,https://www.cyberlabin.com',
+    })
+    assert.deepEqual(single.allowedOrigins, ['https://cyberlabin.com'])
+    assert.deepEqual(multiple.allowedOrigins, ['https://cyberlabin.com', 'https://www.cyberlabin.com'])
   })
 
   it('fails before opening the database pool when the production environment is invalid', () => {

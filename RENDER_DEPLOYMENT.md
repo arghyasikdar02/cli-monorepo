@@ -23,8 +23,8 @@ Enter secret values in the Render dashboard. Do not store them in `render.yaml` 
 ```text
 NODE_ENV=production
 FRONTEND_URL=https://cyberlabin.com
-BACKEND_URL=https://cli-hq1i.onrender.com
-CORS_ORIGINS=https://cyberlabin.com,https://www.cyberlabin.com
+BACKEND_URL=https://cyberlabin.onrender.com
+CORS_ORIGINS=https://cyberlabin.com
 COOKIE_SECURE=true
 COOKIE_SAME_SITE=lax
 BCRYPT_COST=12
@@ -70,7 +70,7 @@ The browser receives host-only, HTTP-only, `Secure`, `SameSite=Lax` cookies from
 
 Google OAuth returns through `https://cyberlabin.com/api/auth/google/callback`; Vercel forwards that request to the existing Express callback on Render. `BACKEND_URL` remains the Render service origin for server identity and diagnostics. It is not used as the browser-facing callback when `GOOGLE_REDIRECT_URI` is configured.
 
-Do not configure `api.cyberlabin.com` for this deployment. The Vercel rewrite is the public API boundary.
+The Vercel rewrite on `cyberlabin.com` is the public API boundary.
 
 ## First deployment
 
@@ -78,7 +78,7 @@ Do not configure `api.cyberlabin.com` for this deployment. The Vercel rewrite is
 2. Enter all required Render variables, especially `DATABASE_URL`.
 3. Deploy from the root `render.yaml` or enter the service settings above.
 4. Confirm the logs show each new PostgreSQL migration and `database=postgresql`.
-5. Verify `https://cli-hq1i.onrender.com/health` returns HTTP 200.
+5. Verify `https://cyberlabin.onrender.com/health` returns HTTP 200.
 6. If the public catalogue is absent, run `npm run db:seed` once from a protected Render shell. Re-running it is safe because inserts use stable identifiers and `ON CONFLICT DO NOTHING`.
 
 Do not set `SEED_DEVELOPMENT_USERS=1` in production.
@@ -86,8 +86,8 @@ Do not set `SEED_DEVELOPMENT_USERS=1` in production.
 ## Verification
 
 ```bash
-curl -fsS https://cli-hq1i.onrender.com/health
-curl -fsS https://cli-hq1i.onrender.com/api/courses
+curl -fsS https://cyberlabin.onrender.com/health
+curl -fsS https://cyberlabin.onrender.com/api/courses
 ```
 
 Use an authenticated smoke test for `/api/auth/me`, dashboards, enrollment and lead persistence. Check Supabase table records to confirm that writes are landing in PostgreSQL.
@@ -99,7 +99,7 @@ Use an authenticated smoke test for `/api/auth/me`, dashboards, enrollment and l
 - TLS/certificate failure: keep `DATABASE_SSL=require` and confirm Render deployed the shared `src/db/config.js` configuration. Remove stale Render overrides such as `NODE_TLS_REJECT_UNAUTHORIZED`; they are neither needed nor permitted. Supply `DATABASE_SSL_CA` only when the database provider supplies a CA chain that should be verified.
 - CORS rejection: ensure the browser origin exactly matches an HTTPS origin in `CORS_ORIGINS`.
 - Secure-session failure: verify `/api/auth/csrf` through `cyberlabin.com` returns `200`, JSON containing `csrfToken`, and a `cli_csrf` cookie. Remove a direct Render `VITE_API_URL` from Vercel and redeploy the frontend.
-- Render `404` with `x-render-routing: no-server`: the `cli-hq1i.onrender.com` hostname is not attached to a running Render web service. Deploy or restore that exact service URL before testing the Vercel `/api` proxy; do not point browser code at a different backend as a workaround.
+- Render `404` with `x-render-routing: no-server`: verify the `cyberlabin.onrender.com` service is running, connected to `main`, and configured with root directory `cyberscout-server` before testing the Vercel `/api` proxy.
 - Existing-schema compatibility failure: no tracked migration was applied. Back up Supabase and complete an explicit data migration; do not alter IDs or delete tables to force deployment.
 - Migration failure: note the migration filename in the log, take a backup, and correct the schema conflict. Do not delete `schema_migrations` or reset production tables.
 - Connection saturation: lower `DATABASE_POOL_MAX` or use the Supabase pooler URL recommended for long-running application servers.

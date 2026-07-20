@@ -144,8 +144,12 @@
   ],
   "rewrites": [
     {
+      "source": "/api",
+      "destination": "https://cyberlabin.onrender.com/api"
+    },
+    {
       "source": "/api/:path*",
-      "destination": "https://cli-hq1i.onrender.com/api/:path*"
+      "destination": "https://cyberlabin.onrender.com/api/:path*"
     },
     {
       "source": "/:path*",

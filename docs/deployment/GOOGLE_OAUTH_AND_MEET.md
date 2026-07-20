@@ -10,7 +10,7 @@ Cyber Lab IN uses server-side Google OAuth 2.0 authorization-code flow. React ne
 - Production redirect URI: `https://cyberlabin.com/api/auth/google/callback`
 - Enabled API: Google Meet REST API
 
-After rotating the previously exposed OAuth client secret, enter the new value only in Render.
+Keep the OAuth client secret only in the existing protected Render environment variable.
 
 ## Backend Environment
 
@@ -24,7 +24,7 @@ GOOGLE_CLIENT_SECRET=<Render secret>
 GOOGLE_REDIRECT_URI=https://cyberlabin.com/api/auth/google/callback
 GOOGLE_TOKEN_ENCRYPTION_KEY=<openssl rand -hex 32>
 FRONTEND_URL=https://cyberlabin.com
-BACKEND_URL=https://cli-hq1i.onrender.com
+BACKEND_URL=https://cyberlabin.onrender.com
 COOKIE_SECURE=true
 COOKIE_SAME_SITE=lax
 ```

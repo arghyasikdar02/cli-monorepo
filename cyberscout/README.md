@@ -60,8 +60,8 @@ Set API env:
 ```env
 JWT_SECRET=use_a_real_random_secret_at_least_32_chars
 FRONTEND_URL=https://cyberlabin.com
-BACKEND_URL=https://cli-hq1i.onrender.com
-CORS_ORIGINS=https://cyberlabin.com,https://www.cyberlabin.com
+BACKEND_URL=https://cyberlabin.onrender.com
+CORS_ORIGINS=https://cyberlabin.com
 COOKIE_SECURE=true
 COOKIE_SAME_SITE=lax
 GOOGLE_CLOUD_PROJECT_ID=cyber-lab-in
