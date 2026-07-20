@@ -60,6 +60,8 @@ RAZORPAY_WEBHOOK_SECRET=
 
 Configure every value in an optional group together or leave the group unset.
 
+Delete `GOOGLE_CALLBACK_URL`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` and `GOOGLE_OAUTH_REDIRECT_URI` from Render if any are present. The backend reads only `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `GOOGLE_REDIRECT_URI`.
+
 ## Browser session routing
 
 Production browser requests use relative `/api/*` URLs on `https://cyberlabin.com`. Vercel forwards those requests to Render with the external rewrite in `cyberscout/vercel.json`. Leave `VITE_API_URL` unset in Vercel.

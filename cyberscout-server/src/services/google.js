@@ -8,14 +8,17 @@ const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const GOOGLE_USERINFO_URL = 'https://openidconnect.googleapis.com/v1/userinfo'
 const GOOGLE_MEET_SPACES_URL = 'https://meet.googleapis.com/v2/spaces'
 
-function callbackUrl() {
-  return process.env.GOOGLE_REDIRECT_URI || process.env.GOOGLE_CALLBACK_URL || `${String(process.env.BACKEND_URL || 'http://localhost:3001').replace(/\/+$/, '')}/api/auth/google/callback`
+export function googleRedirectUri(env = process.env) {
+  const configured = String(env.GOOGLE_REDIRECT_URI || '').trim()
+  if (configured) return configured
+  if (env.NODE_ENV === 'production') throw new Error('Google OAuth is not configured')
+  return `${String(env.BACKEND_URL || 'http://localhost:3001').replace(/\/+$/, '')}/api/auth/google/callback`
 }
 
 export function googleOAuthConfigurationStatus(env = process.env) {
   if (!env.GOOGLE_CLIENT_ID) return { enabled: false, reason: 'missing_client_id' }
   if (!env.GOOGLE_CLIENT_SECRET) return { enabled: false, reason: 'missing_client_secret' }
-  const redirectUri = env.GOOGLE_REDIRECT_URI || env.GOOGLE_CALLBACK_URL
+  const redirectUri = env.GOOGLE_REDIRECT_URI
   if (!redirectUri) return { enabled: false, reason: 'missing_redirect_uri' }
   try {
     const url = new URL(redirectUri)
@@ -30,7 +33,7 @@ function clientConfig() {
   const clientId = process.env.GOOGLE_CLIENT_ID
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET
   if (!clientId || !clientSecret) throw new Error('Google OAuth is not configured')
-  return { clientId, clientSecret, redirectUri: callbackUrl() }
+  return { clientId, clientSecret, redirectUri: googleRedirectUri() }
 }
 
 export function hasGoogleOAuthCredentials() {

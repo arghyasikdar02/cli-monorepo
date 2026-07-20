@@ -3,6 +3,12 @@ const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1'])
 const PRODUCTION_FRONTEND_ORIGIN = 'https://cyberlabin.com'
 const PRODUCTION_GOOGLE_CALLBACK = 'https://cyberlabin.com/api/auth/google/callback'
 const PRODUCTION_CORS_ORIGINS = new Set([PRODUCTION_FRONTEND_ORIGIN, 'https://www.cyberlabin.com'])
+const LEGACY_GOOGLE_ENV_NAMES = [
+  'GOOGLE_CALLBACK_URL',
+  'GOOGLE_OAUTH_CLIENT_ID',
+  'GOOGLE_OAUTH_CLIENT_SECRET',
+  'GOOGLE_OAUTH_REDIRECT_URI',
+]
 
 function isPlaceholder(value) {
   return !value || PLACEHOLDER_PATTERN.test(String(value))
@@ -191,18 +197,22 @@ export function validateEnvironment(env = process.env) {
     errors.push('BCRYPT_COST: must be an integer from 10 through 15 in production')
   }
 
-  const hasGoogleClient = Boolean(env.GOOGLE_CLIENT_ID)
-  const hasGoogleSecret = Boolean(env.GOOGLE_CLIENT_SECRET)
-  if (hasGoogleClient !== hasGoogleSecret) {
-    errors.push('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET: configure both values together or leave both unset')
-  } else if (hasGoogleClient) {
+  const configuredLegacyGoogleNames = LEGACY_GOOGLE_ENV_NAMES.filter(name => Boolean(env[name]))
+  if (configuredLegacyGoogleNames.length) {
+    errors.push(`${configuredLegacyGoogleNames.join(', ')}: legacy Google OAuth variables are not supported; remove them and use GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and GOOGLE_REDIRECT_URI`)
+  }
+
+  const googleNames = ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_REDIRECT_URI']
+  const configuredGoogleNames = googleNames.filter(name => Boolean(env[name]))
+  if (configuredGoogleNames.length > 0 && configuredGoogleNames.length < googleNames.length) {
+    errors.push('GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and GOOGLE_REDIRECT_URI: configure all three values together or leave all three unset')
+  } else if (configuredGoogleNames.length === googleNames.length) {
     if (isPlaceholder(env.GOOGLE_CLIENT_ID)) errors.push('GOOGLE_CLIENT_ID: replace the placeholder with the Google OAuth client ID')
     if (env.GOOGLE_CLOUD_PROJECT_ID && env.GOOGLE_CLOUD_PROJECT_ID !== 'cyber-lab-in') errors.push('GOOGLE_CLOUD_PROJECT_ID: must match the configured Google Cloud project')
     if (env.GOOGLE_CLOUD_PROJECT_NUMBER && env.GOOGLE_CLOUD_PROJECT_NUMBER !== '854487433792') errors.push('GOOGLE_CLOUD_PROJECT_NUMBER: must match the configured Google Cloud project number')
     validateSecret(env, 'GOOGLE_CLIENT_SECRET', 16, errors)
     validateSecret(env, 'GOOGLE_TOKEN_ENCRYPTION_KEY', 32, errors)
-    const redirectName = env.GOOGLE_REDIRECT_URI ? 'GOOGLE_REDIRECT_URI' : 'GOOGLE_CALLBACK_URL'
-    const googleRedirect = validateHttpsUrl(env, redirectName, errors)
+    const googleRedirect = validateHttpsUrl(env, 'GOOGLE_REDIRECT_URI', errors)
     if (googleRedirect && googleRedirect !== PRODUCTION_GOOGLE_CALLBACK) {
       errors.push(`GOOGLE_REDIRECT_URI: must be ${PRODUCTION_GOOGLE_CALLBACK}`)
     }

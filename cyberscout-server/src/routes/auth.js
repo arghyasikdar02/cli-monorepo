@@ -29,14 +29,13 @@ import {
   fetchGoogleIdentity,
   googleOAuthConfigurationStatus,
   googleOAuthFailureReason,
+  googleRedirectUri,
   hasGoogleOAuthCredentials,
 } from '../services/google.js'
 
 const router = Router()
 const trimTrailingSlash = (value) => value?.replace(/\/+$/, '')
 const FRONTEND_URL = trimTrailingSlash(process.env.FRONTEND_URL) || 'http://localhost:5173'
-const BACKEND_URL = trimTrailingSlash(process.env.BACKEND_URL) || `http://localhost:${process.env.PORT || 3001}`
-const GOOGLE_CALLBACK_URL = process.env.GOOGLE_REDIRECT_URI || process.env.GOOGLE_CALLBACK_URL || `${BACKEND_URL}/api/auth/google/callback`
 
 function dashboardPathForUser(user) {
   const roles = user.roles || [user.role]
@@ -101,7 +100,7 @@ router.get('/config', (req, res) => {
   const google = googleOAuthConfigurationStatus()
   if (!google.enabled && process.env.NODE_ENV !== 'test') logGoogleUnavailable(req, 'config')
   res.json({
-    googleCallbackUrl: GOOGLE_CALLBACK_URL,
+    googleCallbackUrl: google.enabled ? googleRedirectUri() : null,
     googleEnabled: google.enabled,
   })
 })

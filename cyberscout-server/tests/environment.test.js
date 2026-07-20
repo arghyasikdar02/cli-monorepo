@@ -54,6 +54,32 @@ describe('production environment validation', () => {
     )
   })
 
+  it('rejects partial and legacy Google OAuth environment variables', () => {
+    assert.throws(
+      () => validateEnvironment({
+        ...validProductionEnvironment,
+        GOOGLE_CLIENT_ID: '854487433792-example.apps.googleusercontent.com',
+      }),
+      /configure all three values together/,
+    )
+    assert.throws(
+      () => validateEnvironment({
+        ...validProductionEnvironment,
+        GOOGLE_OAUTH_CLIENT_ID: 'legacy-client-id',
+        GOOGLE_OAUTH_CLIENT_SECRET: 'legacy-secret',
+        GOOGLE_OAUTH_REDIRECT_URI: 'https://cyberlabin.com/api/auth/google/callback',
+      }),
+      /legacy Google OAuth variables are not supported/,
+    )
+    assert.throws(
+      () => validateEnvironment({
+        ...validProductionEnvironment,
+        GOOGLE_CALLBACK_URL: 'https://cyberlabin.com/api/auth/google/callback',
+      }),
+      /GOOGLE_CALLBACK_URL: legacy Google OAuth variables are not supported/,
+    )
+  })
+
   it('returns every actionable failure without exposing supplied secret values', () => {
     const invalid = {
       ...validProductionEnvironment,

@@ -17,8 +17,12 @@ describe('first-party Vercel API proxy', () => {
 
   it('does not allow production frontend requests to select the Render origin directly', () => {
     const apiSource = fs.readFileSync(path.join(repoRoot, 'cyberscout/src/lib/api.js'), 'utf8')
+    const loginSource = fs.readFileSync(path.join(repoRoot, 'cyberscout/src/pages/auth/LoginPage.jsx'), 'utf8')
     assert.match(apiSource, /if \(import\.meta\.env\.PROD\) return ''/)
     assert.doesNotMatch(apiSource, /cli-hq1i\.onrender\.com/)
     assert.match(apiSource, /credentials: 'include'/)
+    assert.match(apiSource, /authConfig: \(\) => request\('\/api\/auth\/config'\)/)
+    assert.match(loginSource, /api\.authConfig\(\)/)
+    assert.match(loginSource, /setGoogleEnabled\(Boolean\(googleEnabled\)\)/)
   })
 })
