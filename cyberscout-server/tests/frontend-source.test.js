@@ -78,4 +78,16 @@ describe('authenticated frontend icon and role regressions', () => {
     assert.doesNotMatch(`${instructors}\n${form}\n${credentials}`, /Math\.random/)
     assert.doesNotMatch(`${instructors}\n${form}\n${credentials}`, /https:\/\/cyberlabin\.onrender\.com/)
   })
+
+  it('renders student live-class access from the backend join state', () => {
+    const list = fs.readFileSync(path.join(frontendRoot, 'pages/live-classes/LiveClassListPage.jsx'), 'utf8')
+    const detail = fs.readFileSync(path.join(frontendRoot, 'pages/live-classes/LiveClassDetailPage.jsx'), 'utf8')
+    const session = fs.readFileSync(path.join(frontendRoot, 'pages/live-classes/LiveClassSessionPage.jsx'), 'utf8')
+    assert.match(list, /cls\.canJoin/)
+    assert.match(list, /cls\.denialReason/)
+    assert.match(detail, /liveClass\.canJoin/)
+    assert.match(detail, /liveClass\.joinAvailableAt/)
+    assert.match(session, /liveClass\.joinUrl/)
+    assert.doesNotMatch(list, /\{isLive \? \(/)
+  })
 })

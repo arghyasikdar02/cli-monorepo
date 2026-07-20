@@ -765,6 +765,142 @@ describe('Cyber Lab IN database-backed LMS flow', () => {
     assert.equal(cancellationVisible.body.liveClasses.find(item => item.id === liveId)?.meetingUrl, undefined)
   })
 
+  it('gives enrolled students one safe server-owned live-class join state', async () => {
+    const bcrypt = (await import('bcrypt')).default
+    const { createUser } = await import('../src/db/repositories.js')
+    const instructor = await database.queryOne("SELECT id FROM users WHERE email = 'instructor@cyberlabin.com'")
+    const student = await database.queryOne("SELECT id FROM users WHERE email = 'student@cyberlabin.com'")
+    const stamp = Date.now()
+    const course = await request('/api/courses', {
+      method: 'POST',
+      token: adminToken,
+      body: JSON.stringify({
+        title: 'Student Live Access Course',
+        slug: `student-live-access-${stamp}`,
+        duration: '1 week',
+        instructorId: instructor.id,
+        status: 'published',
+      }),
+    })
+    assert.equal(course.response.status, 201, course.body.error)
+    const courseId = course.body.course.id
+    const enrollment = await request('/api/enrollments', {
+      method: 'POST', token: adminToken, body: JSON.stringify({ userId: student.id, courseId }),
+    })
+    assert.equal(enrollment.response.status, 201, enrollment.body.error)
+
+    const otherInstructorEmail = `unrelated-instructor-${stamp}@cyberlabin.com`
+    await createUser({
+      name: 'Unrelated Instructor',
+      email: otherInstructorEmail,
+      username: `unrelated.instructor${stamp}`,
+      passwordHash: await bcrypt.hash('UnrelatedInstructor9!Pass', 4),
+      role: 'instructor',
+      roles: ['instructor'],
+    })
+    const unrelatedInstructorToken = (await login(otherInstructorEmail, 'UnrelatedInstructor9!Pass')).token
+    const meetingUrl = 'https://meet.google.com/student-access-test'
+    const makeClass = async ({ title, start, end, status = 'scheduled', url = meetingUrl }) => {
+      const response = await request('/api/live-classes', {
+        method: 'POST',
+        token: adminToken,
+        body: JSON.stringify({
+          courseId,
+          instructorId: instructor.id,
+          title,
+          scheduledStart: start.toISOString(),
+          scheduledEnd: end.toISOString(),
+          timezone: 'Asia/Kolkata',
+          status,
+          meetingUrl: url,
+        }),
+      })
+      assert.equal(response.response.status, 201, response.body.error)
+      return response.body.liveClass
+    }
+
+    const earlyStart = new Date(Date.now() + 30 * 60 * 1000)
+    const earlyEnd = new Date(earlyStart.getTime() + 60 * 60 * 1000)
+    const earlyClass = await makeClass({ title: 'Early scheduled class', start: earlyStart, end: earlyEnd })
+    const schedule = await request('/api/live-classes/student/upcoming', { token: studentToken })
+    const earlyState = schedule.body.liveClasses.find(item => item.id === earlyClass.id)
+    assert.ok(earlyState)
+    assert.equal(earlyState.canJoin, false)
+    assert.equal(new Date(earlyState.joinAvailableAt).getTime(), earlyStart.getTime() - 15 * 60 * 1000)
+    assert.equal(earlyState.joinUrl, null)
+    assert.equal(earlyState.denialReason, 'The class can be joined 15 minutes before it begins.')
+    assert.equal('meetingUrl' in earlyState, false)
+    assert.equal('googleConnectionId' in earlyState, false)
+
+    const earlyJoin = await request(`/api/live-classes/${earlyClass.id}/join`, { method: 'POST', token: studentToken, body: '{}' })
+    assert.equal(earlyJoin.response.status, 403)
+    assert.equal(earlyJoin.body.error, 'The class can be joined 15 minutes before it begins.')
+    assert.equal(earlyJoin.body.canJoin, false)
+    assert.equal(earlyJoin.body.joinUrl, null)
+
+    const instructorJoin = await request(`/api/live-classes/${earlyClass.id}/join`, { method: 'POST', token: instructorToken, body: '{}' })
+    assert.equal(instructorJoin.response.status, 200, instructorJoin.body.error)
+    assert.equal(instructorJoin.body.liveClass.joinUrl, meetingUrl)
+    const unrelatedInstructor = await request(`/api/live-classes/${earlyClass.id}/join`, { method: 'POST', token: unrelatedInstructorToken, body: '{}' })
+    assert.equal(unrelatedInstructor.response.status, 403)
+    assert.equal(unrelatedInstructor.body.error, 'You are not assigned to this live class.')
+
+    const inWindowStart = new Date(Date.now() + 5 * 60 * 1000)
+    const inWindowEnd = new Date(inWindowStart.getTime() + 60 * 60 * 1000)
+    const openClass = await makeClass({ title: 'Open scheduled class', start: inWindowStart, end: inWindowEnd })
+    const openSchedule = await request('/api/live-classes/student/upcoming', { token: studentToken })
+    const openState = openSchedule.body.liveClasses.find(item => item.id === openClass.id)
+    assert.equal(openState.canJoin, true)
+    assert.equal(openState.joinUrl, meetingUrl)
+    assert.equal(openState.denialReason, null)
+
+    const detail = await request(`/api/live-classes/${openClass.id}`, { token: studentToken })
+    assert.equal(detail.response.status, 200, detail.body.error)
+    assert.equal(detail.body.liveClass.canJoin, true)
+    assert.equal(detail.body.liveClass.joinUrl, meetingUrl)
+    assert.equal('meetingUrl' in detail.body.liveClass, false)
+    const joined = await request(`/api/live-classes/${openClass.id}/join`, { method: 'POST', token: studentToken, body: '{}' })
+    assert.equal(joined.response.status, 200, joined.body.error)
+    assert.equal(joined.body.liveClass.joinUrl, meetingUrl)
+    assert.equal('googleMeetingCode' in joined.body.liveClass, false)
+
+    const unenrolled = await request(`/api/live-classes/${openClass.id}/join`, { method: 'POST', token: neelToken, body: '{}' })
+    assert.equal(unenrolled.response.status, 403)
+    assert.equal(unenrolled.body.error, 'You are not enrolled in this course.')
+
+    const draftClass = await makeClass({ title: 'Draft class', start: inWindowStart, end: inWindowEnd, status: 'draft' })
+    const draftSchedule = await request('/api/live-classes/student/upcoming', { token: studentToken })
+    assert.equal(draftSchedule.body.liveClasses.some(item => item.id === draftClass.id), false)
+    const draftJoin = await request(`/api/live-classes/${draftClass.id}/join`, { method: 'POST', token: studentToken, body: '{}' })
+    assert.equal(draftJoin.response.status, 403)
+    assert.equal(draftJoin.body.error, 'This live class has not been published.')
+
+    const cancelledClass = await makeClass({ title: 'Cancelled class', start: inWindowStart, end: inWindowEnd, status: 'cancelled' })
+    const cancelledJoin = await request(`/api/live-classes/${cancelledClass.id}/join`, { method: 'POST', token: studentToken, body: '{}' })
+    assert.equal(cancelledJoin.response.status, 403)
+    assert.equal(cancelledJoin.body.error, 'This class was cancelled.')
+    const cancelledUnenrolled = await request(`/api/live-classes/${cancelledClass.id}`, { token: neelToken })
+    assert.equal(cancelledUnenrolled.response.status, 403)
+    assert.equal(cancelledUnenrolled.body.error, 'You are not enrolled in this course.')
+
+    const missingLinkClass = await makeClass({ title: 'Missing link class', start: inWindowStart, end: inWindowEnd, url: null })
+    const missingLink = await request(`/api/live-classes/${missingLinkClass.id}/join`, { method: 'POST', token: studentToken, body: '{}' })
+    assert.equal(missingLink.response.status, 403)
+    assert.equal(missingLink.body.error, 'The meeting link is not available yet.')
+
+    const shiftedStart = new Date(earlyStart.getTime() + 20 * 60 * 1000)
+    const shiftedEnd = new Date(earlyEnd.getTime() + 20 * 60 * 1000)
+    const rescheduled = await request(`/api/live-classes/${earlyClass.id}`, {
+      method: 'PATCH', token: adminToken, body: JSON.stringify({ scheduledStart: shiftedStart.toISOString(), scheduledEnd: shiftedEnd.toISOString() }),
+    })
+    assert.equal(rescheduled.response.status, 200, rescheduled.body.error)
+    const updatedSchedule = await request('/api/live-classes/student/upcoming', { token: studentToken })
+    const updated = updatedSchedule.body.liveClasses.find(item => item.id === earlyClass.id)
+    assert.equal(new Date(updated.scheduledStart).getTime(), shiftedStart.getTime())
+    assert.equal(new Date(updated.scheduledEnd).getTime(), shiftedEnd.getTime())
+    assert.equal(new Date(updated.joinAvailableAt).getTime(), shiftedStart.getTime() - 15 * 60 * 1000)
+  })
+
   it('returns health and published blogs', async () => {
     const [root, health, rootHealth, blogs] = await Promise.all([
       request('/'),
@@ -1058,14 +1194,15 @@ describe('Cyber Lab IN database-backed LMS flow', () => {
     const early = await request('/api/live-classes/live_c001_01/validate', { token: studentToken })
     assert.equal(early.response.status, 200)
     assert.equal(early.body.allowed, false)
-    assert.equal(early.body.reason, 'outside_join_window_early')
+    assert.equal(early.body.reason, 'meeting_link_unavailable')
+    assert.equal(early.body.denialReason, 'The meeting link is not available yet.')
 
     await database.execute("INSERT INTO batches (id, course_id, name, status) VALUES ('batch_test_c001', 'c001', 'Test batch', 'active')")
     await database.execute("UPDATE enrollments SET batch_id = 'batch_test_c001' WHERE user_id = (SELECT id FROM users WHERE email = 'student@cyberlabin.com') AND course_id = 'c001'")
     const instructorId = (await database.queryOne("SELECT id FROM users WHERE email = 'instructor@cyberlabin.com'")).id
     const start = new Date(Date.now() - 5 * 60 * 1000).toISOString()
     const end = new Date(Date.now() + 55 * 60 * 1000).toISOString()
-    const created = await request('/api/live-classes', { method: 'POST', token: adminToken, body: JSON.stringify({ courseId: 'c001', batchId: 'batch_test_c001', instructorId, title: 'Batch access test', scheduledStart: start, scheduledEnd: end, provider: 'external' }) })
+    const created = await request('/api/live-classes', { method: 'POST', token: adminToken, body: JSON.stringify({ courseId: 'c001', batchId: 'batch_test_c001', instructorId, title: 'Batch access test', scheduledStart: start, scheduledEnd: end, provider: 'external', meetingUrl: 'https://meet.google.com/batch-access-test' }) })
     assert.equal(created.response.status, 201, created.body.error)
     const liveId = created.body.liveClass.id
     const wrongCourse = await request(`/api/live-classes/${liveId}/join`, { method: 'POST', token: neelToken, body: '{}' })

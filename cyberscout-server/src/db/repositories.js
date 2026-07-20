@@ -921,7 +921,8 @@ export async function getOpsDashboard() {
 
 export async function listUpcomingLiveClasses(userId) {
   return queryMany(`
-    SELECT lc.*, c.title AS course_title, u.name AS instructor_name, u.role AS instructor_title FROM live_classes lc
+    SELECT lc.*, c.title AS course_title, c.status AS course_status,
+      u.name AS instructor_name, u.role AS instructor_title FROM live_classes lc
     JOIN enrollments e ON e.course_id = lc.course_id AND e.user_id = $1 AND e.status = 'active'
     JOIN courses c ON c.id = lc.course_id
     LEFT JOIN users u ON u.id = lc.instructor_id
@@ -932,7 +933,7 @@ export async function listUpcomingLiveClasses(userId) {
 }
 
 export async function listUpcomingLiveClassesForUser(userId) {
-  return listUpcomingLiveClasses(userId)
+  return (await listUpcomingLiveClasses(userId)).map(liveClassFromRow)
 }
 
 function liveClassFromRow(row) {
@@ -941,6 +942,7 @@ function liveClassFromRow(row) {
     id: row.id,
     courseId: row.course_id,
     courseTitle: row.course_title,
+    courseStatus: row.course_status,
     batchId: row.batch_id,
     instructorId: row.instructor_id,
     instructor: row.instructor_name || 'Cyber Lab IN Instructor',
@@ -1079,7 +1081,8 @@ export async function disconnectGoogleConnection(userId, actorId = null) {
 
 export async function getLiveClassById(liveClassId) {
   return liveClassFromRow(await queryOne(`
-    SELECT lc.*, c.title AS course_title, u.name AS instructor_name, u.role AS instructor_title
+    SELECT lc.*, c.title AS course_title, c.status AS course_status,
+      u.name AS instructor_name, u.role AS instructor_title
     FROM live_classes lc JOIN courses c ON c.id = lc.course_id LEFT JOIN users u ON u.id = lc.instructor_id
     WHERE lc.id = $1
   `, [liveClassId]))
@@ -1087,7 +1090,8 @@ export async function getLiveClassById(liveClassId) {
 
 export async function listLiveClassesByCourse(courseId) {
   const rows = await queryMany(`
-    SELECT lc.*, c.title AS course_title, u.name AS instructor_name, u.role AS instructor_title
+    SELECT lc.*, c.title AS course_title, c.status AS course_status,
+      u.name AS instructor_name, u.role AS instructor_title
     FROM live_classes lc JOIN courses c ON c.id = lc.course_id LEFT JOIN users u ON u.id = lc.instructor_id
     WHERE lc.course_id = $1 ORDER BY lc.scheduled_start ASC
   `, [courseId])
@@ -1101,7 +1105,8 @@ export async function listAllLiveClasses(filters = {}) {
   if (filters.instructorId) where.push(`lc.instructor_id = ${parameter(values, filters.instructorId)}`)
   if (filters.status) where.push(`lc.status = ${parameter(values, filters.status)}`)
   const rows = await queryMany(`
-    SELECT lc.*, c.title AS course_title, u.name AS instructor_name, u.role AS instructor_title
+    SELECT lc.*, c.title AS course_title, c.status AS course_status,
+      u.name AS instructor_name, u.role AS instructor_title
     FROM live_classes lc JOIN courses c ON c.id = lc.course_id LEFT JOIN users u ON u.id = lc.instructor_id
     ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
     ORDER BY lc.scheduled_start DESC

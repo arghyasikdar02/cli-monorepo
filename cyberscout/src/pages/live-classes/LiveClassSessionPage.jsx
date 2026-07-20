@@ -15,10 +15,12 @@ export default function LiveClassSessionPage() {
 
   useEffect(() => {
     let active = true
+    let joined = false
     setLoading(true)
     api.post(`/api/live-classes/${id}/join`, {})
       .then(({ liveClass, viewerCount }) => {
         if (!active) return
+        joined = true
         setLiveClass(liveClass)
         setViewerCount(viewerCount)
         setError('')
@@ -32,7 +34,7 @@ export default function LiveClassSessionPage() {
 
     return () => {
       active = false
-      api.post(`/api/live-classes/${id}/leave`, {}).catch(() => {})
+      if (joined) api.post(`/api/live-classes/${id}/leave`, {}).catch(() => {})
     }
   }, [id])
 
@@ -82,14 +84,14 @@ export default function LiveClassSessionPage() {
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 flex flex-col">
           <div className="flex-1 bg-slate-900 flex items-center justify-center relative">
-            {liveClass.meetingUrl ? (
+            {liveClass.joinUrl ? (
               <div className="max-w-lg px-6 text-center">
                 <SiteIcon name="video_chat" size={72} className="mx-auto mb-4 text-slate-600" />
                 <h1 className="font-space-grotesk text-2xl font-black text-white">Join the Google Meet session</h1>
                 <p className="mt-3 text-sm leading-6 text-slate-400">
                   Google Meet opens in a new tab. Keep this Cyber Lab IN class workspace open for agenda, notes and attendance.
                 </p>
-                <a href={liveClass.meetingUrl} target="_blank" rel="noreferrer" className="mt-6 inline-flex rounded-lg bg-white px-5 py-3 text-sm font-bold text-slate-950 hover:bg-slate-100">
+                <a href={liveClass.joinUrl} target="_blank" rel="noreferrer" className="mt-6 inline-flex rounded-lg bg-white px-5 py-3 text-sm font-bold text-slate-950 hover:bg-slate-100">
                   Open Google Meet
                 </a>
               </div>

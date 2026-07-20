@@ -23,8 +23,7 @@ export default function LiveClassDetailPage() {
 
   useEffect(() => {
     let active = true
-    setLoading(true)
-    api.get(`/api/live-classes/${id}`)
+    const load = () => api.get(`/api/live-classes/${id}`)
       .then(({ liveClass, viewerCount }) => {
         if (!active) return
         setLiveClass(liveClass)
@@ -37,8 +36,11 @@ export default function LiveClassDetailPage() {
       .finally(() => {
         if (active) setLoading(false)
       })
+    load()
+    const refresh = window.setInterval(load, 60_000)
     return () => {
       active = false
+      window.clearInterval(refresh)
     }
   }, [id])
 
@@ -59,6 +61,9 @@ export default function LiveClassDetailPage() {
   const isLive = liveClass.status === 'live'
   const isCancelled = liveClass.status === 'cancelled'
   const date = formatDateTime(liveClass.scheduledStart, liveClass.scheduledEnd)
+  const joinAvailable = liveClass.joinAvailableAt
+    ? new Date(liveClass.joinAvailableAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+    : null
 
   return (
     <AppShell>
@@ -106,26 +111,22 @@ export default function LiveClassDetailPage() {
                 <SiteIcon name="group" size={18} />
                 {viewerCount} watching now
               </div>
-              {isLive ? (
+              {liveClass.canJoin ? (
                 <Link to={`/live-classes/${liveClass.id}/session`}
                   className="block w-full text-center py-3.5 bg-green-500 text-white font-space-grotesk font-bold rounded-xl hover:bg-green-600 transition-colors">
-                  Join Live Session
+                  Join Live Class
                 </Link>
               ) : isCancelled ? (
                 <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center text-sm font-semibold text-red-700">Class cancelled</div>
               ) : (
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-center text-sm text-slate-500">
-                  Join opens 15 minutes before start.
+                  <p>{liveClass.denialReason || 'This class is not available to join.'}</p>
+                  {joinAvailable && <p className="mt-1 text-xs">Join window opens {joinAvailable}.</p>}
                 </div>
               )}
               <Link to="/live-classes" className="block w-full text-center py-2.5 border border-slate-200 text-slate-600 text-sm font-space-grotesk rounded-xl hover:bg-slate-50 transition-colors">
                 View Full Schedule
               </Link>
-              {liveClass.meetingUrl && (
-                <a href={liveClass.meetingUrl} target="_blank" rel="noreferrer" className="block w-full text-center py-2.5 border border-violet-200 text-violet-700 text-sm font-space-grotesk rounded-xl hover:bg-violet-50 transition-colors">
-                  Open Google Meet
-                </a>
-              )}
             </div>
           </div>
         </div>

@@ -56,10 +56,37 @@ function publicLiveClass(liveClass, includeJoin = false) {
   return includeJoin ? { ...safe, joinUrl, embedUrl, meetingUrl, googleConnectionId, googleSpaceName, googleMeetingCode } : safe
 }
 
-function deny(res, decision) {
-  const status = decision.reason === 'auth_required' ? 401 : 403
-  return res.status(status).json({ error: decision.reason })
+function studentLiveClass(liveClass, decision) {
+  const safe = publicLiveClass(liveClass)
+  return {
+    ...safe,
+    canJoin: decision.canJoin,
+    joinAvailableAt: decision.joinAvailableAt,
+    joinUrl: decision.joinUrl,
+    denialReason: decision.denialReason,
+    denialCode: decision.canJoin ? null : decision.reason,
+  }
 }
+
+function deny(res, decision) {
+  return res.status(decision.status || 403).json({
+    error: decision.denialReason,
+    code: decision.reason,
+    canJoin: false,
+    joinAvailableAt: decision.joinAvailableAt,
+    joinUrl: null,
+    denialReason: decision.denialReason,
+  })
+}
+
+const detailAccessDenials = new Set([
+  'auth_required',
+  'student_role_required',
+  'instructor_not_assigned',
+  'active_enrollment_required',
+  'course_not_published',
+  'live_class_draft',
+])
 
 function validateSchedule(startValue, endValue, { future = false } = {}) {
   const start = new Date(startValue)
@@ -105,37 +132,36 @@ router.post('/', requireRole(...managerRoles), requireCourseManager, async (req,
 })
 
 router.get('/student/upcoming', async (req, res) => {
-  res.json({ liveClasses: (await listUpcomingLiveClassesForUser(req.user.id)).map(item => publicLiveClass({
-    id: item.id,
-    courseId: item.course_id,
-    courseTitle: item.course_title,
-    batchId: item.batch_id,
-    instructorId: item.instructor_id,
-    instructor: item.instructor_name || 'Cyber Lab IN Instructor',
-    title: item.title,
-    description: item.description || '',
-    agenda: item.agenda || '',
-    provider: item.provider,
-    joinUrl: item.join_url,
-    embedUrl: item.embed_url,
-    scheduledStart: item.scheduled_start,
-    scheduledEnd: item.scheduled_end,
-    timezone: item.timezone || 'Asia/Kolkata',
-    status: item.status,
-    recordingUrl: item.recording_url || null,
-  })) })
+  const liveClasses = await listUpcomingLiveClassesForUser(req.user.id)
+  res.json({
+    liveClasses: await Promise.all(liveClasses.map(async liveClass => (
+      studentLiveClass(liveClass, await joinDecision(req.user, liveClass))
+    ))),
+  })
 })
 
 router.get('/course/:courseId', requireCourseAccess({ allowRoles: monitorRoles }), async (req, res) => {
   const includeJoin = userHasRole(req.user, managerRoles)
-  res.json({ liveClasses: (await listLiveClassesByCourse(req.params.courseId)).map(item => publicLiveClass(item, includeJoin)) })
+  const liveClasses = await listLiveClassesByCourse(req.params.courseId)
+  res.json({
+    liveClasses: includeJoin
+      ? liveClasses.map(item => publicLiveClass(item, true))
+      : await Promise.all(liveClasses.map(async item => studentLiveClass(item, await joinDecision(req.user, item)))),
+  })
 })
 
 router.get('/:liveClassId', async (req, res) => {
   const liveClass = await getLiveClassById(req.params.liveClassId)
   if (!liveClass) return res.status(404).json({ error: 'Live class not found' })
-  if (!await canAccessLiveClass(req.user, liveClass)) return res.status(403).json({ error: 'Live class access denied' })
-  res.json({ liveClass: publicLiveClass(liveClass, userHasRole(req.user, managerRoles)), viewerCount: await getViewerCount(liveClass.id) })
+  const decision = await joinDecision(req.user, liveClass)
+  if (detailAccessDenials.has(decision.reason)) return deny(res, decision)
+  const manager = userHasRole(req.user, monitorRoles) || await canManageLiveClass(req.user, liveClass)
+  res.json({
+    liveClass: manager
+      ? { ...publicLiveClass(liveClass, true), ...studentLiveClass(liveClass, decision) }
+      : studentLiveClass(liveClass, decision),
+    viewerCount: await getViewerCount(liveClass.id),
+  })
 })
 
 router.patch('/:liveClassId', requireRole(...managerRoles), async (req, res) => {
@@ -208,7 +234,15 @@ router.get('/:liveClassId/validate', async (req, res) => {
   const liveClass = await getLiveClassById(req.params.liveClassId)
   if (!liveClass) return res.status(404).json({ error: 'Live class not found' })
   const decision = await joinDecision(req.user, liveClass)
-  res.json({ allowed: decision.allowed, reason: decision.reason, viewerCount: await getViewerCount(liveClass.id) })
+  res.json({
+    allowed: decision.allowed,
+    canJoin: decision.canJoin,
+    reason: decision.reason,
+    denialReason: decision.denialReason,
+    joinAvailableAt: decision.joinAvailableAt,
+    joinUrl: decision.joinUrl,
+    viewerCount: await getViewerCount(liveClass.id),
+  })
 })
 
 router.post('/:liveClassId/join', async (req, res) => {
@@ -217,7 +251,7 @@ router.post('/:liveClassId/join', async (req, res) => {
   const decision = await joinDecision(req.user, liveClass)
   if (!decision.allowed) return deny(res, decision)
   const attendance = await recordLiveEvent(liveClass.id, req.user.id, 'join')
-  res.json({ attendance, liveClass: publicLiveClass(liveClass, true), viewerCount: await getViewerCount(liveClass.id) })
+  res.json({ attendance, liveClass: studentLiveClass(liveClass, decision), viewerCount: await getViewerCount(liveClass.id) })
 })
 
 router.post('/:liveClassId/leave', async (req, res) => {
@@ -231,7 +265,8 @@ router.post('/:liveClassId/leave', async (req, res) => {
 router.post('/:liveClassId/check-in', async (req, res) => {
   const liveClass = await getLiveClassById(req.params.liveClassId)
   if (!liveClass) return res.status(404).json({ error: 'Live class not found' })
-  if (!await canAccessLiveClass(req.user, liveClass)) return res.status(403).json({ error: 'Live class access denied' })
+  const decision = await joinDecision(req.user, liveClass)
+  if (!decision.allowed) return deny(res, decision)
   const attendance = await recordLiveEvent(liveClass.id, req.user.id, 'check_in')
   await recordAudit('live_class.check_in', req.user.id, 'live_class', liveClass.id, { source: 'lms' })
   res.json({ attendance, status: 'checked_in' })

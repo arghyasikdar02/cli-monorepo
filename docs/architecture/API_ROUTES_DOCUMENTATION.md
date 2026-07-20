@@ -101,7 +101,9 @@ Course, module, lesson, and resource writes require an authenticated administrat
 - `GET /api/live-classes/:liveClassId/attendance`
 - `GET /api/live-classes/:liveClassId/viewers`
 
-Student schedules are filtered by active course enrolment and optional batch. Meeting URLs are returned only to authorized staff or after a learner passes the guarded join endpoint during the join window. Google Meet creation is idempotent and stores only safe meeting metadata on the live-class record.
+Student schedules are filtered by published course, active enrolment, and optional batch. Student list and detail responses use the backend-owned fields `canJoin`, `joinAvailableAt`, `joinUrl`, and `denialReason`; the Meet URL is populated only while that learner is authorized and the 15-minute join window is open. Draft classes are hidden, cancelled classes never expose a join URL, and rescheduled timestamps are read directly from PostgreSQL.
+
+The guarded join endpoint repeats every authorization check before recording the join event. It returns specific safe failures for missing enrolment, unpublished or cancelled classes, an unopened/expired join window, and a missing meeting link. Google connection IDs, space resources, tokens, and other provider metadata are not included in student responses.
 
 ## Google Integration
 
