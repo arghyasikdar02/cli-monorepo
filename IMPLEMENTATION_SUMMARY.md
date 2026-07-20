@@ -28,6 +28,8 @@
 - Converted the existing logo artwork to correctly sized WebP delivery assets and added explicit dimensions without changing its appearance.
 - Rebuilt learner profile, resources, notifications and quizzes around real APIs.
 - Added a responsive learner drawer; authenticated pages no longer depend on a fixed desktop sidebar at mobile widths.
+- Added protected operational admin pages for courses, ordered modules and lessons, resources, instructor assignment, student enrolments, live classes, Google authorization and Cysensei usage.
+- Added loading, empty, retry, validation, success and explicit confirmation states to every new management workflow.
 
 ## Backend and data
 
@@ -39,6 +41,9 @@
 - Corrected admin, marketing, instructor and ops dashboards to query real records.
 - Enforced course assignment for instructors and active enrolment plus optional batch membership for learners.
 - Live-class lists and joins now exclude wrong-course, wrong-batch and expired sessions.
+- Added additive course-content fields and transaction-safe reordering through migration `011_admin_course_operations.sql`.
+- Added audited course publish/unpublish/archive/restore operations, idempotent enrolment activation, non-destructive enrolment removal and ownership-checked live-class management.
+- Added idempotent Google Meet creation for assigned future classes while keeping Google tokens encrypted and meeting metadata out of learner responses until the guarded join flow.
 - Razorpay order creation fails closed when price or credentials are absent; webhook processing is signed and idempotent.
 
 ## Security
@@ -62,15 +67,15 @@
 - Preserved the archived monorepo and legacy backup locally but removed 261 archived files from version control and active deployment.
 - Added a legacy-stack GitHub Actions workflow, Render blueprint, smoke test and organised documentation folders.
 - Active architecture remains `cyberscout/` plus `cyberscout-server/`; no monorepo or framework migration was created.
-- Pinned Node 24.14.1 across package engines, `.nvmrc`, CI and the Render Blueprint.
+- Pinned Node 22 LTS across package engines, `.nvmrc` and CI; Render reads the backend package engine.
 - Added a strict pre-database startup gate, aggregated production environment validation, normalized HTTPS origin handling and a public database-aware `/health` readiness route.
 - Configured Render as a stateless service using a secret Supabase `DATABASE_URL`, TLS, tracked migrations before start and no automatic seed.
 
 ## Verification result
 
 - Frontend lint: pass.
-- Backend integration, security and environment suite: 24/24 pass.
-- PostgreSQL 16 integration: pass; all nine migrations applied, duplicate-safe seed verified, and all 24 backend tests passed against PostgreSQL.
+- Backend integration, security and environment suite: 58/58 pass.
+- PostgreSQL 16 integration: pass; all eleven migrations apply safely and the operational admin, live-class, Google Meet, role and course-isolation tests pass.
 - Render-shaped production startup: pass against a disposable TLS-enabled PostgreSQL 16 server; the connection negotiated TLS 1.3, health returned 200, CORS matched the configured frontend, and a database write persisted.
 - Live Supabase read/write verification remains pending because the production `DATABASE_URL` is not stored in or available to this workspace.
 - Production build and 41-route prerender: pass.

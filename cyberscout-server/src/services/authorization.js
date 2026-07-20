@@ -80,7 +80,8 @@ export async function canInstructorAccessCourse(user, courseId) {
 export async function canJoinLiveClass(user, liveClass, at = new Date()) {
   if (!user) return deny('auth_required')
   if (isAdmin(user) || userHasRole(user, OPS_ROLES)) return allow('staff_monitoring')
-  if (userHasRole(user, INSTRUCTOR_ROLES) && await isInstructorAssigned(user.id, liveClass.courseId)) return allow('assigned_instructor')
+  if (userHasRole(user, INSTRUCTOR_ROLES) && (liveClass.instructorId === user.id || await isInstructorAssigned(user.id, liveClass.courseId))) return allow('assigned_instructor')
+  if (!['scheduled', 'live'].includes(liveClass.status)) return deny(`live_class_${liveClass.status || 'unavailable'}`)
   const access = liveClass.batchId
     ? await canAccessBatch(user, liveClass.courseId, liveClass.batchId)
     : await canAccessCourse(user, liveClass.courseId)

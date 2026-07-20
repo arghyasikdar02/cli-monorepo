@@ -85,6 +85,7 @@ export default function LiveClassListPage() {
 
 function ClassCard({ cls }) {
   const isLive = cls.status === 'live'
+  const isCancelled = cls.status === 'cancelled'
   const date = formatDate(cls.scheduledStart)
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-card p-6 flex gap-5 hover:shadow-card-hover transition-shadow">
@@ -96,9 +97,10 @@ function ClassCard({ cls }) {
         <div className="flex items-start justify-between gap-3 mb-1">
           <h3 className="font-space-grotesk font-bold text-on-surface">{cls.title}</h3>
           {isLive && <span className="flex-shrink-0 bg-green-50 text-green-600 text-[10px] font-bold px-2 py-0.5 rounded">LIVE NOW</span>}
+          {isCancelled && <span className="flex-shrink-0 bg-red-50 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded">CANCELLED</span>}
         </div>
         <p className="text-sm text-on-surface-variant mb-1">{cls.courseTitle}</p>
-        <p className="text-xs text-slate-400 mb-4">{date.time}</p>
+        <p className="text-xs text-slate-400 mb-4">{date.time} · {cls.timezone}</p>
         <div className="flex items-center justify-end">
           {isLive ? (
             <Link to={`/live-classes/${cls.id}/session`}

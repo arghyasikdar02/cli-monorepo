@@ -2,12 +2,15 @@ import { useEffect, useState } from 'react'
 import StaffDashboardShell from '../../components/layout/StaffDashboardShell'
 import DashboardMetric from '../../components/ui/DashboardMetric'
 import { api, API_BASE } from '../../lib/api'
+import SiteIcon from '../../components/ui/SiteIcon'
 
 export default function InstructorDashboardPage() {
   const [dashboard, setDashboard] = useState(null)
   const [google, setGoogle] = useState(null)
   const [error, setError] = useState('')
   const [googleError, setGoogleError] = useState('')
+  const [liveMessage, setLiveMessage] = useState('')
+  const [creatingMeet, setCreatingMeet] = useState('')
 
   useEffect(() => {
     api.dashboard('instructor')
@@ -29,6 +32,21 @@ export default function InstructorDashboardPage() {
       setGoogle(google)
     } catch (err) {
       setGoogleError(err.message || 'Google account could not be disconnected')
+    }
+  }
+
+  const createMeet = async liveClassId => {
+    setCreatingMeet(liveClassId)
+    setLiveMessage('')
+    try {
+      await api.createGoogleMeet(liveClassId)
+      const { dashboard: refreshed } = await api.dashboard('instructor')
+      setDashboard(refreshed)
+      setLiveMessage('Google Meet created for the live class.')
+    } catch (err) {
+      setLiveMessage(err.message || 'Google Meet could not be created')
+    } finally {
+      setCreatingMeet('')
     }
   }
 
@@ -86,6 +104,22 @@ export default function InstructorDashboardPage() {
                   <p className="mt-1 text-sm text-slate-500">{course.description}</p>
                 </div>
               ))}
+            </div>
+          </section>
+
+          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 className="font-space-grotesk text-lg font-bold">Assigned Live Classes</h2>
+            {liveMessage && <p role="status" className="mt-2 text-sm font-semibold text-violet-700">{liveMessage}</p>}
+            <div className="mt-4 space-y-3">
+              {dashboard.liveClasses?.length ? dashboard.liveClasses.map(liveClass => (
+                <div key={liveClass.id} className="flex flex-col gap-3 rounded-lg border border-slate-100 p-4 md:flex-row md:items-center md:justify-between">
+                  <div><p className="font-semibold text-slate-900">{liveClass.title}</p><p className="mt-1 text-sm text-slate-500">{liveClass.courseTitle} · {new Date(liveClass.scheduledStart).toLocaleString()}</p></div>
+                  <div className="flex flex-wrap gap-2">
+                    {!liveClass.meetingUrl && <button type="button" disabled={creatingMeet === liveClass.id} onClick={() => createMeet(liveClass.id)} className="min-h-10 rounded-lg bg-violet-700 px-3 text-sm font-bold text-white disabled:opacity-60">{creatingMeet === liveClass.id ? 'Creating...' : 'Create Google Meet'}</button>}
+                    {liveClass.meetingUrl && <a href={liveClass.meetingUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-slate-950 px-3 text-sm font-bold text-white">Start or join Meet<SiteIcon name="external_link" size={15} /></a>}
+                  </div>
+                </div>
+              )) : <p className="text-sm text-slate-500">No live classes are assigned.</p>}
             </div>
           </section>
 

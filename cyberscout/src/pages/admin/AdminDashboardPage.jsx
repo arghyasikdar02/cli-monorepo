@@ -1,17 +1,26 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import StaffDashboardShell from '../../components/layout/StaffDashboardShell'
 import DashboardMetric from '../../components/ui/DashboardMetric'
 import { api } from '../../lib/api'
+import SiteIcon from '../../components/ui/SiteIcon'
+import { adminNavigation } from './adminNavigation'
 
 export default function AdminDashboardPage() {
   const [dashboard, setDashboard] = useState(null)
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  const load = () => {
+    setLoading(true)
+    setError('')
     api.dashboard('admin')
       .then(({ dashboard }) => setDashboard(dashboard))
       .catch(err => setError(err.message || 'Unable to load admin dashboard'))
-  }, [])
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => { load() }, [])
 
   const analytics = dashboard?.analytics || {}
 
@@ -20,12 +29,23 @@ export default function AdminDashboardPage() {
       title="Admin Dashboard"
       subtitle="Manage users, courses, enrollments, payments, live monitoring, platform analytics, and audit activity."
       loginPath="/admin/login"
+      navigation={adminNavigation}
     >
-      {error && <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
-      {!dashboard ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-8 text-slate-500">Loading admin systems...</div>
+      {error && <div role="alert" className="mb-6 flex items-center justify-between gap-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><span>{error}</span><button type="button" onClick={load} className="font-bold underline">Retry</button></div>}
+      {loading ? (
+        <div className="rounded-xl border border-slate-200 bg-white p-8 text-slate-500" role="status">Loading admin systems...</div>
+      ) : !dashboard ? (
+        <div className="rounded-xl border border-slate-200 bg-white p-8 text-slate-500">Admin dashboard data is unavailable.</div>
       ) : (
         <div className="space-y-6">
+          <div className="flex flex-wrap gap-3">
+            <Link to="/admin/courses?create=1" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white hover:bg-slate-800">
+              <SiteIcon name="add" size={17} /> Create Course
+            </Link>
+            <Link to="/admin/live-classes?create=1" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 hover:bg-slate-100">
+              <SiteIcon name="calendar" size={17} /> Schedule Live Class
+            </Link>
+          </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <DashboardMetric label="Users" value={analytics.users ?? 0} helper="Role-aware accounts" />
             <DashboardMetric label="Courses" value={analytics.courses ?? 0} helper="Published and draft" />

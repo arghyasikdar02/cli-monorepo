@@ -129,6 +129,8 @@ describe('Cyber Lab IN database-backed LMS flow', () => {
   it('has applied the Google OAuth and Meet migration', async () => {
     const migration = await database.queryOne('SELECT name FROM schema_migrations WHERE name = $1', ['010_google_oauth_meet.sql'])
     assert.equal(migration.name, '010_google_oauth_meet.sql')
+    const adminMigration = await database.queryOne('SELECT name FROM schema_migrations WHERE name = $1', ['011_admin_course_operations.sql'])
+    assert.equal(adminMigration.name, '011_admin_course_operations.sql')
   })
 
   it('registers a real user, hashes the password, and returns a working session', async () => {
@@ -420,6 +422,172 @@ describe('Cyber Lab IN database-backed LMS flow', () => {
     assert.deepEqual(courseIndex.body.courses.map(course => course.id), ['c001', 'c002'])
     assert.equal(courseDetail.response.status, 200)
     assert.equal(courseDetail.body.course.id, 'c002')
+  })
+
+  it('provides complete admin course, content, instructor, and enrollment operations', async () => {
+    const instructor = await database.queryOne("SELECT id FROM users WHERE email = 'instructor@cyberlabin.com'")
+    const student = await database.queryOne("SELECT id FROM users WHERE email = 'student@cyberlabin.com'")
+    const slug = `admin-course-${Date.now()}`
+
+    const denied = await request('/api/courses', {
+      method: 'POST', token: studentToken, body: JSON.stringify({ title: 'Not allowed' }),
+    })
+    assert.equal(denied.response.status, 403)
+
+    const created = await request('/api/courses', {
+      method: 'POST', token: adminToken, body: JSON.stringify({
+        title: 'Admin Operations Course', slug, description: 'Draft course', overview: 'Admin managed course',
+        duration: '4 weeks', instructorId: instructor.id, status: 'draft', outcomes: ['Review evidence'],
+      }),
+    })
+    assert.equal(created.response.status, 201, created.body.error)
+    const courseId = created.body.course.id
+    assert.equal(created.body.course.status, 'draft')
+    assert.equal(created.body.course.instructorId, instructor.id)
+
+    const hidden = await request('/api/courses/public')
+    assert.equal(hidden.body.courses.some(course => course.id === courseId), false)
+
+    const updated = await request(`/api/courses/${courseId}`, {
+      method: 'PATCH', token: adminToken, body: JSON.stringify({ title: 'Admin Operations Updated', duration: '5 weeks' }),
+    })
+    assert.equal(updated.response.status, 200, updated.body.error)
+    assert.equal(updated.body.course.title, 'Admin Operations Updated')
+
+    const module = await request(`/api/courses/${courseId}/modules`, {
+      method: 'POST', token: adminToken, body: JSON.stringify({ title: 'Foundation', description: 'Start here' }),
+    })
+    assert.equal(module.response.status, 201, module.body.error)
+    const lesson = await request(`/api/courses/${courseId}/modules/${module.body.module.id}/lessons`, {
+      method: 'POST', token: adminToken, body: JSON.stringify({ title: 'Inspect evidence', type: 'text', status: 'published', content: 'Review the supplied evidence.' }),
+    })
+    assert.equal(lesson.response.status, 201, lesson.body.error)
+
+    const crossCourse = await request(`/api/courses/c001/modules/${module.body.module.id}/lessons`, {
+      method: 'POST', token: adminToken, body: JSON.stringify({ title: 'Cross-course write' }),
+    })
+    assert.equal(crossCourse.response.status, 404)
+
+    const resource = await request(`/api/courses/${courseId}/resources`, {
+      method: 'POST', token: adminToken, body: JSON.stringify({ title: 'Reference guide', type: 'link', lessonId: lesson.body.lesson.id, resourceUrl: 'https://example.com/reference' }),
+    })
+    assert.equal(resource.response.status, 201, resource.body.error)
+
+    const enrollment = await request('/api/enrollments', {
+      method: 'POST', token: adminToken, body: JSON.stringify({ userId: student.id, courseId }),
+    })
+    assert.equal(enrollment.response.status, 201, enrollment.body.error)
+    const duplicate = await request('/api/enrollments', {
+      method: 'POST', token: adminToken, body: JSON.stringify({ userId: student.id, courseId }),
+    })
+    assert.equal(duplicate.response.status, 201, duplicate.body.error)
+    assert.equal(duplicate.body.enrollment.id, enrollment.body.enrollment.id)
+
+    const published = await request(`/api/courses/${courseId}/publish`, { method: 'PATCH', token: adminToken, body: '{}' })
+    assert.equal(published.response.status, 200, published.body.error)
+    const visible = await request('/api/courses/public')
+    assert.ok(visible.body.courses.some(course => course.id === courseId))
+    const learnerCourses = await request('/api/courses/my', { token: studentToken })
+    assert.ok(learnerCourses.body.courses.some(course => course.id === courseId))
+
+    const unpublished = await request(`/api/courses/${courseId}/unpublish`, { method: 'PATCH', token: adminToken, body: '{}' })
+    assert.equal(unpublished.body.course.status, 'unpublished')
+    const hiddenAgain = await request('/api/courses/my', { token: studentToken })
+    assert.equal(hiddenAgain.body.courses.some(course => course.id === courseId), false)
+    await request(`/api/courses/${courseId}/publish`, { method: 'PATCH', token: adminToken, body: '{}' })
+
+    const detail = await request(`/api/courses/admin/${courseId}`, { token: adminToken })
+    assert.equal(detail.response.status, 200)
+    assert.equal(detail.body.course.modules[0].description, 'Start here')
+    assert.equal(detail.body.course.modules[0].lessons[0].type, 'text')
+    assert.equal(detail.body.course.enrollments.length, 1)
+
+    const removed = await request(`/api/enrollments/${enrollment.body.enrollment.id}`, { method: 'DELETE', token: adminToken })
+    assert.equal(removed.response.status, 200)
+    assert.equal(removed.body.enrollment.status, 'inactive')
+  })
+
+  it('manages live-class schedules and creates one idempotent Google Meet space', async () => {
+    const { encryptToken } = await import('../src/lib/tokenCrypto.js')
+    const { GOOGLE_MEET_SCOPE } = await import('../src/services/google.js')
+    const admin = await database.queryOne("SELECT id FROM users WHERE email = 'admin@cyberlabin.com'")
+    const instructor = await database.queryOne("SELECT id FROM users WHERE email = 'instructor@cyberlabin.com'")
+    const student = await database.queryOne("SELECT id FROM users WHERE email = 'student@cyberlabin.com'")
+    const slug = `live-admin-${Date.now()}`
+    const course = await request('/api/courses', { method: 'POST', token: adminToken, body: JSON.stringify({ title: 'Live Admin Course', slug, duration: '2 weeks', instructorId: instructor.id, status: 'published' }) })
+    assert.equal(course.response.status, 201, course.body.error)
+    const courseId = course.body.course.id
+    await request('/api/enrollments', { method: 'POST', token: adminToken, body: JSON.stringify({ userId: student.id, courseId }) })
+
+    const invalid = await request('/api/live-classes', { method: 'POST', token: adminToken, body: JSON.stringify({ courseId, instructorId: instructor.id, title: 'Invalid class', scheduledStart: new Date(Date.now() + 60_000).toISOString(), scheduledEnd: new Date().toISOString() }) })
+    assert.equal(invalid.response.status, 400)
+
+    const start = new Date(Date.now() + 24 * 60 * 60 * 1000)
+    const end = new Date(start.getTime() + 60 * 60 * 1000)
+    const created = await request('/api/live-classes', { method: 'POST', token: adminToken, body: JSON.stringify({ courseId, instructorId: instructor.id, title: 'Evidence review', description: 'Review course evidence.', scheduledStart: start.toISOString(), scheduledEnd: end.toISOString(), timezone: 'Asia/Kolkata', status: 'scheduled' }) })
+    assert.equal(created.response.status, 201, created.body.error)
+    const liveId = created.body.liveClass.id
+
+    const deniedStudentUpdate = await request(`/api/live-classes/${liveId}`, { method: 'PATCH', token: studentToken, body: JSON.stringify({ status: 'cancelled' }) })
+    assert.equal(deniedStudentUpdate.response.status, 403)
+    const deniedMarketingUpdate = await request(`/api/live-classes/${liveId}`, { method: 'PATCH', token: marketingToken, body: JSON.stringify({ status: 'cancelled' }) })
+    assert.equal(deniedMarketingUpdate.response.status, 403)
+
+    const learnerSchedule = await request('/api/live-classes/student/upcoming', { token: studentToken })
+    assert.ok(learnerSchedule.body.liveClasses.some(item => item.id === liveId))
+    const unenrolledSchedule = await request('/api/live-classes/student/upcoming', { token: neelToken })
+    assert.equal(unenrolledSchedule.body.liveClasses.some(item => item.id === liveId), false)
+
+    const missingGoogle = await request(`/api/live-classes/${liveId}/google-meet`, { method: 'POST', token: adminToken, body: '{}' })
+    assert.equal(missingGoogle.response.status, 409)
+
+    const connect = await request('/api/integrations/google/connect?redirect=%2Fadmin%2Fgoogle', { token: adminToken, redirect: 'manual' })
+    assert.equal(connect.response.status, 302)
+    const authorization = new URL(connect.response.headers.get('location'))
+    assert.equal(authorization.origin, 'https://accounts.google.com')
+    assert.ok(authorization.searchParams.get('scope').includes(GOOGLE_MEET_SCOPE))
+
+    await database.execute(`
+      INSERT INTO google_connections (id, user_id, google_subject, google_email, encrypted_access_token, encrypted_refresh_token, token_expiry, granted_scopes)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+      ON CONFLICT (user_id) DO UPDATE SET encrypted_access_token = excluded.encrypted_access_token, encrypted_refresh_token = excluded.encrypted_refresh_token,
+        token_expiry = excluded.token_expiry, granted_scopes = excluded.granted_scopes, revoked_at = NULL
+    `, ['gcon_admin_test', admin.id, 'google-admin-test', 'admin-google@example.com', encryptToken('access-token'), encryptToken('refresh-token'), new Date(Date.now() + 60 * 60 * 1000).toISOString(), JSON.stringify([GOOGLE_MEET_SCOPE])])
+
+    const nativeFetch = globalThis.fetch
+    let meetCalls = 0
+    globalThis.fetch = async (input, options) => {
+      if (String(input) === 'https://meet.googleapis.com/v2/spaces') {
+        meetCalls += 1
+        return new Response(JSON.stringify({ name: 'spaces/test-space', meetingCode: 'abc-defg-hij', meetingUri: 'https://meet.google.com/abc-defg-hij' }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      return nativeFetch(input, options)
+    }
+    try {
+      const meet = await request(`/api/live-classes/${liveId}/google-meet`, { method: 'POST', token: adminToken, body: '{}' })
+      assert.equal(meet.response.status, 200, meet.body.error)
+      assert.equal(meet.body.googleMeet.meetingUrl, 'https://meet.google.com/abc-defg-hij')
+      assert.equal(meet.body.liveClass.googleSpaceName, 'spaces/test-space')
+      const duplicate = await request(`/api/live-classes/${liveId}/google-meet`, { method: 'POST', token: adminToken, body: '{}' })
+      assert.equal(duplicate.response.status, 200)
+      assert.equal(duplicate.body.googleMeet.meetingUrl, meet.body.googleMeet.meetingUrl)
+      assert.equal(meetCalls, 1)
+    } finally {
+      globalThis.fetch = nativeFetch
+    }
+
+    const shiftedStart = new Date(start.getTime() + 24 * 60 * 60 * 1000)
+    const shiftedEnd = new Date(end.getTime() + 24 * 60 * 60 * 1000)
+    const rescheduled = await request(`/api/live-classes/${liveId}`, { method: 'PATCH', token: instructorToken, body: JSON.stringify({ scheduledStart: shiftedStart.toISOString(), scheduledEnd: shiftedEnd.toISOString() }) })
+    assert.equal(rescheduled.response.status, 200, rescheduled.body.error)
+    assert.equal(new Date(rescheduled.body.liveClass.scheduledStart).toISOString(), shiftedStart.toISOString())
+
+    const cancelled = await request(`/api/live-classes/${liveId}`, { method: 'PATCH', token: adminToken, body: JSON.stringify({ status: 'cancelled' }) })
+    assert.equal(cancelled.response.status, 200)
+    assert.equal(cancelled.body.liveClass.status, 'cancelled')
+    const cancellationVisible = await request('/api/live-classes/student/upcoming', { token: studentToken })
+    assert.equal(cancellationVisible.body.liveClasses.find(item => item.id === liveId)?.status, 'cancelled')
+    assert.equal(cancellationVisible.body.liveClasses.find(item => item.id === liveId)?.meetingUrl, undefined)
   })
 
   it('returns health and published blogs', async () => {

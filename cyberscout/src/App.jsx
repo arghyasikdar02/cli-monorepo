@@ -18,6 +18,12 @@ const OAuthCallbackPage = lazy(() => import('./pages/auth/OAuthCallbackPage'))
 // Core
 const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'))
 const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage'))
+const AdminCoursesPage = lazy(() => import('./pages/admin/AdminCoursesPage'))
+const AdminContentPage = lazy(() => import('./pages/admin/AdminContentPage'))
+const AdminPeoplePage = lazy(() => import('./pages/admin/AdminPeoplePage'))
+const AdminLiveClassesPage = lazy(() => import('./pages/admin/AdminLiveClassesPage'))
+const AdminGoogleIntegrationPage = lazy(() => import('./pages/admin/AdminGoogleIntegrationPage'))
+const AdminCysenseiPage = lazy(() => import('./pages/admin/AdminCysenseiPage'))
 const InstructorDashboardPage = lazy(() => import('./pages/instructor/InstructorDashboardPage'))
 const MarketingDashboardPage = lazy(() => import('./pages/marketing/MarketingDashboardPage'))
 const OpsDashboardPage = lazy(() => import('./pages/ops/OpsDashboardPage'))
@@ -149,6 +155,13 @@ export default function App() {
         <Route path="/dashboard/instructor" element={<RoleP roles={ROLE_GROUPS.instructor} loginPath="/instructor/login"><InstructorDashboardPage /></RoleP>} />
         <Route path="/dashboard/sales" element={<RoleP roles={ROLE_GROUPS.marketing} loginPath="/marketing/login"><MarketingDashboardPage /></RoleP>} />
         <Route path="/admin/dashboard" element={<RoleP roles={ROLE_GROUPS.admin} loginPath="/admin/login"><AdminDashboardPage /></RoleP>} />
+        <Route path="/admin/courses" element={<RoleP roles={ROLE_GROUPS.admin} loginPath="/admin/login"><AdminCoursesPage /></RoleP>} />
+        <Route path="/admin/content" element={<RoleP roles={ROLE_GROUPS.admin} loginPath="/admin/login"><AdminContentPage /></RoleP>} />
+        <Route path="/admin/live-classes" element={<RoleP roles={ROLE_GROUPS.admin} loginPath="/admin/login"><AdminLiveClassesPage /></RoleP>} />
+        <Route path="/admin/instructors" element={<RoleP roles={ROLE_GROUPS.admin} loginPath="/admin/login"><AdminPeoplePage mode="instructors" /></RoleP>} />
+        <Route path="/admin/enrolments" element={<RoleP roles={ROLE_GROUPS.admin} loginPath="/admin/login"><AdminPeoplePage mode="enrolments" /></RoleP>} />
+        <Route path="/admin/cysensei" element={<RoleP roles={ROLE_GROUPS.admin} loginPath="/admin/login"><AdminCysenseiPage /></RoleP>} />
+        <Route path="/admin/google" element={<RoleP roles={ROLE_GROUPS.admin} loginPath="/admin/login"><AdminGoogleIntegrationPage /></RoleP>} />
         <Route path="/instructor/dashboard" element={<RoleP roles={ROLE_GROUPS.instructor} loginPath="/instructor/login"><InstructorDashboardPage /></RoleP>} />
         <Route path="/marketing/dashboard" element={<RoleP roles={ROLE_GROUPS.marketing} loginPath="/marketing/login"><MarketingDashboardPage /></RoleP>} />
         <Route path="/ops/dashboard" element={<RoleP roles={ROLE_GROUPS.ops} loginPath="/ops/login"><OpsDashboardPage /></RoleP>} />

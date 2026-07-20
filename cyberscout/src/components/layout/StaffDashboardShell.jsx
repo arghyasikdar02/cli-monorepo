@@ -1,9 +1,10 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
 import CLILogo from '../CLILogo'
 import { useAppStore } from '../../store/useAppStore'
 import { api } from '../../lib/api'
+import SiteIcon from '../ui/SiteIcon'
 
-export default function StaffDashboardShell({ title, subtitle, children, loginPath }) {
+export default function StaffDashboardShell({ title, subtitle, children, loginPath, navigation = [] }) {
   const { user, logout } = useAppStore()
   const navigate = useNavigate()
 
@@ -35,6 +36,24 @@ export default function StaffDashboardShell({ title, subtitle, children, loginPa
           </div>
         </div>
       </header>
+
+      {navigation.length > 0 && (
+        <nav className="border-b border-slate-200 bg-white" aria-label="Dashboard sections">
+          <div className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-5 py-2">
+            {navigation.map(item => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to.endsWith('/dashboard')}
+                className={({ isActive }) => `inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-semibold transition ${isActive ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'}`}
+              >
+                <SiteIcon name={item.icon} size={17} />
+                {item.label}
+              </NavLink>
+            ))}
+          </div>
+        </nav>
+      )}
 
       <section className="mx-auto max-w-7xl px-5 py-8">
         <div className="mb-8">

@@ -80,6 +80,26 @@ function slugify(value) {
     .replace(/^-+|-+$/g, '')
 }
 
+export const COURSE_STATUSES = Object.freeze(['draft', 'published', 'unpublished', 'archived'])
+export const LESSON_STATUSES = Object.freeze(['draft', 'published'])
+export const LESSON_TYPES = Object.freeze(['text', 'video', 'document', 'link', 'lab', 'quiz', 'assignment'])
+export const LIVE_CLASS_STATUSES = Object.freeze(['draft', 'scheduled', 'live', 'completed', 'cancelled'])
+
+function allowedValue(value, allowed, fallback) {
+  const normalized = String(value || fallback).trim().toLowerCase()
+  if (!allowed.includes(normalized)) throw new Error(`Unsupported value: ${normalized}`)
+  return normalized
+}
+
+async function requireAssignableInstructor(userId, client) {
+  if (!userId) return null
+  const user = await findUserById(userId, client)
+  if (!user || user.status !== 'active' || !userHasRole(user, ['instructor', 'admin', 'super_admin'])) {
+    throw new Error('Assigned instructor must be an active instructor or administrator')
+  }
+  return user
+}
+
 function courseFromRow(row, extra = {}) {
   if (!row) return null
   return {
@@ -91,9 +111,14 @@ function courseFromRow(row, extra = {}) {
     duration: row.duration,
     description: row.description,
     overview: row.overview,
-    instructor: { name: row.instructor_name, title: row.instructor_title },
-    instructorName: row.instructor_name,
+    instructor: {
+      name: row.assigned_instructor_name || row.instructor_name,
+      title: row.instructor_title,
+      email: row.assigned_instructor_email || null,
+    },
+    instructorName: row.assigned_instructor_name || row.instructor_name,
     instructorTitle: row.instructor_title,
+    instructorEmail: row.assigned_instructor_email || null,
     instructorId: row.instructor_id || null,
     status: row.status,
     price: Number(row.price || 0),
@@ -108,6 +133,7 @@ function courseFromRow(row, extra = {}) {
     moduleCount: Number(extra.moduleCount ?? row.module_count ?? 0),
     lessonCount: Number(extra.lessonCount ?? row.lesson_count ?? 0),
     materialCount: Number(extra.materialCount ?? row.material_count ?? 0),
+    enrollmentCount: Number(extra.enrollmentCount ?? row.enrollment_count ?? 0),
     enrolled: Boolean(extra.enrolled ?? row.enrolled ?? false),
     progress: Number(extra.progress ?? row.progress ?? 0),
     currentLessonId: extra.currentLessonId ?? row.current_lesson_id ?? null,
@@ -118,7 +144,16 @@ function courseFromRow(row, extra = {}) {
 }
 
 function moduleFromRow(row) {
-  return { id: row.id, courseId: row.course_id, title: row.title, order: row.sort_order, lessons: [] }
+  return {
+    id: row.id,
+    courseId: row.course_id,
+    title: row.title,
+    description: row.description || '',
+    order: Number(row.sort_order || 0),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at || row.created_at,
+    lessons: [],
+  }
 }
 
 function lessonFromRow(row, completed = false) {
@@ -129,9 +164,13 @@ function lessonFromRow(row, completed = false) {
     title: row.title,
     duration: row.duration,
     content: row.content,
-    order: row.sort_order,
+    type: row.lesson_type || 'text',
+    resourceUrl: row.resource_url || null,
+    order: Number(row.sort_order || 0),
     status: row.status,
     completed,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at || row.created_at,
   }
 }
 
@@ -148,6 +187,7 @@ function materialFromRow(row) {
     isPublic: Boolean(row.is_public),
     order: row.sort_order,
     createdAt: row.created_at,
+    updatedAt: row.updated_at || row.created_at,
   }
 }
 
@@ -170,8 +210,21 @@ export async function findUserById(userId, client) {
   return userFromRow(await queryOne('SELECT * FROM users WHERE id = $1', [userId], client))
 }
 
-export async function listUsers() {
-  const rows = await queryMany('SELECT * FROM users ORDER BY created_at DESC')
+export async function listUsers(filters = {}) {
+  const values = []
+  const where = []
+  const role = normalizeRole(filters.role)
+  if (filters.role && !role) return []
+  if (role) {
+    const roleParameter = parameter(values, role)
+    where.push(`(role = ${roleParameter} OR roles ? ${roleParameter})`)
+  }
+  if (filters.status) where.push(`status = ${parameter(values, String(filters.status))}`)
+  if (filters.search) {
+    const search = parameter(values, `%${String(filters.search).trim().toLowerCase()}%`)
+    where.push(`(lower(name) LIKE ${search} OR lower(email) LIKE ${search})`)
+  }
+  const rows = await queryMany(`SELECT * FROM users${where.length ? ` WHERE ${where.join(' AND ')}` : ''} ORDER BY created_at DESC`, values)
   return rows.map(userFromRow).map(publicUser)
 }
 
@@ -253,14 +306,18 @@ export async function suspendUser(userId) {
 const COURSE_COUNTS = `
   SELECT c.*,
     (SELECT count(*) FROM course_modules m WHERE m.course_id = c.id) AS module_count,
-    (SELECT count(*) FROM lessons l WHERE l.course_id = c.id AND l.status = 'published') AS lesson_count,
-    (SELECT count(*) FROM course_materials cm WHERE cm.course_id = c.id) AS material_count
+    (SELECT count(*) FROM lessons l WHERE l.course_id = c.id) AS lesson_count,
+    (SELECT count(*) FROM lessons l WHERE l.course_id = c.id AND l.status = 'published') AS published_lesson_count,
+    (SELECT count(*) FROM course_materials cm WHERE cm.course_id = c.id) AS material_count,
+    (SELECT count(*) FROM enrollments e WHERE e.course_id = c.id AND e.status = 'active') AS enrollment_count,
+    (SELECT u.name FROM users u WHERE u.id = c.instructor_id) AS assigned_instructor_name,
+    (SELECT u.email FROM users u WHERE u.id = c.instructor_id) AS assigned_instructor_email
   FROM courses c
 `
 
 export async function listPublicCourses() {
   const rows = await queryMany(`${COURSE_COUNTS} WHERE c.status = 'published' ORDER BY c.created_at ASC`)
-  return rows.map(courseFromRow)
+  return rows.map(row => courseFromRow(row, { lessonCount: row.published_lesson_count }))
 }
 
 export async function listCourses() {
@@ -272,18 +329,22 @@ export async function createCourse(input, actorId = null) {
   const courseId = input.id || id('crs')
   const title = String(input.title || '').trim()
   if (!title) throw new Error('Course title is required')
+  const slug = slugify(input.slug || `${title}-${courseId.slice(-6)}`)
+  if (!slug) throw new Error('Course slug is required')
+  const status = allowedValue(input.status, COURSE_STATUSES, 'draft')
+  const assignedInstructor = await requireAssignableInstructor(input.instructorId || null)
   const values = [
     courseId,
-    input.slug || `${slugify(title)}-${courseId.slice(-6)}`,
+    slug,
     title,
     input.category || 'Cybersecurity',
     input.level || 'Beginner',
     input.duration || 'Self-paced',
-    input.description || 'Course description pending.',
-    input.overview || input.description || 'Course overview pending.',
-    input.instructorName || input.instructor?.name || 'Cyber Lab IN Faculty',
+    input.description || '',
+    input.overview || input.description || '',
+    assignedInstructor?.name || input.instructorName || input.instructor?.name || 'Cyber Lab IN Faculty',
     input.instructorTitle || input.instructor?.title || 'Cybersecurity Educators',
-    input.status || 'draft',
+    status,
     Number(input.price || 0),
     input.mode || 'Online',
     input.credential || 'Certificate of Completion',
@@ -309,15 +370,25 @@ export async function createCourse(input, actorId = null) {
 }
 
 export async function updateCourse(courseId, updates, actorId = null) {
+  if (!await getCourseById(courseId)) return null
+  if (updates.status !== undefined) updates = { ...updates, status: allowedValue(updates.status, COURSE_STATUSES, 'draft') }
+  if (updates.instructorId !== undefined) {
+    const assignedInstructor = await requireAssignableInstructor(updates.instructorId || null)
+    if (assignedInstructor) updates = { ...updates, instructorName: assignedInstructor.name }
+  }
   const allowed = {
-    title: 'title', category: 'category', level: 'level', duration: 'duration', description: 'description', overview: 'overview',
+    slug: 'slug', title: 'title', category: 'category', level: 'level', duration: 'duration', description: 'description', overview: 'overview',
     status: 'status', price: 'price', mode: 'mode', credential: 'credential', prerequisites: 'prerequisites',
     brochureUrl: 'brochure_url', categorySlug: 'category_slug', instructorId: 'instructor_id',
   }
   const values = []
   const sets = []
   for (const [key, column] of Object.entries(allowed)) {
-    if (updates[key] !== undefined) sets.push(`${column} = ${parameter(values, updates[key])}`)
+    if (updates[key] !== undefined) {
+      const value = key === 'slug' ? slugify(updates[key]) : updates[key]
+      if (key === 'slug' && !value) throw new Error('Course slug is required')
+      sets.push(`${column} = ${parameter(values, value)}`)
+    }
   }
   for (const [key, column] of Object.entries({ audience: 'audience', outcomes: 'outcomes', labs: 'labs' })) {
     if (updates[key] !== undefined) sets.push(`${column} = ${parameter(values, JSON.stringify(Array.isArray(updates[key]) ? updates[key] : []))}::jsonb`)
@@ -344,10 +415,18 @@ export async function archiveCourse(courseId, actorId = null) {
   return updateCourse(courseId, { status: 'archived' }, actorId)
 }
 
+export async function unpublishCourse(courseId, actorId = null) {
+  return updateCourse(courseId, { status: 'unpublished' }, actorId)
+}
+
+export async function restoreCourse(courseId, actorId = null) {
+  return updateCourse(courseId, { status: 'draft' }, actorId)
+}
+
 export async function getPublicCourse(courseId) {
   const row = await queryOne(`${COURSE_COUNTS} WHERE c.id = $1 AND c.status = 'published'`, [courseId])
   if (!row) return null
-  const course = courseFromRow(row)
+  const course = courseFromRow(row, { lessonCount: row.published_lesson_count })
   course.modules = await listCourseModules(courseId, null, { publicOnly: true })
   return course
 }
@@ -355,7 +434,7 @@ export async function getPublicCourse(courseId) {
 export async function getPublicCourseBySlug(categorySlug, courseSlug) {
   const row = await queryOne(`${COURSE_COUNTS} WHERE c.category_slug = $1 AND c.slug = $2 AND c.status = 'published'`, [categorySlug, courseSlug])
   if (!row) return null
-  const course = courseFromRow(row)
+  const course = courseFromRow(row, { lessonCount: row.published_lesson_count })
   course.modules = await listCourseModules(course.id, null, { publicOnly: true })
   course.materials = (await listCourseMaterials(course.id)).filter(material => material.isPublic)
   return course
@@ -381,7 +460,7 @@ export async function canReadCourse(user, courseId, allowedRoles = []) {
 export async function enrollUser(userId, courseId, source = 'self_service', batchId = null, client) {
   if (!await findUserById(userId, client)) throw new Error('User not found')
   const course = await getCourseById(courseId, client)
-  if (!course || course.status !== 'published') throw new Error('Course not found')
+  if (!course || course.status === 'archived' || (source === 'self_service' && course.status !== 'published')) throw new Error('Course not found')
   const existing = await queryOne('SELECT * FROM enrollments WHERE user_id = $1 AND course_id = $2', [userId, courseId], client)
   let enrollmentId
   if (existing) {
@@ -396,8 +475,21 @@ export async function enrollUser(userId, courseId, source = 'self_service', batc
   return getEnrollment(enrollmentId, client)
 }
 
-export async function addEnrollment({ userId, courseId, batchId = null, source = 'manual' }) {
-  return enrollUser(userId, courseId, source, batchId)
+export async function addEnrollment({ userId, courseId, batchId = null, source = 'manual' }, actorId = null) {
+  const enrollment = await enrollUser(userId, courseId, source, batchId)
+  await recordAudit('enrollment.add', actorId, 'enrollment', enrollment.id, { userId, courseId, batchId, source })
+  return enrollment
+}
+
+export async function removeEnrollment(enrollmentId, actorId = null) {
+  const enrollment = await getEnrollment(enrollmentId)
+  if (!enrollment) return null
+  await execute("UPDATE enrollments SET status = 'inactive', updated_at = CURRENT_TIMESTAMP WHERE id = $1", [enrollmentId])
+  await recordAudit('enrollment.remove', actorId, 'enrollment', enrollmentId, {
+    userId: enrollment.user_id,
+    courseId: enrollment.course_id,
+  })
+  return getEnrollment(enrollmentId)
 }
 
 export async function getEnrollment(enrollmentId, client) {
@@ -452,7 +544,7 @@ async function currentLesson(userId, courseId) {
 export async function listEnrolledCourses(userId) {
   const rows = await queryMany(`${COURSE_COUNTS}
     JOIN enrollments e ON e.course_id = c.id
-    WHERE e.user_id = $1 AND e.status = 'active'
+    WHERE e.user_id = $1 AND e.status = 'active' AND c.status = 'published'
     ORDER BY e.enrolled_at DESC
   `, [userId])
   return Promise.all(rows.map(async row => {
@@ -461,13 +553,14 @@ export async function listEnrolledCourses(userId) {
   }))
 }
 
-export async function listCourseModules(courseId, userId = null, { publicOnly = false } = {}) {
+export async function listCourseModules(courseId, userId = null, { publicOnly = false, includeUnpublished = false } = {}) {
   const moduleRows = await queryMany('SELECT * FROM course_modules WHERE course_id = $1 ORDER BY sort_order ASC', [courseId])
   const modules = moduleRows.map(moduleFromRow)
   const lessons = await queryMany(`
     SELECT l.*, p.completion_percentage
     FROM lessons l LEFT JOIN user_progress p ON p.lesson_id = l.id AND p.user_id = $1
-    WHERE l.course_id = $2 AND l.status = 'published' ORDER BY l.sort_order ASC
+    WHERE l.course_id = $2 ${includeUnpublished ? '' : "AND l.status = 'published'"}
+    ORDER BY l.sort_order ASC
   `, [userId || '', courseId])
   const byModule = new Map(modules.map(module => [module.id, module]))
   for (const lesson of lessons) {
@@ -475,6 +568,160 @@ export async function listCourseModules(courseId, userId = null, { publicOnly = 
     if (target) target.lessons.push(lessonFromRow(lesson, !publicOnly && Number(lesson.completion_percentage || 0) >= 100))
   }
   return modules
+}
+
+export async function getCourseAdminDetail(courseId) {
+  const course = await getCourseById(courseId)
+  if (!course) return null
+  const [modules, materials, enrollments] = await Promise.all([
+    listCourseModules(courseId, null, { includeUnpublished: true }),
+    listCourseMaterials(courseId),
+    listEnrollmentsByCourse(courseId),
+  ])
+  return { ...course, modules, materials, enrollments }
+}
+
+export async function createCourseModule(courseId, input, actorId = null) {
+  if (!await getCourseById(courseId)) throw new Error('Course not found')
+  const title = String(input.title || '').trim()
+  if (!title) throw new Error('Module title is required')
+  return transaction(async client => {
+    const next = await queryOne('SELECT coalesce(max(sort_order), -1) + 1 AS value FROM course_modules WHERE course_id = $1', [courseId], client)
+    const moduleId = id('mod')
+    const row = await queryOne(`
+      INSERT INTO course_modules (id, course_id, title, description, sort_order)
+      VALUES ($1, $2, $3, $4, $5) RETURNING *
+    `, [moduleId, courseId, title, String(input.description || '').trim(), Number.isInteger(input.order) && input.order >= 0 ? input.order : Number(next.value)], client)
+    await recordAudit('course.module.create', actorId, 'course_module', moduleId, { courseId, title }, client)
+    return moduleFromRow(row)
+  })
+}
+
+export async function updateCourseModule(courseId, moduleId, updates, actorId = null) {
+  const existing = await queryOne('SELECT * FROM course_modules WHERE id = $1 AND course_id = $2', [moduleId, courseId])
+  if (!existing) return null
+  const values = []
+  const sets = []
+  if (updates.title !== undefined) {
+    const title = String(updates.title).trim()
+    if (!title) throw new Error('Module title is required')
+    sets.push(`title = ${parameter(values, title)}`)
+  }
+  if (updates.description !== undefined) sets.push(`description = ${parameter(values, String(updates.description).trim())}`)
+  if (!sets.length) return moduleFromRow(existing)
+  sets.push('updated_at = CURRENT_TIMESTAMP')
+  const row = await queryOne(`UPDATE course_modules SET ${sets.join(', ')} WHERE id = ${parameter(values, moduleId)} AND course_id = ${parameter(values, courseId)} RETURNING *`, values)
+  await recordAudit('course.module.update', actorId, 'course_module', moduleId, { courseId, fields: Object.keys(updates) })
+  return moduleFromRow(row)
+}
+
+async function reorderOwnedRows({ table, ownerColumn, ownerId, ids, actorId, action, entityType }) {
+  if (!Array.isArray(ids) || !ids.length || new Set(ids).size !== ids.length) throw new Error('A unique ordered id list is required')
+  return transaction(async client => {
+    const existing = await queryMany(`SELECT id FROM ${table} WHERE ${ownerColumn} = $1 ORDER BY sort_order ASC`, [ownerId], client)
+    const existingIds = existing.map(row => row.id)
+    if (existingIds.length !== ids.length || ids.some(item => !existingIds.includes(item))) throw new Error('Ordered ids must match the existing records')
+    for (let index = 0; index < ids.length; index += 1) {
+      await execute(`UPDATE ${table} SET sort_order = $1${table === 'course_modules' || table === 'lessons' ? ', updated_at = CURRENT_TIMESTAMP' : ''} WHERE id = $2 AND ${ownerColumn} = $3`, [index, ids[index], ownerId], client)
+    }
+    await recordAudit(action, actorId, entityType, ownerId, { orderedIds: ids }, client)
+    return ids
+  })
+}
+
+export async function reorderCourseModules(courseId, moduleIds, actorId = null) {
+  if (!await getCourseById(courseId)) throw new Error('Course not found')
+  return reorderOwnedRows({ table: 'course_modules', ownerColumn: 'course_id', ownerId: courseId, ids: moduleIds, actorId, action: 'course.module.reorder', entityType: 'course' })
+}
+
+export async function createLesson(courseId, moduleId, input, actorId = null) {
+  const module = await queryOne('SELECT id FROM course_modules WHERE id = $1 AND course_id = $2', [moduleId, courseId])
+  if (!module) throw new Error('Course module not found')
+  const title = String(input.title || '').trim()
+  if (!title) throw new Error('Lesson title is required')
+  const status = allowedValue(input.status, LESSON_STATUSES, 'draft')
+  const type = allowedValue(input.type, LESSON_TYPES, 'text')
+  return transaction(async client => {
+    const next = await queryOne('SELECT coalesce(max(sort_order), -1) + 1 AS value FROM lessons WHERE module_id = $1', [moduleId], client)
+    const lessonId = id('lsn')
+    const row = await queryOne(`
+      INSERT INTO lessons (id, course_id, module_id, title, duration, content, lesson_type, resource_url, sort_order, status)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *
+    `, [lessonId, courseId, moduleId, title, String(input.duration || '10 min').trim(), String(input.content || ''), type, input.resourceUrl || null, Number.isInteger(input.order) && input.order >= 0 ? input.order : Number(next.value), status], client)
+    await recordAudit('course.lesson.create', actorId, 'lesson', lessonId, { courseId, moduleId, title }, client)
+    return lessonFromRow(row)
+  })
+}
+
+export async function updateLesson(courseId, moduleId, lessonId, updates, actorId = null) {
+  const existing = await queryOne('SELECT * FROM lessons WHERE id = $1 AND module_id = $2 AND course_id = $3', [lessonId, moduleId, courseId])
+  if (!existing) return null
+  const allowed = { title: 'title', duration: 'duration', content: 'content', resourceUrl: 'resource_url' }
+  const values = []
+  const sets = []
+  for (const [key, column] of Object.entries(allowed)) {
+    if (updates[key] === undefined) continue
+    const value = key === 'title' || key === 'duration' ? String(updates[key]).trim() : updates[key]
+    if (key === 'title' && !value) throw new Error('Lesson title is required')
+    sets.push(`${column} = ${parameter(values, value || null)}`)
+  }
+  if (updates.type !== undefined) sets.push(`lesson_type = ${parameter(values, allowedValue(updates.type, LESSON_TYPES, 'text'))}`)
+  if (updates.status !== undefined) sets.push(`status = ${parameter(values, allowedValue(updates.status, LESSON_STATUSES, 'draft'))}`)
+  if (!sets.length) return lessonFromRow(existing)
+  sets.push('updated_at = CURRENT_TIMESTAMP')
+  const row = await queryOne(`UPDATE lessons SET ${sets.join(', ')} WHERE id = ${parameter(values, lessonId)} AND module_id = ${parameter(values, moduleId)} AND course_id = ${parameter(values, courseId)} RETURNING *`, values)
+  await recordAudit('course.lesson.update', actorId, 'lesson', lessonId, { courseId, moduleId, fields: Object.keys(updates) })
+  return lessonFromRow(row)
+}
+
+export async function reorderLessons(courseId, moduleId, lessonIds, actorId = null) {
+  const module = await queryOne('SELECT id FROM course_modules WHERE id = $1 AND course_id = $2', [moduleId, courseId])
+  if (!module) throw new Error('Course module not found')
+  return reorderOwnedRows({ table: 'lessons', ownerColumn: 'module_id', ownerId: moduleId, ids: lessonIds, actorId, action: 'course.lesson.reorder', entityType: 'course_module' })
+}
+
+export async function createCourseMaterial(courseId, input, actorId = null) {
+  if (!await getCourseById(courseId)) throw new Error('Course not found')
+  if (input.lessonId) {
+    const lesson = await queryOne('SELECT id FROM lessons WHERE id = $1 AND course_id = $2', [input.lessonId, courseId])
+    if (!lesson) throw new Error('Lesson not found in this course')
+  }
+  const title = String(input.title || '').trim()
+  const type = String(input.type || '').trim().toLowerCase()
+  if (!title || !['pdf', 'video', 'link', 'text', 'download'].includes(type)) throw new Error('A valid resource title and type are required')
+  const next = await queryOne('SELECT coalesce(max(sort_order), -1) + 1 AS value FROM course_materials WHERE course_id = $1', [courseId])
+  const materialId = id('mat')
+  const row = await queryOne(`
+    INSERT INTO course_materials (id, course_id, lesson_id, type, title, description, content, resource_url, is_public, sort_order)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *
+  `, [materialId, courseId, input.lessonId || null, type, title, String(input.description || ''), String(input.content || ''), input.resourceUrl || null, Boolean(input.isPublic), Number(next.value)])
+  await recordAudit('course.material.create', actorId, 'course_material', materialId, { courseId, lessonId: input.lessonId || null, type })
+  return materialFromRow(row)
+}
+
+export async function updateCourseMaterial(courseId, materialId, updates, actorId = null) {
+  const existing = await queryOne('SELECT * FROM course_materials WHERE id = $1 AND course_id = $2', [materialId, courseId])
+  if (!existing) return null
+  if (updates.lessonId) {
+    const lesson = await queryOne('SELECT id FROM lessons WHERE id = $1 AND course_id = $2', [updates.lessonId, courseId])
+    if (!lesson) throw new Error('Lesson not found in this course')
+  }
+  const allowed = { lessonId: 'lesson_id', title: 'title', description: 'description', content: 'content', resourceUrl: 'resource_url', isPublic: 'is_public' }
+  const values = []
+  const sets = []
+  for (const [key, column] of Object.entries(allowed)) {
+    if (updates[key] !== undefined) sets.push(`${column} = ${parameter(values, updates[key] || (key === 'isPublic' ? false : null))}`)
+  }
+  if (updates.type !== undefined) {
+    const type = String(updates.type).trim().toLowerCase()
+    if (!['pdf', 'video', 'link', 'text', 'download'].includes(type)) throw new Error('Unsupported resource type')
+    sets.push(`type = ${parameter(values, type)}`)
+  }
+  if (!sets.length) return materialFromRow(existing)
+  sets.push('updated_at = CURRENT_TIMESTAMP')
+  const row = await queryOne(`UPDATE course_materials SET ${sets.join(', ')} WHERE id = ${parameter(values, materialId)} AND course_id = ${parameter(values, courseId)} RETURNING *`, values)
+  await recordAudit('course.material.update', actorId, 'course_material', materialId, { courseId, fields: Object.keys(updates) })
+  return materialFromRow(row)
 }
 
 export async function getCourseForUser(courseId, user) {
@@ -586,18 +833,19 @@ export async function getInstructorDashboard(instructorId) {
   const assignedCourses = assignedRows.map(courseFromRow)
   const courseIds = assignedCourses.map(course => course.id)
   if (!courseIds.length) {
-    return { instructorId, assignedCourses, students: [], attendance: [], labAttempts: [], quizResults: [], progress: [] }
+    return { instructorId, assignedCourses, liveClasses: [], students: [], attendance: [], labAttempts: [], quizResults: [], progress: [] }
   }
   const values = []
   const courseList = inParameters(values, courseIds)
-  const [students, progress, attendance, labAttempts, quizResults] = await Promise.all([
+  const [liveClasses, students, progress, attendance, labAttempts, quizResults] = await Promise.all([
+    listAllLiveClasses({ instructorId }),
     queryMany(`SELECT DISTINCT u.id, u.name, u.email FROM enrollments e JOIN users u ON u.id = e.user_id WHERE e.course_id IN (${courseList}) AND e.status = 'active' ORDER BY u.name ASC`, values),
     queryMany(`SELECT p.id, p.user_id AS "userId", p.course_id AS "courseId", p.lesson_id AS "lessonId", p.completion_percentage AS "completionPercentage", p.updated_at AS "updatedAt" FROM user_progress p WHERE p.course_id IN (${courseList}) ORDER BY p.updated_at DESC LIMIT 50`, values),
     queryMany(`SELECT a.id, a.live_class_id AS "liveClassId", a.user_id AS "userId", a.event, a.created_at AS "createdAt", lc.course_id AS "courseId" FROM live_class_attendance a JOIN live_classes lc ON lc.id = a.live_class_id WHERE lc.course_id IN (${courseList}) ORDER BY a.created_at DESC LIMIT 100`, values),
     queryMany(`SELECT id, lab_id AS "labId", course_id AS "courseId", user_id AS "userId", status, score, started_at AS "startedAt", submitted_at AS "submittedAt" FROM lab_attempts WHERE course_id IN (${courseList}) ORDER BY started_at DESC LIMIT 100`, values),
     queryMany(`SELECT id, quiz_id AS "quizId", course_id AS "courseId", user_id AS "userId", score, submitted_at AS "submittedAt" FROM quiz_attempts WHERE course_id IN (${courseList}) ORDER BY submitted_at DESC LIMIT 100`, values),
   ])
-  return { instructorId, assignedCourses, students, attendance, labAttempts, quizResults, progress }
+  return { instructorId, assignedCourses, liveClasses, students, attendance, labAttempts, quizResults, progress }
 }
 
 export async function getSalesDashboard() {
@@ -641,10 +889,11 @@ export async function getOpsDashboard() {
 
 export async function listUpcomingLiveClasses(userId) {
   return queryMany(`
-    SELECT lc.*, c.title AS course_title FROM live_classes lc
+    SELECT lc.*, c.title AS course_title, u.name AS instructor_name, u.role AS instructor_title FROM live_classes lc
     JOIN enrollments e ON e.course_id = lc.course_id AND e.user_id = $1 AND e.status = 'active'
     JOIN courses c ON c.id = lc.course_id
-    WHERE lc.status = 'scheduled' AND lc.scheduled_end >= CURRENT_TIMESTAMP
+    LEFT JOIN users u ON u.id = lc.instructor_id
+    WHERE c.status = 'published' AND lc.status IN ('scheduled', 'live', 'cancelled') AND lc.scheduled_end >= CURRENT_TIMESTAMP
       AND (lc.batch_id IS NULL OR lc.batch_id = e.batch_id)
     ORDER BY lc.scheduled_start ASC LIMIT 10
   `, [userId])
@@ -707,7 +956,7 @@ export async function createLiveClass(input, actorId = null) {
 
 export async function updateLiveClass(liveClassId, updates, actorId = null) {
   const allowed = {
-    title: 'title', description: 'description', agenda: 'agenda', provider: 'provider', joinUrl: 'join_url',
+    batchId: 'batch_id', cohortId: 'cohort_id', instructorId: 'instructor_id', title: 'title', description: 'description', agenda: 'agenda', provider: 'provider', joinUrl: 'join_url',
     embedUrl: 'embed_url', meetingUrl: 'meeting_url', scheduledStart: 'scheduled_start', scheduledEnd: 'scheduled_end',
     startAt: 'start_at', endAt: 'end_at', timezone: 'timezone', status: 'status', recordingUrl: 'recording_url',
     googleConnectionId: 'google_connection_id', googleSpaceName: 'google_space_name', googleMeetingCode: 'google_meeting_code',
@@ -810,6 +1059,21 @@ export async function listLiveClassesByCourse(courseId) {
     FROM live_classes lc JOIN courses c ON c.id = lc.course_id LEFT JOIN users u ON u.id = lc.instructor_id
     WHERE lc.course_id = $1 ORDER BY lc.scheduled_start ASC
   `, [courseId])
+  return rows.map(liveClassFromRow)
+}
+
+export async function listAllLiveClasses(filters = {}) {
+  const values = []
+  const where = []
+  if (filters.courseId) where.push(`lc.course_id = ${parameter(values, filters.courseId)}`)
+  if (filters.instructorId) where.push(`lc.instructor_id = ${parameter(values, filters.instructorId)}`)
+  if (filters.status) where.push(`lc.status = ${parameter(values, filters.status)}`)
+  const rows = await queryMany(`
+    SELECT lc.*, c.title AS course_title, u.name AS instructor_name, u.role AS instructor_title
+    FROM live_classes lc JOIN courses c ON c.id = lc.course_id LEFT JOIN users u ON u.id = lc.instructor_id
+    ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+    ORDER BY lc.scheduled_start DESC
+  `, values)
   return rows.map(liveClassFromRow)
 }
 

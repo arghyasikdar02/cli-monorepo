@@ -8,8 +8,11 @@ const router = Router()
 router.use(requireAuth)
 router.use(requireRole('admin', 'super_admin', 'support'))
 
-router.get('/', async (_req, res) => {
-  res.json({ users: await listUsers(), roles: VALID_ROLES })
+router.get('/', async (req, res) => {
+  res.json({
+    users: await listUsers({ role: req.query.role, status: req.query.status, search: req.query.search }),
+    roles: VALID_ROLES,
+  })
 })
 
 router.get('/:userId', async (req, res) => {

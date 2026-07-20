@@ -57,6 +57,7 @@ export default function LiveClassDetailPage() {
   )
 
   const isLive = liveClass.status === 'live'
+  const isCancelled = liveClass.status === 'cancelled'
   const date = formatDateTime(liveClass.scheduledStart, liveClass.scheduledEnd)
 
   return (
@@ -77,6 +78,8 @@ export default function LiveClassDetailPage() {
                 <span className="text-xs text-slate-400">{liveClass.courseTitle}</span>
               </div>
               <h1 className="font-space-grotesk text-2xl font-black text-primary mb-3">{liveClass.title}</h1>
+              {isCancelled && <div role="status" className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">This live class has been cancelled. Check the schedule for a replacement session.</div>}
+              {liveClass.description && <p className="text-on-surface-variant leading-relaxed mb-4">{liveClass.description}</p>}
               <p className="text-on-surface-variant leading-relaxed mb-6">
                 This session is available only to learners enrolled in the linked course.
               </p>
@@ -97,6 +100,7 @@ export default function LiveClassDetailPage() {
               <div className="text-center py-4">
                 <p className="font-space-grotesk text-4xl font-black text-on-surface">{date.day}</p>
                 <p className="text-sm text-on-surface-variant">{date.month} · {date.time}</p>
+                <p className="mt-1 text-xs text-slate-400">{liveClass.timezone}</p>
               </div>
               <div className="flex items-center justify-center gap-2 text-sm text-on-surface-variant">
                 <SiteIcon name="group" size={18} />
@@ -107,6 +111,8 @@ export default function LiveClassDetailPage() {
                   className="block w-full text-center py-3.5 bg-green-500 text-white font-space-grotesk font-bold rounded-xl hover:bg-green-600 transition-colors">
                   Join Live Session
                 </Link>
+              ) : isCancelled ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center text-sm font-semibold text-red-700">Class cancelled</div>
               ) : (
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-center text-sm text-slate-500">
                   Join opens 15 minutes before start.

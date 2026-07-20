@@ -35,12 +35,27 @@ Browser `POST`, `PUT`, `PATCH`, and `DELETE` requests must include the `cli_csrf
 
 - `GET /api/courses/public`
 - `GET /api/courses/public/:courseId`
-- `GET /api/courses/enrolled`
-- `POST /api/courses`
+- `GET /api/courses/public/slug/:categorySlug/:courseSlug`
+- `GET /api/courses/my`
+- `GET /api/courses/admin` — admin course catalogue with content and enrolment counts.
+- `GET /api/courses/admin/:courseId` — full admin course structure.
+- `POST /api/courses` — admin-only draft/course creation.
 - `GET /api/courses/:courseId`
 - `PATCH /api/courses/:courseId`
 - `PATCH /api/courses/:courseId/publish`
+- `PATCH /api/courses/:courseId/unpublish`
 - `PATCH /api/courses/:courseId/archive`
+- `PATCH /api/courses/:courseId/restore`
+- `POST /api/courses/:courseId/modules`
+- `PATCH /api/courses/:courseId/modules/:moduleId`
+- `POST /api/courses/:courseId/modules/reorder`
+- `POST /api/courses/:courseId/modules/:moduleId/lessons`
+- `PATCH /api/courses/:courseId/modules/:moduleId/lessons/:lessonId`
+- `POST /api/courses/:courseId/modules/:moduleId/lessons/reorder`
+- `POST /api/courses/:courseId/resources`
+- `PATCH /api/courses/:courseId/resources/:materialId`
+
+Course, module, lesson, and resource writes require an authenticated administrator. Course assignment checks and composite identifiers prevent cross-course content changes. Reordering requires the submitted IDs to exactly match the records owned by the course or module.
 
 ## Enrollments
 
@@ -49,18 +64,33 @@ Browser `POST`, `PUT`, `PATCH`, and `DELETE` requests must include the `cli_csrf
 - `GET /api/enrollments/users/:userId`
 - `GET /api/enrollments/courses/:courseId`
 - `GET /api/enrollments/check/:courseId`
+- `DELETE /api/enrollments/:enrollmentId` — deactivates the enrolment without deleting history.
 
 ## Live Classes
 
+- `GET /api/live-classes` — admin/operations list; instructors receive only assigned classes.
 - `POST /api/live-classes`
 - `GET /api/live-classes/student/upcoming`
 - `GET /api/live-classes/course/:courseId`
 - `GET /api/live-classes/:liveClassId`
 - `PATCH /api/live-classes/:liveClassId`
+- `POST /api/live-classes/:liveClassId/google-meet`
+- `GET /api/live-classes/:liveClassId/validate`
 - `POST /api/live-classes/:liveClassId/join`
 - `POST /api/live-classes/:liveClassId/leave`
+- `POST /api/live-classes/:liveClassId/check-in`
 - `GET /api/live-classes/:liveClassId/attendance`
 - `GET /api/live-classes/:liveClassId/viewers`
+
+Student schedules are filtered by active course enrolment and optional batch. Meeting URLs are returned only to authorized staff or after a learner passes the guarded join endpoint during the join window. Google Meet creation is idempotent and stores only safe meeting metadata on the live-class record.
+
+## Google Integration
+
+- `GET /api/integrations/google/status`
+- `GET /api/integrations/google/connect`
+- `POST /api/integrations/google/disconnect`
+
+Google access and refresh tokens remain encrypted in PostgreSQL and are never returned by these endpoints.
 
 ## Videos
 

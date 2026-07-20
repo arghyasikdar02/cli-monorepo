@@ -61,6 +61,20 @@ The homepage loads directly at `/`. Key routes include `/courses`, `/courses/cyb
 
 The production build pre-renders 41 public route shells with unique metadata, canonical URLs, social previews and accurate structured data. `sitemap.xml` and `robots.txt` are included.
 
+## Admin operations
+
+Administrators use `/admin/dashboard` and its protected navigation to manage the LMS:
+
+- `/admin/courses`: create, edit, publish, unpublish, archive and restore courses.
+- `/admin/content`: add and reorder modules and lessons, publish lessons and attach course resources.
+- `/admin/instructors`: assign active instructor accounts to courses.
+- `/admin/enrolments`: search active students, grant course access and deactivate enrolments.
+- `/admin/live-classes`: create, reschedule, publish and cancel course-scoped sessions; connected Google accounts can create an idempotent Meet space.
+- `/admin/google`: connect, reauthorize or disconnect the administrator's Google Meet permission.
+- `/admin/cysensei`: inspect database-backed Cysensei usage and course isolation boundaries.
+
+All management writes are checked again by the Express API, protected by the cookie/CSRF session, parameterized in PostgreSQL and recorded in `audit_logs`. Instructors see only their assigned courses and live classes. Students see scheduled sessions only for active course and optional batch enrolments.
+
 ## Verification
 
 ```bash
