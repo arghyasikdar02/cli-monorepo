@@ -13,7 +13,7 @@ function safeRedirect(value) {
 
 export default function RoleLoginPage({ title, purpose, allowedRoles, redirectTo }) {
   const [searchParams] = useSearchParams()
-  const [email, setEmail] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
@@ -24,7 +24,7 @@ export default function RoleLoginPage({ title, purpose, allowedRoles, redirectTo
 
   useEffect(() => {
     document.title = `${title} | Cyber Lab IN`
-    if (isAuthenticated && hasAnyRole(user, allowedRoles)) navigate(redirectTarget || redirectTo, { replace: true })
+    if (isAuthenticated && hasAnyRole(user, allowedRoles)) navigate(user?.mustChangePassword ? '/change-password' : (redirectTarget || redirectTo), { replace: true })
   }, [allowedRoles, isAuthenticated, navigate, redirectTarget, redirectTo, title, user])
 
   const submit = async (event) => {
@@ -32,7 +32,7 @@ export default function RoleLoginPage({ title, purpose, allowedRoles, redirectTo
     setError('')
     setLoading(true)
     try {
-      const result = await api.login(email, password)
+      const result = await api.login(identifier, password)
       if (!hasAnyRole(result.user, allowedRoles)) {
         await api.logout().catch(() => {})
         logout()
@@ -40,7 +40,7 @@ export default function RoleLoginPage({ title, purpose, allowedRoles, redirectTo
         return
       }
       setSession(result.user)
-      navigate(redirectTarget || redirectTo, { replace: true })
+      navigate(result.user.mustChangePassword ? '/change-password' : (redirectTarget || redirectTo), { replace: true })
     } catch (err) {
       setError(err.message || 'Login failed')
     } finally {
@@ -53,7 +53,7 @@ export default function RoleLoginPage({ title, purpose, allowedRoles, redirectTo
       <div className="auth-form-heading"><p className="site-eyebrow">Authorised dashboard</p><h2>{title}</h2><p>Use an account assigned to the required role. Access is verified again by the backend.</p></div>
       {error && <div className="auth-alert" role="alert"><SiteIcon name="error" /><span>{error}</span></div>}
       <form onSubmit={submit} className="auth-form-fields">
-        <label><span>Email address</span><input type="email" value={email} onChange={event => setEmail(event.target.value)} required autoComplete="email" placeholder="name@cyberlabin.com" /></label>
+        <label><span>Email or username</span><input type="text" value={identifier} onChange={event => setIdentifier(event.target.value)} required autoComplete="username" placeholder="name@cyberlabin.com or username" /></label>
         <label><span>Password</span><div className="auth-password-field"><input type={showPw ? 'text' : 'password'} value={password} onChange={event => setPassword(event.target.value)} required autoComplete="current-password" /><button type="button" onClick={() => setShowPw(value => !value)} aria-label={showPw ? 'Hide password' : 'Show password'}><SiteIcon name={showPw ? 'visibility_off' : 'visibility'} /></button></div></label>
         <button type="submit" disabled={loading} className="auth-submit-button">{loading ? 'Checking access...' : 'Enter dashboard'}</button>
       </form>

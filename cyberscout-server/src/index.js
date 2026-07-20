@@ -29,6 +29,7 @@ import blogsRouter from './routes/blogs.js'
 import visitorsRouter from './routes/visitors.js'
 import videosRouter from './routes/videos.js'
 import webhooksRouter from './routes/webhooks.js'
+import adminInstructorsRouter from './routes/adminInstructors.js'
 import { checkDatabaseConnection, closeDatabase } from './db/index.js'
 import { databaseConfigurationStatus } from './db/config.js'
 import { normalizeOrigin, validateEnvironment } from './lib/environment.js'
@@ -104,6 +105,7 @@ export function createApp() {
   app.use('/health', healthRouter)
   app.use('/api/health', healthRouter)
   app.use('/api/auth', authRouter)
+  app.use('/api/admin', adminInstructorsRouter)
   app.use('/api/users', usersRouter)
   app.use('/api/courses', coursesRouter)
   app.use('/api/blogs', blogsRouter)

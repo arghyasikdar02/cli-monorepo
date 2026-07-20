@@ -14,6 +14,7 @@ const SignUpPage = lazy(() => import('./pages/auth/SignUpPage'))
 const AuthPage = lazy(() => import('./pages/auth/AuthPage'))
 const GettingStartedPage = lazy(() => import('./pages/auth/GettingStartedPage'))
 const OAuthCallbackPage = lazy(() => import('./pages/auth/OAuthCallbackPage'))
+const RequiredPasswordChangePage = lazy(() => import('./pages/auth/RequiredPasswordChangePage'))
 
 // Core
 const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'))
@@ -21,6 +22,7 @@ const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage')
 const AdminCoursesPage = lazy(() => import('./pages/admin/AdminCoursesPage'))
 const AdminContentPage = lazy(() => import('./pages/admin/AdminContentPage'))
 const AdminPeoplePage = lazy(() => import('./pages/admin/AdminPeoplePage'))
+const AdminInstructorsPage = lazy(() => import('./pages/admin/AdminInstructorsPage'))
 const AdminLiveClassesPage = lazy(() => import('./pages/admin/AdminLiveClassesPage'))
 const AdminGoogleIntegrationPage = lazy(() => import('./pages/admin/AdminGoogleIntegrationPage'))
 const AdminCysenseiPage = lazy(() => import('./pages/admin/AdminCysenseiPage'))
@@ -78,7 +80,7 @@ const PrivacyPolicyPage = lazy(() => import('./pages/support/PrivacyPolicyPage')
 const TermsOfServicePage = lazy(() => import('./pages/support/TermsOfServicePage'))
 const RefundPolicyPage = lazy(() => import('./pages/support/RefundPolicyPage'))
 
-const P = ({ children }) => <ProtectedRoute>{children}</ProtectedRoute>
+const P = ({ children, allowPasswordChange = false }) => <ProtectedRoute allowPasswordChange={allowPasswordChange}>{children}</ProtectedRoute>
 const RoleP = ({ children, roles, loginPath }) => (
   <RoleProtectedRoute roles={roles} loginPath={loginPath}>{children}</RoleProtectedRoute>
 )
@@ -139,6 +141,7 @@ export default function App() {
         <Route path="/signup" element={<SignUpPage />} />
         <Route path="/getting-started" element={<GettingStartedPage />} />
         <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
+        <Route path="/change-password" element={<P allowPasswordChange><RequiredPasswordChangePage /></P>} />
         <Route path="/privacy" element={<PrivacyPolicyPage />} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="/terms" element={<TermsOfServicePage />} />
@@ -158,7 +161,7 @@ export default function App() {
         <Route path="/admin/courses" element={<RoleP roles={ROLE_GROUPS.admin} loginPath="/admin/login"><AdminCoursesPage /></RoleP>} />
         <Route path="/admin/content" element={<RoleP roles={ROLE_GROUPS.admin} loginPath="/admin/login"><AdminContentPage /></RoleP>} />
         <Route path="/admin/live-classes" element={<RoleP roles={ROLE_GROUPS.admin} loginPath="/admin/login"><AdminLiveClassesPage /></RoleP>} />
-        <Route path="/admin/instructors" element={<RoleP roles={ROLE_GROUPS.admin} loginPath="/admin/login"><AdminPeoplePage mode="instructors" /></RoleP>} />
+        <Route path="/admin/instructors" element={<RoleP roles={ROLE_GROUPS.admin} loginPath="/admin/login"><AdminInstructorsPage /></RoleP>} />
         <Route path="/admin/enrolments" element={<RoleP roles={ROLE_GROUPS.admin} loginPath="/admin/login"><AdminPeoplePage mode="enrolments" /></RoleP>} />
         <Route path="/admin/cysensei" element={<RoleP roles={ROLE_GROUPS.admin} loginPath="/admin/login"><AdminCysenseiPage /></RoleP>} />
         <Route path="/admin/google" element={<RoleP roles={ROLE_GROUPS.admin} loginPath="/admin/login"><AdminGoogleIntegrationPage /></RoleP>} />

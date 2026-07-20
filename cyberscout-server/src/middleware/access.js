@@ -19,12 +19,24 @@ export async function requireAuth(req, res, next) {
     const user = await findUserById(payload.sub)
     if (!user) return res.status(401).json({ error: 'User not found' })
     if (user.status === 'suspended') return res.status(403).json({ error: 'Account suspended' })
+    if (user.status !== 'active') return res.status(403).json({ error: 'Account unavailable' })
     if (!rolesForUser(user).length) return res.status(403).json({ error: 'Unsupported account role' })
     if (Number(payload.tokenVersion || 0) !== Number(user.tokenVersion || 0)) {
       return res.status(401).json({ error: 'Session expired' })
     }
     req.auth = payload
     req.user = user
+    if (user.mustChangePassword) {
+      const allowedWhileChangingPassword = new Set([
+        '/api/auth/me',
+        '/api/auth/change-password',
+        '/api/auth/logout',
+      ])
+      const requestPath = String(req.originalUrl || '').split('?')[0]
+      if (!allowedWhileChangingPassword.has(requestPath)) {
+        return res.status(428).json({ error: 'Password change required', code: 'PASSWORD_CHANGE_REQUIRED' })
+      }
+    }
     return next()
   } catch {
     return res.status(401).json({ error: 'Invalid token' })

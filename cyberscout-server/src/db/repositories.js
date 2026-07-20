@@ -48,6 +48,8 @@ function userFromRow(row) {
     status: row.status,
     tokenVersion: Number(row.token_version || 0),
     passwordUpdatedAt: row.password_updated_at,
+    mustChangePassword: Boolean(row.must_change_password),
+    archivedAt: row.archived_at,
     lastLogin: row.last_login_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -67,6 +69,8 @@ export function publicUser(user) {
     roles,
     status: user.status,
     hasPassword: Boolean(user.passwordHash),
+    mustChangePassword: Boolean(user.mustChangePassword),
+    passwordUpdatedAt: user.passwordUpdatedAt,
     lastLogin: user.lastLogin,
     createdAt: user.createdAt,
   }
@@ -233,7 +237,16 @@ export function userHasRole(user, allowedRoles) {
   return rolesForUser(user).some(role => allowed.includes(role))
 }
 
-export async function createUser({ name, email, username, passwordHash, googleId = null, role = 'student', roles = ['student'] }, client) {
+export async function createUser({
+  name,
+  email,
+  username,
+  passwordHash,
+  googleId = null,
+  role = 'student',
+  roles = ['student'],
+  mustChangePassword = false,
+}, client) {
   const normalizedEmail = String(email || '').trim().toLowerCase()
   const normalizedUsername = username ? String(username).trim().toLowerCase() : null
   const primaryRole = normalizeRole(role)
@@ -242,9 +255,19 @@ export async function createUser({ name, email, username, passwordHash, googleId
   if (!safeRoles.length) throw new Error('At least one supported user role is required')
   const userId = id('usr')
   await execute(`
-    INSERT INTO users (id, name, username, email, password_hash, google_id, role, roles)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
-  `, [userId, String(name || '').trim(), normalizedUsername, normalizedEmail, passwordHash, googleId, primaryRole, JSON.stringify(safeRoles)], client)
+    INSERT INTO users (id, name, username, email, password_hash, google_id, role, roles, must_change_password)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)
+  `, [
+    userId,
+    String(name || '').trim(),
+    normalizedUsername,
+    normalizedEmail,
+    passwordHash,
+    googleId,
+    primaryRole,
+    JSON.stringify(safeRoles),
+    Boolean(mustChangePassword),
+  ], client)
   return findUserById(userId, client)
 }
 
@@ -252,6 +275,7 @@ export async function updateUser(userId, updates, client) {
   const allowed = {
     name: 'name', username: 'username', email: 'email', googleId: 'google_id', passwordHash: 'password_hash',
     role: 'role', roles: 'roles', status: 'status', lastLogin: 'last_login_at', tokenVersion: 'token_version', passwordUpdatedAt: 'password_updated_at',
+    mustChangePassword: 'must_change_password', archivedAt: 'archived_at',
   }
   const values = []
   const sets = []
@@ -279,14 +303,22 @@ export async function updateUser(userId, updates, client) {
   return findUserById(userId, client)
 }
 
-export async function updateUserPassword(userId, passwordHash) {
-  await execute(`
-    UPDATE users SET password_hash = $1, password_updated_at = CURRENT_TIMESTAMP,
-      token_version = coalesce(token_version, 0) + 1, updated_at = CURRENT_TIMESTAMP
-    WHERE id = $2
-  `, [passwordHash, userId])
-  await recordAudit('auth.password_change', userId, 'user', userId, {})
-  return findUserById(userId)
+export async function updateUserPassword(userId, passwordHash, options = {}) {
+  const {
+    mustChangePassword = false,
+    actorId = userId,
+    auditAction = 'auth.password_change',
+  } = options
+  return transaction(async client => {
+    await execute(`
+      UPDATE users SET password_hash = $1, password_updated_at = CURRENT_TIMESTAMP,
+        must_change_password = $2, token_version = coalesce(token_version, 0) + 1,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $3
+    `, [passwordHash, Boolean(mustChangePassword), userId], client)
+    await recordAudit(auditAction, actorId, 'user', userId, {}, client)
+    return findUserById(userId, client)
+  })
 }
 
 export async function assignRole(userId, role) {

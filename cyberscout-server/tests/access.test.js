@@ -131,6 +131,8 @@ describe('Cyber Lab IN database-backed LMS flow', () => {
     assert.equal(migration.name, '010_google_oauth_meet.sql')
     const adminMigration = await database.queryOne('SELECT name FROM schema_migrations WHERE name = $1', ['011_admin_course_operations.sql'])
     assert.equal(adminMigration.name, '011_admin_course_operations.sql')
+    const instructorMigration = await database.queryOne('SELECT name FROM schema_migrations WHERE name = $1', ['012_instructor_account_management.sql'])
+    assert.equal(instructorMigration.name, '012_instructor_account_management.sql')
   })
 
   it('registers a real user, hashes the password, and returns a working session', async () => {
@@ -505,6 +507,179 @@ describe('Cyber Lab IN database-backed LMS flow', () => {
     const removed = await request(`/api/enrollments/${enrollment.body.enrollment.id}`, { method: 'DELETE', token: adminToken })
     assert.equal(removed.response.status, 200)
     assert.equal(removed.body.enrollment.status, 'inactive')
+  })
+
+  it('provisions and manages instructor accounts without exposing stored credentials', async () => {
+    const bcrypt = (await import('bcrypt')).default
+    const { generateTemporaryPassword, validateTemporaryPassword } = await import('../src/services/instructorAccounts.js')
+    const generated = generateTemporaryPassword()
+    assert.equal(validateTemporaryPassword(generated), '')
+    assert.ok(generated.length >= 14)
+
+    const stamp = Date.now()
+    const email = `managed-instructor-${stamp}@cyberlabin.com`
+    const username = `managed.instructor${stamp}`
+    const temporaryPassword = 'TempInstructor9!Secure'
+
+    const denied = await request('/api/admin/instructors', {
+      method: 'POST', token: studentToken, body: JSON.stringify({ name: 'Denied Instructor', email, username, temporaryPassword }),
+    })
+    assert.equal(denied.response.status, 403)
+
+    const reserved = await request('/api/admin/instructors', {
+      method: 'POST', token: adminToken, body: JSON.stringify({ name: 'Reserved Instructor', email: `reserved-${stamp}@cyberlabin.com`, username: 'admin', temporaryPassword }),
+    })
+    assert.equal(reserved.response.status, 400)
+
+    const suggestion = await request(`/api/admin/usernames/check?name=${encodeURIComponent('Managed Instructor')}`, { token: adminToken })
+    assert.equal(suggestion.response.status, 200)
+    assert.equal(suggestion.body.available, true)
+    assert.match(suggestion.body.username, /^managed\.instructor\d*$/)
+
+    const generatedAccount = await request('/api/admin/instructors', {
+      method: 'POST',
+      token: adminToken,
+      body: JSON.stringify({ name: 'Collision Instructor', email: `collision-${stamp}@cyberlabin.com` }),
+    })
+    assert.equal(generatedAccount.response.status, 201, generatedAccount.body.error)
+    assert.equal(generatedAccount.body.instructor.username, 'collision.instructor')
+    assert.equal(validateTemporaryPassword(generatedAccount.body.temporaryPassword), '')
+    const collisionSuggestion = await request(`/api/admin/usernames/check?name=${encodeURIComponent('Collision Instructor')}`, { token: adminToken })
+    assert.equal(collisionSuggestion.body.username, 'collision.instructor2')
+
+    const created = await request('/api/admin/instructors', {
+      method: 'POST',
+      token: adminToken,
+      body: JSON.stringify({ name: 'Managed Instructor', email, username: username.toUpperCase(), temporaryPassword, courseIds: ['c001'] }),
+    })
+    assert.equal(created.response.status, 201, created.body.error)
+    assert.equal(created.body.instructor.role, 'instructor')
+    assert.equal(created.body.instructor.username, username)
+    assert.equal(created.body.instructor.mustChangePassword, true)
+    assert.equal(created.body.temporaryPassword, temporaryPassword)
+    assert.equal('passwordHash' in created.body.instructor, false)
+    assert.deepEqual(created.body.instructor.assignedCourses.map(course => course.id), ['c001'])
+
+    const userId = created.body.instructor.id
+    const detailAfterCreation = await request(`/api/admin/instructors/${userId}`, { token: adminToken })
+    assert.equal(detailAfterCreation.response.status, 200)
+    assert.equal('temporaryPassword' in detailAfterCreation.body, false)
+    assert.equal('temporaryPassword' in detailAfterCreation.body.instructor, false)
+    const stored = await database.queryOne('SELECT password_hash, must_change_password, role, status FROM users WHERE id = $1', [userId])
+    assert.notEqual(stored.password_hash, temporaryPassword)
+    assert.equal(await bcrypt.compare(temporaryPassword, stored.password_hash), true)
+    assert.equal(stored.must_change_password, true)
+    assert.equal(stored.role, 'instructor')
+    assert.equal(stored.status, 'active')
+    const audits = await database.queryMany('SELECT action, metadata::text AS metadata FROM audit_logs WHERE entity_id = $1', [userId])
+    assert.ok(audits.some(row => row.action === 'instructor.created'))
+    assert.equal(JSON.stringify(audits).includes(temporaryPassword), false)
+    assert.equal(JSON.stringify(audits).includes(stored.password_hash), false)
+
+    const duplicateEmail = await request('/api/admin/instructors', {
+      method: 'POST', token: adminToken, body: JSON.stringify({ name: 'Duplicate Email', email: email.toUpperCase(), username: `other.${stamp}`, temporaryPassword }),
+    })
+    assert.equal(duplicateEmail.response.status, 409)
+    const duplicateUsername = await request('/api/admin/instructors', {
+      method: 'POST', token: adminToken, body: JSON.stringify({ name: 'Duplicate Username', email: `other-${stamp}@cyberlabin.com`, username: username.toUpperCase(), temporaryPassword }),
+    })
+    assert.equal(duplicateUsername.response.status, 409)
+
+    const usernameLogin = await request('/api/auth/login', {
+      method: 'POST', body: JSON.stringify({ identifier: username.toUpperCase(), password: temporaryPassword }),
+    })
+    assert.equal(usernameLogin.response.status, 200, usernameLogin.body.error)
+    assert.equal(usernameLogin.body.redirectTo, '/change-password')
+    assert.equal(usernameLogin.body.user.mustChangePassword, true)
+    const temporarySession = cookieFrom(usernameLogin.response, 'cli_session')
+
+    const forced = await request('/api/dashboards/instructor', { token: temporarySession })
+    assert.equal(forced.response.status, 428)
+    assert.equal(forced.body.code, 'PASSWORD_CHANGE_REQUIRED')
+    const googleBlocked = await request('/api/integrations/google/connect', { token: temporarySession })
+    assert.equal(googleBlocked.response.status, 428)
+
+    const reused = await request('/api/auth/change-password', {
+      method: 'POST', token: temporarySession, body: JSON.stringify({ currentPassword: temporaryPassword, newPassword: temporaryPassword }),
+    })
+    assert.equal(reused.response.status, 400)
+
+    const newPassword = 'MyInstructor9!Passphrase'
+    const changed = await request('/api/auth/change-password', {
+      method: 'POST', token: temporarySession, body: JSON.stringify({ currentPassword: temporaryPassword, newPassword }),
+    })
+    assert.equal(changed.response.status, 200, changed.body.error)
+    assert.equal(changed.body.user.mustChangePassword, false)
+    assert.equal(changed.body.redirectTo, '/instructor/dashboard')
+    const activeSession = cookieFrom(changed.response, 'cli_session')
+    const dashboard = await request('/api/dashboards/instructor', { token: activeSession })
+    assert.equal(dashboard.response.status, 200, dashboard.body.error)
+    assert.ok(dashboard.body.dashboard.assignedCourses.some(course => course.id === 'c001'))
+    const unassigned = await request('/api/labs/course/c002', { token: activeSession })
+    assert.equal(unassigned.response.status, 403)
+
+    const updatedProfile = await request(`/api/admin/instructors/${userId}`, {
+      method: 'PATCH', token: adminToken, body: JSON.stringify({ name: 'Managed Instructor Updated' }),
+    })
+    assert.equal(updatedProfile.response.status, 200)
+    assert.equal(updatedProfile.body.instructor.name, 'Managed Instructor Updated')
+
+    const duplicateCourse = await request(`/api/admin/instructors/${userId}/courses`, {
+      method: 'PUT', token: adminToken, body: JSON.stringify({ courseIds: ['c001', 'c001'] }),
+    })
+    assert.equal(duplicateCourse.response.status, 409)
+
+    const courseRemoved = await request(`/api/admin/instructors/${userId}/courses/c001`, { method: 'DELETE', token: adminToken })
+    assert.equal(courseRemoved.response.status, 200, courseRemoved.body.error)
+    assert.equal(courseRemoved.body.instructor.assignedCourses.length, 0)
+    const courseRestored = await request(`/api/admin/instructors/${userId}/courses`, {
+      method: 'PUT', token: adminToken, body: JSON.stringify({ courseIds: ['c001'] }),
+    })
+    assert.equal(courseRestored.response.status, 200, courseRestored.body.error)
+
+    const reset = await request(`/api/admin/instructors/${userId}/reset-password`, { method: 'POST', token: adminToken, body: '{}' })
+    assert.equal(reset.response.status, 200, reset.body.error)
+    assert.equal(reset.body.instructor.mustChangePassword, true)
+    assert.ok(reset.body.temporaryPassword)
+    assert.equal(validateTemporaryPassword(reset.body.temporaryPassword), '')
+    const expired = await request('/api/dashboards/instructor', { token: activeSession })
+    assert.equal(expired.response.status, 401)
+
+    const resetLogin = await request('/api/auth/login', {
+      method: 'POST', body: JSON.stringify({ email: email.toUpperCase(), password: reset.body.temporaryPassword }),
+    })
+    assert.equal(resetLogin.response.status, 200, resetLogin.body.error)
+    assert.equal(resetLogin.body.redirectTo, '/change-password')
+
+    const suspended = await request(`/api/admin/instructors/${userId}/suspend`, { method: 'POST', token: adminToken, body: '{}' })
+    assert.equal(suspended.response.status, 200)
+    const blockedLogin = await request('/api/auth/login', {
+      method: 'POST', body: JSON.stringify({ identifier: username, password: reset.body.temporaryPassword }),
+    })
+    assert.equal(blockedLogin.response.status, 403)
+    const reactivated = await request(`/api/admin/instructors/${userId}/reactivate`, { method: 'POST', token: adminToken, body: '{}' })
+    assert.equal(reactivated.response.status, 200)
+    const workingLogin = await request('/api/auth/login', {
+      method: 'POST', body: JSON.stringify({ identifier: username, password: reset.body.temporaryPassword }),
+    })
+    assert.equal(workingLogin.response.status, 200)
+
+    const listed = await request(`/api/admin/instructors?search=${encodeURIComponent(username)}&status=active&courseId=c001`, { token: adminToken })
+    assert.equal(listed.response.status, 200)
+    assert.equal(listed.body.instructors.length, 1)
+    assert.equal(listed.body.instructors[0].id, userId)
+
+    const archived = await request(`/api/admin/instructors/${userId}/archive`, { method: 'POST', token: adminToken, body: '{}' })
+    assert.equal(archived.response.status, 200, archived.body.error)
+    assert.equal(archived.body.instructor.status, 'archived')
+    assert.equal(archived.body.instructor.assignedCourses.length, 0)
+    const archivedLogin = await request('/api/auth/login', {
+      method: 'POST', body: JSON.stringify({ identifier: username, password: reset.body.temporaryPassword }),
+    })
+    assert.equal(archivedLogin.response.status, 403)
+    const restoredAccount = await request(`/api/admin/instructors/${userId}/reactivate`, { method: 'POST', token: adminToken, body: '{}' })
+    assert.equal(restoredAccount.response.status, 200)
+    assert.equal(restoredAccount.body.instructor.status, 'active')
   })
 
   it('manages live-class schedules and creates one idempotent Google Meet space', async () => {

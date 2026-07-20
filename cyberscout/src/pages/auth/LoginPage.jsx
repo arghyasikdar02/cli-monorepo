@@ -9,7 +9,7 @@ import { dashboardPathForUser } from '../../lib/roles'
 const authErrors = {
   oauth_failed: 'Google sign-in failed. Please try again.',
   oauth_state: 'Google sign-in could not be verified. Please start again from this page.',
-  oauth_unconfigured: 'Google sign-in is unavailable right now. Use your email and password instead.',
+  oauth_unconfigured: 'Google sign-in is unavailable right now. Use your email or username and password instead.',
   oauth_cancelled: 'Google sign-in was cancelled.',
   oauth_link_required: 'This email already has a Cyber Lab IN account. Log in with email first, then connect Google from your profile.',
   oauth_forbidden: 'This Google authorization is not available for your account role.',
@@ -23,7 +23,7 @@ function safeRedirect(value) {
 
 export default function LoginPage() {
   const [searchParams] = useSearchParams()
-  const [email, setEmail] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [showPw, setShowPw] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -63,11 +63,11 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
     try {
-      const { user, redirectTo } = await api.login(email, password)
+      const { user, redirectTo } = await api.login(identifier, password)
       setSession(user)
       const dashboardPath = dashboardPathForUser(user)
       if (!dashboardPath) throw new Error('This account has an unsupported role. Contact Cyber Lab IN support.')
-      navigate(redirectTarget || redirectTo || dashboardPath)
+      navigate(user.mustChangePassword ? '/change-password' : (redirectTarget || redirectTo || dashboardPath))
     } catch (err) {
       setError(err.message || 'Login failed')
     } finally {
@@ -77,12 +77,12 @@ export default function LoginPage() {
 
   return (
     <AuthFrame eyebrow="Learner portal" title="Continue your cybersecurity learning" description="Log in to access enrolled courses, guided labs, protected materials and recorded progress." footer={<><span>New to Cyber Lab IN?</span><Link to={signupHref}>Create an account</Link><Link to="/">Back to website</Link></>}>
-      <div className="auth-form-heading"><p className="site-eyebrow">Login</p><h2>Access your account</h2><p>Use your email and password, or continue with Google when it is configured.</p></div>
+      <div className="auth-form-heading"><p className="site-eyebrow">Login</p><h2>Access your account</h2><p>Use your email or username and password, or continue with Google when it is configured.</p></div>
       {error && <div className="auth-alert" role="alert"><SiteIcon name="error" /><span>{error}</span></div>}
       <button type="button" onClick={handleGoogleAuth} className="auth-google-button"><GoogleMark />Sign in with Google</button>
-      <div className="auth-divider"><span>or use email</span></div>
+      <div className="auth-divider"><span>or use your password</span></div>
       <form onSubmit={handleSubmit} className="auth-form-fields">
-        <label><span>Email address</span><input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" placeholder="name@example.com" /></label>
+        <label><span>Email or username</span><input type="text" value={identifier} onChange={e => setIdentifier(e.target.value)} required autoComplete="username" placeholder="name@example.com or username" /></label>
         <label><span>Password</span><div className="auth-password-field"><input type={showPw ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required autoComplete="current-password" /><button type="button" onClick={() => setShowPw(value => !value)} aria-label={showPw ? 'Hide password' : 'Show password'}><SiteIcon name={showPw ? 'visibility_off' : 'visibility'} /></button></div></label>
         <button type="submit" disabled={loading} className="auth-submit-button">{loading ? 'Logging in...' : 'Log in'}</button>
       </form>

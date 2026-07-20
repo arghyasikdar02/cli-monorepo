@@ -66,6 +66,7 @@ async function request(path, options = {}, allowCsrfRetry = true) {
     const error = new Error(err.error || 'Request failed')
     error.status = res.status
     error.requestId = err.requestId
+    error.code = err.code
     throw error
   }
   return res.json()
@@ -75,14 +76,15 @@ export const api = {
   authConfig: () => request('/api/auth/config'),
   register: (name, email, password, username) =>
     request('/api/auth/register', { method: 'POST', body: JSON.stringify({ name, email, password, username }) }),
-  login: (email, password) =>
-    request('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  login: (identifier, password) =>
+    request('/api/auth/login', { method: 'POST', body: JSON.stringify({ identifier, password }) }),
   me: () => request('/api/auth/me'),
   logout: () => request('/api/auth/logout', { method: 'POST' }),
   changePassword: (currentPassword, newPassword) =>
     request('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) }),
   get: (path) => request(path),
   post: (path, body) => request(path, { method: 'POST', body: JSON.stringify(body) }),
+  put: (path, body) => request(path, { method: 'PUT', body: JSON.stringify(body) }),
   patch: (path, body) => request(path, { method: 'PATCH', body: JSON.stringify(body) }),
   delete: (path) => request(path, { method: 'DELETE' }),
   dashboard: (kind) => request(`/api/dashboards/${kind}`),

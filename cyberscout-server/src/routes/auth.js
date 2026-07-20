@@ -21,6 +21,7 @@ import { requireAuth } from '../middleware/access.js'
 import { authCookieOptions, clearCookieOptions, csrfCookieOptions, oauthPkceCookieOptions, oauthStateCookieOptions } from '../lib/cookies.js'
 import { validatePassword } from '../lib/validation.js'
 import { dashboardPathForUser, rolesForUser } from '../lib/roles.js'
+import { validateTemporaryPassword } from '../services/instructorAccounts.js'
 import { authSecurityDiagnostics, loginLimiter, registrationLimiter } from '../middleware/security.js'
 import {
   buildGoogleAuthUrl,
@@ -132,17 +133,19 @@ router.post('/register', registrationLimiter, async (req, res) => {
 // POST /api/auth/login
 router.post('/login', authSecurityDiagnostics('auth.login'), loginLimiter, async (req, res) => {
   try {
-    const { email, password } = req.body
-    if (!email || !password) return res.status(400).json({ error: 'Email and password required' })
-    const user = await findUserByEmail(email)
+    const identifier = String(req.body.identifier || req.body.email || '').trim().toLowerCase()
+    const { password } = req.body
+    if (!identifier || !password) return res.status(400).json({ error: 'Email or username and password required' })
+    const user = identifier.includes('@') ? await findUserByEmail(identifier) : await findUserByUsername(identifier)
     if (!user || !user.passwordHash) return res.status(401).json({ error: 'Invalid credentials' })
     if (user.status === 'suspended') return res.status(403).json({ error: 'Account suspended' })
+    if (user.status !== 'active') return res.status(403).json({ error: 'Account unavailable' })
     const valid = await bcrypt.compare(password, user.passwordHash)
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' })
     await updateUser(user.id, { lastLogin: new Date().toISOString() })
     await recordAudit('auth.login', user.id, 'user', user.id, {})
     const freshUser = await findUserById(user.id)
-    const redirectTo = dashboardPathForUser(freshUser)
+    const redirectTo = freshUser.mustChangePassword ? '/change-password' : dashboardPathForUser(freshUser)
     if (!redirectTo) return res.status(403).json({ error: 'Unsupported account role' })
     const token = signUserToken(freshUser)
     setAuthCookie(res, token)
@@ -264,19 +267,24 @@ router.get('/me', requireAuth, (req, res) => {
 router.post('/change-password', loginLimiter, requireAuth, async (req, res) => {
   try {
     const { currentPassword = '', newPassword = '' } = req.body
-    const passwordError = validatePassword(newPassword)
+    const passwordError = req.user.mustChangePassword ? validateTemporaryPassword(newPassword) : validatePassword(newPassword)
     if (passwordError) return res.status(400).json({ error: passwordError })
     const user = await findUserById(req.user.id)
     if (!user) return res.status(401).json({ error: 'User not found' })
     if (user.passwordHash) {
       const valid = await bcrypt.compare(currentPassword, user.passwordHash)
       if (!valid) return res.status(401).json({ error: 'Current password is incorrect' })
+      if (await bcrypt.compare(newPassword, user.passwordHash)) return res.status(400).json({ error: 'New password must be different from the current password.' })
     }
     const passwordHash = await bcrypt.hash(newPassword, Number(process.env.BCRYPT_COST || 12))
     const updatedUser = await updateUserPassword(user.id, passwordHash)
     const token = signUserToken(updatedUser)
     setAuthCookie(res, token)
-    res.json({ user: publicUser(updatedUser), message: user.passwordHash ? 'Password updated' : 'Password set for this account' })
+    res.json({
+      user: publicUser(updatedUser),
+      redirectTo: dashboardPathForUser(updatedUser),
+      message: user.passwordHash ? 'Password updated' : 'Password set for this account',
+    })
   } catch {
     res.status(500).json({ error: 'Password update failed' })
   }

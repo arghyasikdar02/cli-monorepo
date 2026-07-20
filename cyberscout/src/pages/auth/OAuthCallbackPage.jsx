@@ -29,7 +29,7 @@ export default function OAuthCallbackPage() {
         const dashboardPath = dashboardPathForUser(user)
         if (!dashboardPath) throw new Error('Unsupported account role')
         setSession(user)
-        navigate(redirectTarget || dashboardPath, { replace: true })
+        navigate(user.mustChangePassword ? '/change-password' : (redirectTarget || dashboardPath), { replace: true })
       })
       .catch(() => {
         navigate('/login?error=oauth_failed', { replace: true })

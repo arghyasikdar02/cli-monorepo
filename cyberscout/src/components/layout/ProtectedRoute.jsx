@@ -2,8 +2,8 @@ import { useEffect } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore'
 
-export default function ProtectedRoute({ children }) {
-  const { isAuthenticated, authStatus, hydrateSession } = useAppStore()
+export default function ProtectedRoute({ children, allowPasswordChange = false }) {
+  const { isAuthenticated, authStatus, hydrateSession, user } = useAppStore()
   const location = useLocation()
 
   useEffect(() => {
@@ -16,6 +16,9 @@ export default function ProtectedRoute({ children }) {
   if (!isAuthenticated) {
     const redirect = `${location.pathname}${location.search || ''}`
     return <Navigate to={`/auth?mode=login&redirect=${encodeURIComponent(redirect)}`} replace />
+  }
+  if (user?.mustChangePassword && !allowPasswordChange) {
+    return <Navigate to="/change-password" replace />
   }
   return children
 }

@@ -20,6 +20,7 @@ export default function RoleProtectedRoute({ children, roles, loginPath }) {
   if (!isAuthenticated) {
     return <Navigate to={loginTarget} replace />
   }
+  if (user?.mustChangePassword) return <Navigate to="/change-password" replace />
   if (!hasAnyRole(user, roles)) return <AccessDenied loginPath={loginPath} />
   return children
 }

@@ -16,12 +16,31 @@ Both health endpoints verify PostgreSQL connectivity and return `database: "conn
 - `GET /api/auth/config`
 - `POST /api/auth/register`
 - `POST /api/auth/login`
+- `POST /api/auth/change-password`
 - `POST /api/auth/logout`
 - `GET /api/auth/google`
 - `GET /api/auth/google/callback`
 - `GET /api/auth/me`
 
 Browser `POST`, `PUT`, `PATCH`, and `DELETE` requests must include the `cli_csrf` cookie and matching `X-CSRF-Token` header. This includes login and registration. Session JWTs are stored only in the HTTP-only `cli_session` cookie.
+
+Login accepts `identifier` as an email address or username. Existing clients that send `email` remain supported. Accounts with `must_change_password` set receive `/change-password` as their redirect and may access only session, logout, and password-change endpoints until the password is replaced.
+
+## Admin Instructor Accounts
+
+- `GET /api/admin/usernames/check`
+- `GET /api/admin/instructors`
+- `POST /api/admin/instructors`
+- `GET /api/admin/instructors/:instructorId`
+- `PATCH /api/admin/instructors/:instructorId`
+- `POST /api/admin/instructors/:instructorId/reset-password`
+- `POST /api/admin/instructors/:instructorId/suspend`
+- `POST /api/admin/instructors/:instructorId/reactivate`
+- `POST /api/admin/instructors/:instructorId/archive`
+- `PUT /api/admin/instructors/:instructorId/courses`
+- `DELETE /api/admin/instructors/:instructorId/courses/:courseId`
+
+These routes require `admin` or `super_admin`. Creation and reset responses contain a temporary password once; no password or hash is available from list/detail routes or audit records. Course replacement checks future live-class ownership before removing assignments.
 
 ## Users
 

@@ -10,6 +10,8 @@
 
 The existing student login page at `/login` was preserved.
 
+All password login pages accept either email or username. Instructor accounts created by an administrator begin with a temporary password and are sent to `/change-password` before any dashboard, course, Google integration, or live-class API is available.
+
 ## Redirect Targets
 
 - `student` -> `/dashboard`
@@ -20,11 +22,7 @@ The existing student login page at `/login` was preserved.
 
 ## Backend Role Claims
 
-`POST /api/auth/login` returns:
-
-- `token`
-- `user`
-- `redirectTo`
+`POST /api/auth/login` returns `user` and `redirectTo`. The signed session stays in the secure HTTP-only cookie and is not returned to frontend JavaScript.
 
 The JWT includes:
 
@@ -43,7 +41,7 @@ Role dashboard routes use:
 
 - `cyberscout/src/components/layout/RoleProtectedRoute.jsx`
 
-If a user is not authenticated, the guard redirects to the correct login page. If a user has the wrong role, the guard also redirects to the role-specific login page.
+If a user is not authenticated, the guard redirects to the correct login page. Authenticated users with the wrong role see an access-denied state. Users with a mandatory password change are redirected to `/change-password` before role routing.
 
 ## Backend Guards
 
@@ -58,3 +56,5 @@ Middleware includes:
 - `requireDashboardRole`
 - `requireCourseAccess`
 - `requireCourseManager`
+
+`requireAuth` also validates account status, token version, and the mandatory password-change state. Password reset, suspension, reactivation, and archival increment the token version so prior sessions cannot continue.
