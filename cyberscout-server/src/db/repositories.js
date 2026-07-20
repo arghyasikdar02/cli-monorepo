@@ -1,18 +1,8 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { execute, queryMany, queryOne, transaction } from './index.js'
+import { canonicalRoles, normalizeRole, rolesForUser, VALID_ROLES } from '../lib/roles.js'
 
-export const VALID_ROLES = [
-  'student',
-  'admin',
-  'super_admin',
-  'instructor',
-  'marketing',
-  'sales',
-  'ops',
-  'lab_creator',
-  'support',
-  'finance',
-]
+export { VALID_ROLES }
 
 function id(prefix) {
   return `${prefix}_${randomUUID()}`
@@ -44,6 +34,8 @@ async function countQuery(sql, values = [], client) {
 
 function userFromRow(row) {
   if (!row) return null
+  const roles = canonicalRoles(parseJson(row.roles, []), normalizeRole(row.role))
+  const role = normalizeRole(row.role) || roles[0] || null
   return {
     id: row.id,
     name: row.name,
@@ -51,8 +43,8 @@ function userFromRow(row) {
     email: row.email,
     passwordHash: row.password_hash,
     googleId: row.google_id,
-    role: row.role,
-    roles: parseJson(row.roles, [row.role || 'student']),
+    role,
+    roles,
     status: row.status,
     tokenVersion: Number(row.token_version || 0),
     passwordUpdatedAt: row.password_updated_at,
@@ -64,13 +56,15 @@ function userFromRow(row) {
 
 export function publicUser(user) {
   if (!user) return null
+  const roles = rolesForUser(user)
+  const role = normalizeRole(user.role) || roles[0] || null
   return {
     id: user.id,
     name: user.name,
     username: user.username,
     email: user.email,
-    role: user.role,
-    roles: user.roles || [user.role || 'student'],
+    role,
+    roles,
     status: user.status,
     hasPassword: Boolean(user.passwordHash),
     lastLogin: user.lastLogin,
@@ -182,20 +176,22 @@ export async function listUsers() {
 }
 
 export function userHasRole(user, allowedRoles) {
-  const roles = user?.roles || [user?.role]
-  return roles.some(role => allowedRoles.includes(role))
+  const allowed = canonicalRoles(allowedRoles)
+  return rolesForUser(user).some(role => allowed.includes(role))
 }
 
 export async function createUser({ name, email, username, passwordHash, googleId = null, role = 'student', roles = ['student'] }, client) {
   const normalizedEmail = String(email || '').trim().toLowerCase()
   const normalizedUsername = username ? String(username).trim().toLowerCase() : null
-  const primaryRole = VALID_ROLES.includes(role) ? role : 'student'
-  const safeRoles = Array.from(new Set((roles?.length ? roles : [primaryRole]).filter(item => VALID_ROLES.includes(item))))
+  const primaryRole = normalizeRole(role)
+  if (!primaryRole) throw new Error('Unsupported user role')
+  const safeRoles = canonicalRoles(roles, primaryRole)
+  if (!safeRoles.length) throw new Error('At least one supported user role is required')
   const userId = id('usr')
   await execute(`
     INSERT INTO users (id, name, username, email, password_hash, google_id, role, roles)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
-  `, [userId, String(name || '').trim(), normalizedUsername, normalizedEmail, passwordHash, googleId, primaryRole, JSON.stringify(safeRoles.length ? safeRoles : [primaryRole])], client)
+  `, [userId, String(name || '').trim(), normalizedUsername, normalizedEmail, passwordHash, googleId, primaryRole, JSON.stringify(safeRoles)], client)
   return findUserById(userId, client)
 }
 
@@ -209,12 +205,14 @@ export async function updateUser(userId, updates, client) {
   for (const [key, column] of Object.entries(allowed)) {
     if (updates[key] === undefined) continue
     if (key === 'role') {
-      if (!VALID_ROLES.includes(updates[key])) continue
-      sets.push(`${column} = ${parameter(values, updates[key])}`)
+      const role = normalizeRole(updates[key])
+      if (!role) throw new Error('Unsupported user role')
+      sets.push(`${column} = ${parameter(values, role)}`)
       continue
     }
     if (key === 'roles') {
-      const safeRoles = Array.from(new Set((updates[key] || []).filter(item => VALID_ROLES.includes(item))))
+      const safeRoles = canonicalRoles(updates[key])
+      if (!safeRoles.length) throw new Error('At least one supported user role is required')
       sets.push(`${column} = ${parameter(values, JSON.stringify(safeRoles))}::jsonb`)
       continue
     }
@@ -239,11 +237,12 @@ export async function updateUserPassword(userId, passwordHash) {
 }
 
 export async function assignRole(userId, role) {
-  if (!VALID_ROLES.includes(role)) return null
+  const normalizedRole = normalizeRole(role)
+  if (!normalizedRole) throw new Error('Unsupported user role')
   const user = await findUserById(userId)
   if (!user) return null
-  const roles = Array.from(new Set([...(user.roles || []), role]))
-  await execute('UPDATE users SET role = $1, roles = $2::jsonb, updated_at = CURRENT_TIMESTAMP WHERE id = $3', [role, JSON.stringify(roles), userId])
+  const roles = canonicalRoles(user.roles, normalizedRole)
+  await execute('UPDATE users SET role = $1, roles = $2::jsonb, updated_at = CURRENT_TIMESTAMP WHERE id = $3', [normalizedRole, JSON.stringify(roles), userId])
   return findUserById(userId)
 }
 

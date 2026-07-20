@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import AppShell from '../../components/layout/AppShell'
 import { api } from '../../lib/api'
+import SiteIcon from '../../components/ui/SiteIcon'
 
 function formatDateTime(startValue, endValue) {
   const start = new Date(startValue)
@@ -62,7 +63,7 @@ export default function LiveClassDetailPage() {
     <AppShell>
       <div className="max-w-[1280px] mx-auto px-8 py-8">
         <Link to="/live-classes" className="flex items-center gap-1.5 text-sm text-on-surface-variant hover:text-primary mb-6 transition-colors">
-          <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+          <SiteIcon name="arrow_back" size={18} />
           Back to Schedule
         </Link>
 
@@ -98,7 +99,7 @@ export default function LiveClassDetailPage() {
                 <p className="text-sm text-on-surface-variant">{date.month} · {date.time}</p>
               </div>
               <div className="flex items-center justify-center gap-2 text-sm text-on-surface-variant">
-                <span className="material-symbols-outlined text-[18px]">group</span>
+                <SiteIcon name="group" size={18} />
                 {viewerCount} watching now
               </div>
               {isLive ? (

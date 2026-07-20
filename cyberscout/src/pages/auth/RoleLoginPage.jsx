@@ -4,11 +4,7 @@ import AuthFrame from '../../components/site/AuthFrame'
 import { api } from '../../lib/api'
 import { useAppStore } from '../../store/useAppStore'
 import SiteIcon from '../../components/ui/SiteIcon'
-
-function hasAllowedRole(user, allowedRoles) {
-  const roles = user?.roles || [user?.role]
-  return roles.some(role => allowedRoles.includes(role))
-}
+import { hasAnyRole } from '../../lib/roles'
 
 function safeRedirect(value) {
   if (!value || !value.startsWith('/') || value.startsWith('//')) return ''
@@ -28,7 +24,7 @@ export default function RoleLoginPage({ title, purpose, allowedRoles, redirectTo
 
   useEffect(() => {
     document.title = `${title} | Cyber Lab IN`
-    if (isAuthenticated && hasAllowedRole(user, allowedRoles)) navigate(redirectTarget || redirectTo, { replace: true })
+    if (isAuthenticated && hasAnyRole(user, allowedRoles)) navigate(redirectTarget || redirectTo, { replace: true })
   }, [allowedRoles, isAuthenticated, navigate, redirectTarget, redirectTo, title, user])
 
   const submit = async (event) => {
@@ -37,7 +33,7 @@ export default function RoleLoginPage({ title, purpose, allowedRoles, redirectTo
     setLoading(true)
     try {
       const result = await api.login(email, password)
-      if (!hasAllowedRole(result.user, allowedRoles)) {
+      if (!hasAnyRole(result.user, allowedRoles)) {
         await api.logout().catch(() => {})
         logout()
         setError('This account does not have access to this dashboard.')

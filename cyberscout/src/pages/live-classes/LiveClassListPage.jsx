@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import AppShell from '../../components/layout/AppShell'
 import { api } from '../../lib/api'
+import SiteIcon from '../../components/ui/SiteIcon'
 
 function formatDate(value) {
   const date = new Date(value)
@@ -102,7 +103,7 @@ function ClassCard({ cls }) {
           {isLive ? (
             <Link to={`/live-classes/${cls.id}/session`}
               className="px-4 py-2 bg-green-500 text-white text-xs font-bold font-space-grotesk rounded-lg hover:bg-green-600 transition-colors flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[16px]">play_arrow</span>
+              <SiteIcon name="play_arrow" size={16} />
               Join Now
             </Link>
           ) : (

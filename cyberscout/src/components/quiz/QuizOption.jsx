@@ -1,3 +1,5 @@
+import SiteIcon from '../ui/SiteIcon'
+
 const STATE_STYLES = {
   default:  'border-slate-100 hover:border-slate-300 hover:bg-slate-50',
   selected: 'border-secondary bg-secondary/5',
@@ -25,9 +27,9 @@ export default function QuizOption({ label, text, state = 'default', onClick }) 
         </span>
         <span className="text-on-surface text-sm">{text}</span>
       </div>
-      {state === 'selected' && <span className="material-symbols-outlined text-secondary">check_circle</span>}
-      {state === 'correct' && <span className="material-symbols-outlined text-green-500">check_circle</span>}
-      {state === 'wrong' && <span className="material-symbols-outlined text-error">cancel</span>}
+      {state === 'selected' && <SiteIcon name="check_circle" className="text-secondary" />}
+      {state === 'correct' && <SiteIcon name="check_circle" className="text-green-500" />}
+      {state === 'wrong' && <SiteIcon name="cancel" className="text-error" />}
     </button>
   )
 }

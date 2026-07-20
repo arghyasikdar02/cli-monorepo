@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import AppShell from '../../components/layout/AppShell'
+import SiteIcon from '../../components/ui/SiteIcon'
 
 const FAQS = [
   { q: 'How do I reset my password?', a: "Go to the login page and click 'Forgot?'. Enter your email and we'll send a reset link. Links expire after 1 hour." },
@@ -18,7 +19,7 @@ export default function AccountSecurityHelpPage() {
     <AppShell>
       <div className="max-w-[760px] mx-auto px-8 py-8">
         <Link to="/help" className="flex items-center gap-1.5 text-sm text-on-surface-variant hover:text-primary mb-6 transition-colors">
-          <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+          <SiteIcon name="arrow_back" size={18} />
           Help Center
         </Link>
         <h1 className="font-space-grotesk text-2xl font-black text-primary mb-2">Account &amp; Security</h1>
@@ -31,9 +32,7 @@ export default function AccountSecurityHelpPage() {
                 onClick={() => setOpen(open === i ? null : i)}
                 className="w-full flex items-center justify-between px-6 py-4 hover:bg-slate-50 transition-colors text-left">
                 <span className="font-space-grotesk font-semibold text-sm text-on-surface">{faq.q}</span>
-                <span className="material-symbols-outlined text-slate-400 text-[20px] flex-shrink-0 ml-4">
-                  {open === i ? 'expand_less' : 'expand_more'}
-                </span>
+                <SiteIcon name={open === i ? 'expand_less' : 'expand_more'} size={20} className="ml-4 flex-shrink-0 text-slate-400" />
               </button>
               {open === i && (
                 <div className="px-6 pb-5 border-t border-slate-100">
@@ -48,7 +47,7 @@ export default function AccountSecurityHelpPage() {
           <p className="text-sm text-on-surface-variant mb-3">Didn't find your answer?</p>
           <Link to="/report-bug"
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-white font-space-grotesk font-bold text-sm rounded-xl hover:opacity-90 transition-opacity">
-            <span className="material-symbols-outlined text-[18px]">support_agent</span>
+            <SiteIcon name="support_agent" size={18} />
             Contact Support
           </Link>
         </div>

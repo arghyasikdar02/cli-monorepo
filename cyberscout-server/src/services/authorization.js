@@ -6,11 +6,12 @@ import {
   isInstructorAssigned,
   userHasRole,
 } from '../db/repositories.js'
+import { ROLE_GROUPS } from '../lib/roles.js'
 
-export const ADMIN_ROLES = ['admin', 'super_admin']
-export const OPS_ROLES = ['ops', 'lab_creator', 'support', 'finance']
-export const INSTRUCTOR_ROLES = ['instructor']
-export const SALES_ROLES = ['marketing', 'sales']
+export const ADMIN_ROLES = ROLE_GROUPS.admin
+export const OPS_ROLES = ROLE_GROUPS.ops
+export const INSTRUCTOR_ROLES = ROLE_GROUPS.instructor
+export const SALES_ROLES = ROLE_GROUPS.marketing
 
 export function allow(reason = 'allowed') {
   return { allowed: true, reason }

@@ -81,15 +81,23 @@ npm run cliadm -- analytics summary --json
 npm run cliadm -- audit search --json
 ```
 
-Mutation commands require `--admin-token`; destructive commands also require `--dry-run` or `--confirm YES`. See `npm run cliadm -- --help` and `docs/architecture/API_ROUTES_DOCUMENTATION.md`.
+Mutation commands require the protected `CLIADM_ADMIN_TOKEN` environment value. A matching `--admin-token` remains available for environments where the token is not already injected. Destructive commands also require `--dry-run` or `--confirm YES`. See `npm run cliadm -- --help` and `docs/architecture/API_ROUTES_DOCUMENTATION.md`.
 
 Development seeding creates local test identities only when `SEED_DEVELOPMENT_USERS=1` and `NODE_ENV` is not `production`. Production startup runs tracked migrations but does not seed. Run the baseline seed deliberately only when the catalogue is missing, then bootstrap the first production administrator from a protected Render shell with a strong password and `cliadm`:
 
 ```bash
 read -s CLIADM_NEW_PASSWORD
-read -s CLIADM_TOKEN
-npm run cliadm -- user create --email admin@your-domain.example --name "Platform Administrator" --password "$CLIADM_NEW_PASSWORD" --role super_admin --admin-token "$CLIADM_TOKEN" --json
-unset CLIADM_NEW_PASSWORD CLIADM_TOKEN
+export CLIADM_NEW_PASSWORD
+npm run cliadm -- user create --email admin@cyberlabin.com --name "Cyber Lab Admin" --password-env CLIADM_NEW_PASSWORD --role admin --json
+npm run cliadm -- user create --email marketing@cyberlabin.com --name "Cyber Lab Marketing" --password-env CLIADM_NEW_PASSWORD --role marketing --json
+npm run cliadm -- user create --email instructor@cyberlabin.com --name "Cyber Lab Instructor" --password-env CLIADM_NEW_PASSWORD --role instructor --json
+unset CLIADM_NEW_PASSWORD
+```
+
+`user create` is idempotent when the existing account already has the requested role and never resets an existing password. If an address was previously registered as a student, change it only through an explicitly confirmed, audited role assignment:
+
+```bash
+npm run cliadm -- user set-role --email instructor@cyberlabin.com --role instructor --confirm YES --json
 ```
 
 ## Deployment

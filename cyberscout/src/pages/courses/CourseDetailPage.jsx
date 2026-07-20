@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import AppShell from '../../components/layout/AppShell'
 import ProgressBar from '../../components/ui/ProgressBar'
 import { api } from '../../lib/api'
+import SiteIcon from '../../components/ui/SiteIcon'
 
 function MaterialIcon({ type }) {
   const icon = {
@@ -11,7 +12,7 @@ function MaterialIcon({ type }) {
     link: 'link',
     text: 'article',
   }[type] || 'description'
-  return <span className="material-symbols-outlined text-secondary text-[20px]">{icon}</span>
+  return <SiteIcon name={icon} size={20} className="text-secondary" />
 }
 
 export default function CourseDetailPage() {
@@ -75,7 +76,7 @@ export default function CourseDetailPage() {
   if (!course || error) return (
     <AppShell>
       <div className="max-w-[760px] mx-auto px-8 py-20 text-center">
-        <span className="material-symbols-outlined text-6xl text-slate-300 block mb-3">error</span>
+        <SiteIcon name="error" size={54} className="mx-auto mb-3 text-slate-300" />
         <h1 className="font-space-grotesk text-2xl font-black text-primary">Course unavailable</h1>
         <p className="mt-2 text-on-surface-variant">{error || 'Course not found'}</p>
         <Link to="/learn/courses" className="mt-6 inline-flex rounded-lg bg-primary px-5 py-3 font-space-grotesk text-sm font-bold text-white">Back to courses</Link>
@@ -92,7 +93,7 @@ export default function CourseDetailPage() {
       <div className="bg-gradient-to-br from-primary-container to-slate-800 text-white">
         <div className="max-w-[1280px] mx-auto px-8 py-12">
           <Link to="/learn/courses" className="flex items-center gap-1 text-white/60 hover:text-white text-sm mb-6 transition-colors">
-            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+            <SiteIcon name="arrow_back" size={18} />
             Back to Courses
           </Link>
           <div className="flex flex-wrap gap-3 mb-4">
@@ -112,15 +113,15 @@ export default function CourseDetailPage() {
           <p className="text-white/70 text-base mb-6 max-w-xl">{course.description}</p>
           <div className="flex flex-wrap items-center gap-6 text-sm text-white/60">
             <span className="flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[18px]">schedule</span>
+              <SiteIcon name="schedule" size={18} />
               {course.duration}
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[18px]">view_module</span>
+              <SiteIcon name="view_module" size={18} />
               {course.moduleCount} modules
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[18px]">description</span>
+              <SiteIcon name="description" size={18} />
               {course.materialCount} resources
             </span>
           </div>
@@ -175,7 +176,7 @@ export default function CourseDetailPage() {
                     className="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="material-symbols-outlined text-slate-300 text-[20px]">radio_button_unchecked</span>
+                      <SiteIcon name="radio_button_unchecked" size={20} className="text-slate-300" />
                       <div className="text-left">
                         <p className="font-space-grotesk font-semibold text-sm text-on-surface">
                           Module {module.order}: {module.title}
@@ -183,9 +184,7 @@ export default function CourseDetailPage() {
                         <p className="text-xs text-on-surface-variant">{module.lessons.length} lessons</p>
                       </div>
                     </div>
-                    <span className="material-symbols-outlined text-slate-400 text-[20px]">
-                      {openModule === module.id ? 'expand_less' : 'expand_more'}
-                    </span>
+                    <SiteIcon name={openModule === module.id ? 'expand_less' : 'expand_more'} size={20} className="text-slate-400" />
                   </button>
 
                   {openModule === module.id && (
@@ -194,7 +193,7 @@ export default function CourseDetailPage() {
                         const content = (
                           <>
                             {lesson.completed ? (
-                              <span className="material-symbols-outlined text-green-500 text-[18px] flex-shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                              <SiteIcon name="check_circle" size={18} className="flex-shrink-0 text-green-500" />
                             ) : (
                               <span className="w-5 h-5 rounded-full border-2 border-slate-300 flex-shrink-0 flex items-center justify-center">
                                 <span className="text-[9px] font-bold text-slate-400">{index + 1}</span>
@@ -220,7 +219,7 @@ export default function CourseDetailPage() {
                             className="flex items-center gap-3 px-4 py-3 border-b border-slate-50 last:border-0 text-slate-400"
                           >
                             {content}
-                            <span className="material-symbols-outlined text-[18px]">lock</span>
+                            <SiteIcon name="lock" size={18} />
                           </div>
                         )
                       })}
@@ -301,7 +300,7 @@ export default function CourseDetailPage() {
                 [course.duration, 'schedule'],
               ].map(([text, icon]) => (
                 <div key={text} className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-secondary text-[18px]">{icon}</span>
+                  <SiteIcon name={icon} size={18} className="text-secondary" />
                   <span>{text}</span>
                 </div>
               ))}

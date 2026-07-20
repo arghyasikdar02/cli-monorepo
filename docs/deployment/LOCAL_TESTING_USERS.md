@@ -6,7 +6,7 @@ All seeded users use:
 
 Run the seed with `SEED_DEVELOPMENT_USERS=1` in a non-production environment. If these emails already exist locally, the development seed refreshes their password and role so stale hashes do not cause `Invalid credentials`.
 
-The role-specific login pages show a local demo credential box with a `Use demo account` button.
+These identities are development-only. Production does not create or reset them; provision staff deliberately with the protected `cliadm` workflow in the root README.
 
 ## Student
 

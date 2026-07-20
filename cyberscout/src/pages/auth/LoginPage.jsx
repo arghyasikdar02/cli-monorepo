@@ -4,6 +4,7 @@ import { useAppStore } from '../../store/useAppStore'
 import { api, API_BASE } from '../../lib/api'
 import AuthFrame, { GoogleMark } from '../../components/site/AuthFrame'
 import SiteIcon from '../../components/ui/SiteIcon'
+import { dashboardPathForUser } from '../../lib/roles'
 
 const authErrors = {
   oauth_failed: 'Google sign-in failed. Please try again.',
@@ -64,7 +65,9 @@ export default function LoginPage() {
     try {
       const { user, redirectTo } = await api.login(email, password)
       setSession(user)
-      navigate(redirectTarget || redirectTo || '/dashboard')
+      const dashboardPath = dashboardPathForUser(user)
+      if (!dashboardPath) throw new Error('This account has an unsupported role. Contact Cyber Lab IN support.')
+      navigate(redirectTarget || redirectTo || dashboardPath)
     } catch (err) {
       setError(err.message || 'Login failed')
     } finally {

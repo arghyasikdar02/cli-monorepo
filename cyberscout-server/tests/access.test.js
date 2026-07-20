@@ -463,7 +463,95 @@ describe('Cyber Lab IN database-backed LMS flow', () => {
       assert.equal(result.redirectTo, redirectTo)
       assert.ok(result.token)
       assert.equal(result.user.email, email)
+      assert.ok(result.user.roles.includes(result.user.role))
+      const { verifyToken } = await import('../src/lib/jwt.js')
+      const payload = verifyToken(result.token.slice('cli_session='.length))
+      assert.equal(payload.role, result.user.role)
+      assert.deepEqual(payload.roles, result.user.roles)
     }
+  })
+
+  it('normalizes supported legacy role capitalization and fails closed for unknown roles', async () => {
+    const normalizedEmail = `normalized-role-${Date.now()}@cyberlabin.com`
+    const normalizedSignup = await request('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Normalized Instructor', email: normalizedEmail, password: 'newPassword123' }),
+    })
+    assert.equal(normalizedSignup.response.status, 200)
+    await database.execute('UPDATE users SET role = $1, roles = $2::jsonb WHERE email = $3', ['Instructor', JSON.stringify(['INSTRUCTOR']), normalizedEmail])
+    const normalizedLogin = await login(normalizedEmail, 'newPassword123')
+    assert.equal(normalizedLogin.user.role, 'instructor')
+    assert.deepEqual(normalizedLogin.user.roles, ['instructor'])
+    assert.equal(normalizedLogin.redirectTo, '/instructor/dashboard')
+
+    const unknownEmail = `unknown-role-${Date.now()}@cyberlabin.com`
+    const unknownSignup = await request('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Unknown Role', email: unknownEmail, password: 'newPassword123' }),
+    })
+    assert.equal(unknownSignup.response.status, 200)
+    const originalSession = cookieFrom(unknownSignup.response, 'cli_session')
+    await database.execute('UPDATE users SET role = $1, roles = $2::jsonb WHERE email = $3', ['unknown_role', JSON.stringify(['unknown_role']), unknownEmail])
+
+    const restored = await request('/api/auth/me', { token: originalSession })
+    assert.equal(restored.response.status, 403)
+    assert.equal(restored.body.error, 'Unsupported account role')
+
+    const rejectedLogin = await request('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email: unknownEmail, password: 'newPassword123' }),
+    })
+    assert.equal(rejectedLogin.response.status, 403)
+    assert.equal(rejectedLogin.body.error, 'Unsupported account role')
+    assert.equal(cookieFrom(rejectedLogin.response, 'cli_session'), '')
+  })
+
+  it('rejects invalid credentials and suspended accounts without leaking account details', async () => {
+    const missing = await request('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email: `missing-${Date.now()}@cyberlabin.com`, password: 'incorrect-passphrase' }),
+    })
+    const wrongPassword = await request('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email: 'student@cyberlabin.com', password: 'incorrect-passphrase' }),
+    })
+    assert.equal(missing.response.status, 401)
+    assert.equal(wrongPassword.response.status, 401)
+    assert.equal(missing.body.error, 'Invalid credentials')
+    assert.equal(wrongPassword.body.error, 'Invalid credentials')
+
+    const suspendedEmail = `suspended-${Date.now()}@cyberlabin.com`
+    const signup = await request('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Suspended User', email: suspendedEmail, password: 'newPassword123' }),
+    })
+    assert.equal(signup.response.status, 200)
+    await database.execute('UPDATE users SET status = $1 WHERE email = $2', ['suspended', suspendedEmail])
+    const suspended = await request('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email: suspendedEmail, password: 'newPassword123' }),
+    })
+    assert.equal(suspended.response.status, 403)
+    assert.equal(suspended.body.error, 'Account suspended')
+  })
+
+  it('enforces each dashboard role and rejects staff access to the student dashboard', async () => {
+    const allowed = await Promise.all([
+      request('/api/dashboards/student', { token: studentToken }),
+      request('/api/dashboards/admin', { token: adminToken }),
+      request('/api/dashboards/marketing', { token: marketingToken }),
+      request('/api/dashboards/instructor', { token: instructorToken }),
+    ])
+    assert.ok(allowed.every(result => result.response.status === 200))
+
+    const denied = await Promise.all([
+      request('/api/dashboards/admin', { token: studentToken }),
+      request('/api/dashboards/marketing', { token: instructorToken }),
+      request('/api/dashboards/instructor', { token: marketingToken }),
+      request('/api/dashboards/student', { token: adminToken }),
+    ])
+    assert.ok(denied.every(result => result.response.status === 403))
+    assert.ok(denied.every(result => result.body.error === 'Insufficient role'))
   })
 
   it('loads database-backed role dashboards without 500 errors', async () => {
@@ -693,6 +781,23 @@ describe('Cyber Lab IN database-backed LMS flow', () => {
     assert.equal(dryRun.status, 0, dryRun.stderr)
     assert.equal(JSON.parse(dryRun.stdout).dryRun, true)
     assert.equal((await database.queryOne('SELECT count(*)::integer AS count FROM users WHERE email = $1', [dryRunEmail])).count, 0)
+
+    const invalidRole = cli('user', 'create', '--email', `invalid-role-${Date.now()}@example.com`, '--name', 'Invalid Role', '--password', 'a-long-cli-passphrase', '--role', 'owner', '--admin-token', 'test_admin_token', '--dry-run', '--json')
+    assert.notEqual(invalidRole.status, 0)
+    assert.match(invalidRole.stderr, /Unsupported role/)
+
+    const provisionEmail = `cli-instructor-${Date.now()}@example.com`
+    const provisionArgs = ['user', 'create', '--email', provisionEmail, '--name', 'CLI Instructor', '--password', 'a-long-cli-passphrase', '--role', 'instructor', '--admin-token', 'test_admin_token', '--json']
+    const provisioned = cli(...provisionArgs)
+    assert.equal(provisioned.status, 0, provisioned.stderr)
+    const provisionedBody = JSON.parse(provisioned.stdout)
+    assert.equal(provisionedBody.user.role, 'instructor')
+    assert.equal('passwordHash' in provisionedBody.user, false)
+    assert.equal(provisionedBody.alreadyExists, false)
+    const repeated = cli(...provisionArgs)
+    assert.equal(repeated.status, 0, repeated.stderr)
+    assert.equal(JSON.parse(repeated.stdout).alreadyExists, true)
+    assert.equal((await database.queryOne('SELECT count(*)::integer AS count FROM users WHERE email = $1', [provisionEmail])).count, 1)
 
     const studentId = (await database.queryOne("SELECT id FROM users WHERE email = 'student@cyberlabin.com'")).id
     const blockedSuspend = cli('user', 'suspend', '--user-id', studentId, '--admin-token', 'test_admin_token')

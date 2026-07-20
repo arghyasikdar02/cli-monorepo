@@ -1,11 +1,8 @@
 import { useEffect } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore'
-
-function hasAnyRole(user, allowedRoles) {
-  const roles = user?.roles || [user?.role]
-  return roles.some(role => allowedRoles.includes(role))
-}
+import { hasAnyRole } from '../../lib/roles'
+import AccessDenied from './AccessDenied'
 
 export default function RoleProtectedRoute({ children, roles, loginPath }) {
   const { isAuthenticated, authStatus, user, hydrateSession } = useAppStore()
@@ -23,6 +20,6 @@ export default function RoleProtectedRoute({ children, roles, loginPath }) {
   if (!isAuthenticated) {
     return <Navigate to={loginTarget} replace />
   }
-  if (!hasAnyRole(user, roles)) return <Navigate to={loginTarget} replace />
+  if (!hasAnyRole(user, roles)) return <AccessDenied loginPath={loginPath} />
   return children
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api } from '../../lib/api'
+import SiteIcon from '../../components/ui/SiteIcon'
 
 export default function LiveClassSessionPage() {
   const { id } = useParams()
@@ -47,7 +48,7 @@ export default function LiveClassSessionPage() {
     return (
       <div className="h-screen bg-slate-950 flex items-center justify-center p-8 text-center">
         <div>
-          <span className="material-symbols-outlined text-[72px] text-slate-700 block mb-4">lock</span>
+          <SiteIcon name="lock" size={72} className="mx-auto mb-4 text-slate-700" />
           <h1 className="font-space-grotesk text-2xl font-black text-white">Live session unavailable</h1>
           <p className="mt-2 text-slate-400">{error || 'You cannot join this class right now.'}</p>
           <Link to="/live-classes" className="mt-6 inline-flex rounded-lg bg-white px-5 py-3 text-sm font-bold text-slate-950">
@@ -62,13 +63,13 @@ export default function LiveClassSessionPage() {
     <div className="h-screen bg-slate-950 flex flex-col overflow-hidden">
       <div className="h-14 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0">
         <div className="flex items-center gap-3">
-          <span className="material-symbols-outlined text-primary-fixed-dim">shield</span>
+          <SiteIcon name="shield" className="text-primary-fixed-dim" />
           <span className="font-space-grotesk font-bold text-white text-sm">{liveClass.title}</span>
           <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase ml-2">LIVE</span>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-slate-400 text-sm flex items-center gap-1.5">
-            <span className="material-symbols-outlined text-[16px]">group</span>
+            <SiteIcon name="group" size={16} />
             {viewerCount} watching
           </span>
           <Link to="/live-classes"
@@ -83,7 +84,7 @@ export default function LiveClassSessionPage() {
           <div className="flex-1 bg-slate-900 flex items-center justify-center relative">
             {liveClass.meetingUrl ? (
               <div className="max-w-lg px-6 text-center">
-                <span className="material-symbols-outlined text-[72px] text-slate-600 block mb-4">video_chat</span>
+                <SiteIcon name="video_chat" size={72} className="mx-auto mb-4 text-slate-600" />
                 <h1 className="font-space-grotesk text-2xl font-black text-white">Join the Google Meet session</h1>
                 <p className="mt-3 text-sm leading-6 text-slate-400">
                   Google Meet opens in a new tab. Keep this Cyber Lab IN class workspace open for agenda, notes and attendance.
@@ -94,7 +95,7 @@ export default function LiveClassSessionPage() {
               </div>
             ) : (
               <div className="text-center">
-                <span className="material-symbols-outlined text-[80px] text-slate-700 block mb-4">video_camera_front</span>
+                <SiteIcon name="video_camera_front" size={80} className="mx-auto mb-4 text-slate-700" />
                 <p className="font-space-grotesk font-bold text-slate-500">{liveClass.instructor ?? 'Instructor'}</p>
                 <p className="text-xs text-slate-600 mt-1">This class does not have a viewing link yet. Contact your instructor if it should already be available.</p>
               </div>
@@ -107,16 +108,20 @@ export default function LiveClassSessionPage() {
 
           <div className="h-16 bg-slate-900 border-t border-slate-800 flex items-center justify-center gap-4">
             <button onClick={() => setMuted(m => !m)}
+              aria-label={muted ? 'Unmute microphone' : 'Mute microphone'}
               className={`p-3 rounded-full transition-colors ${muted ? 'bg-red-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>
-              <span className="material-symbols-outlined text-[20px]">{muted ? 'mic_off' : 'mic'}</span>
+              <SiteIcon name={muted ? 'mic_off' : 'mic'} size={20} />
             </button>
             <button
+              type="button"
+              aria-label="Camera is unavailable"
               className="p-3 rounded-full bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors">
-              <span className="material-symbols-outlined text-[20px]">videocam_off</span>
+              <SiteIcon name="videocam_off" size={20} />
             </button>
             <button onClick={() => setHandRaised(h => !h)}
+              aria-label={handRaised ? 'Lower hand' : 'Raise hand'}
               className={`p-3 rounded-full transition-colors ${handRaised ? 'bg-amber-500 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>
-              <span className="material-symbols-outlined text-[20px]">back_hand</span>
+              <SiteIcon name="back_hand" size={20} />
             </button>
           </div>
         </div>

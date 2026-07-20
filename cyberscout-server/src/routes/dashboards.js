@@ -16,7 +16,7 @@ const router = Router()
 
 router.use(requireAuth)
 
-router.get('/student', async (req, res) => {
+router.get('/student', requireDashboardRole('student'), async (req, res) => {
   res.json({ dashboard: await getStudentDashboard(req.user.id) })
 })
 

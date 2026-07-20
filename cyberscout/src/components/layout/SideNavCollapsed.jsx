@@ -2,11 +2,12 @@
 import CLILogo from '../CLILogo'
 import { useAppStore } from '../../store/useAppStore'
 import { api } from '../../lib/api'
+import SiteIcon from '../ui/SiteIcon'
 
 const navItems = [
   { to: '/dashboard', icon: 'dashboard', label: 'Dashboard' },
   { to: '/learn/courses', icon: 'school', label: 'Courses' },
-  { to: '/ai-tutor', icon: 'smart_toy', label: 'AI Tutor' },
+  { to: '/ai-tutor', icon: 'smart_toy', label: 'Cysensei' },
   { to: '/live-classes', icon: 'video_chat', label: 'Live Classes' },
   { to: '/leaderboard', icon: 'leaderboard', label: 'Leaderboard' },
 ]
@@ -28,20 +29,21 @@ export default function SideNavCollapsed() {
       <nav className="flex flex-col gap-4 flex-1">
         {navItems.map(({ to, icon, label }) => (
           <NavLink key={to} to={to} title={label} className={linkClass}>
-            <span className="material-symbols-outlined text-[22px]">{icon}</span>
+            <SiteIcon name={icon} size={22} />
           </NavLink>
         ))}
       </nav>
       <div className="flex flex-col gap-4">
         <NavLink to="/settings" title="Settings" className={linkClass}>
-          <span className="material-symbols-outlined text-[22px]">settings</span>
+          <SiteIcon name="settings" size={22} />
         </NavLink>
         <button
           title="Sign Out"
+          aria-label="Sign out"
           onClick={async () => { await api.logout().catch(() => {}); logout(); navigate('/login') }}
           className="p-2 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
         >
-          <span className="material-symbols-outlined text-[22px]">logout</span>
+          <SiteIcon name="logout" size={22} />
         </button>
       </div>
     </aside>

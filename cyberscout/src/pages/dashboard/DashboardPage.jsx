@@ -6,10 +6,11 @@ import CourseCard from '../../components/ui/CourseCard'
 import StatCard from '../../components/ui/StatCard'
 import { useAppStore } from '../../store/useAppStore'
 import { api } from '../../lib/api'
+import SiteIcon from '../../components/ui/SiteIcon'
 
 const quickActions = [
   { icon: 'school', label: 'Browse Courses', desc: 'Find practical cybersecurity courses.', to: '/learn/courses', dark: false },
-  { icon: 'smart_toy', label: 'Ask AI', desc: 'Open course-specific tutor support.', to: '/ai-tutor', dark: true },
+  { icon: 'smart_toy', label: 'Ask Cysensei', desc: 'Open course-specific Cysensei support.', to: '/ai-tutor', dark: true },
   { icon: 'video_chat', label: 'Live Classes', desc: 'See sessions for enrolled courses.', to: '/live-classes', dark: false },
   { icon: 'account_circle', label: 'My Profile', desc: 'Manage your account.', to: '/profile', dark: false },
 ]
@@ -101,7 +102,7 @@ export default function DashboardPage() {
                         to={`/learn/courses/${activeCourse.id}`}
                         className="bg-white text-slate-900 px-5 py-2 rounded-lg font-bold font-space-grotesk flex items-center justify-center gap-2 hover:bg-violet-50 transition-colors shadow-lg flex-shrink-0"
                       >
-                        <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
+                        <SiteIcon name="play_arrow" size={18} />
                         Open Course
                       </Link>
                     </div>
@@ -119,7 +120,7 @@ export default function DashboardPage() {
               </section>
             ) : (
               <section className="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-card">
-                <span className="material-symbols-outlined text-5xl text-slate-300 block mb-3">school</span>
+                <SiteIcon name="school" size={48} className="mx-auto mb-3 text-slate-300" />
                 <h3 className="font-space-grotesk text-xl font-black text-primary">No courses enrolled yet</h3>
                 <p className="mt-2 text-sm text-on-surface-variant">Browse the catalog and enroll to unlock course materials.</p>
                 <Link to="/learn/courses" className="mt-5 inline-flex rounded-lg bg-primary px-5 py-3 font-space-grotesk text-sm font-bold text-white">
@@ -190,7 +191,7 @@ export default function DashboardPage() {
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform ${
                     dark ? 'bg-violet-500 text-white' : 'bg-slate-100 text-slate-900'
                   }`}>
-                    <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>{icon}</span>
+                    <SiteIcon name={icon} size={20} />
                   </div>
                   <h6 className={`font-space-grotesk font-bold text-sm ${dark ? 'text-white' : 'text-slate-900'}`}>{label}</h6>
                   <p className={`text-xs mt-1 ${dark ? 'text-slate-400' : 'text-slate-500'}`}>{desc}</p>

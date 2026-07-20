@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import AppShell from '../../components/layout/AppShell'
 import { api } from '../../lib/api'
+import SiteIcon from '../../components/ui/SiteIcon'
 
 const SUGGESTIONS = [
   'Summarize this course',
@@ -22,6 +23,10 @@ export default function AITutorPage() {
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   const bottomRef = useRef(null)
+
+  useEffect(() => {
+    document.title = 'Cysensei | Cyber Lab IN'
+  }, [])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -60,7 +65,7 @@ export default function AITutorPage() {
         setLimit(limit)
       })
       .catch(err => {
-        if (active) setError(err.message || 'Unable to load AI usage')
+        if (active) setError(err.message || 'Unable to load Cysensei usage')
       })
     return () => {
       active = false
@@ -82,7 +87,7 @@ export default function AITutorPage() {
       const assistant = result.messages.find(message => message.role === 'assistant')
       setMessages(current => [...current, { role: 'assistant', content: assistant?.content || 'No answer returned.', citations: result.citations || [], refused: result.refused }])
     } catch (err) {
-      setError(err.message || 'AI request failed')
+      setError(err.message || 'Cysensei request failed')
     } finally {
       setSending(false)
     }
@@ -94,7 +99,7 @@ export default function AITutorPage() {
         <section className="flex flex-col border-r border-slate-200 bg-white w-full lg:w-[68%]">
           <div className="px-6 py-4 border-b border-slate-100 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between flex-shrink-0">
             <div>
-              <h2 className="font-space-grotesk font-bold text-primary-container">Course AI Tutor</h2>
+              <h2 className="font-space-grotesk font-bold text-primary-container">Cysensei</h2>
               <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mt-0.5">
                 Answers are limited to enrolled course materials
               </p>
@@ -115,9 +120,9 @@ export default function AITutorPage() {
           ) : !courses.length ? (
             <div className="flex-1 flex items-center justify-center p-8 text-center">
               <div>
-                <span className="material-symbols-outlined text-6xl text-slate-300 block mb-3">school</span>
-                <h1 className="font-space-grotesk text-2xl font-black text-primary">Enroll to use course AI</h1>
-                <p className="mt-2 text-sm text-on-surface-variant">The tutor only answers from courses you are enrolled in.</p>
+                <SiteIcon name="school" size={54} className="mx-auto mb-3 text-slate-300" />
+                <h1 className="font-space-grotesk text-2xl font-black text-primary">Enroll to use Cysensei</h1>
+                <p className="mt-2 text-sm text-on-surface-variant">Cysensei only answers from courses you are enrolled in.</p>
                 <Link to="/learn/courses" className="mt-5 inline-flex rounded-lg bg-primary px-5 py-3 font-space-grotesk text-sm font-bold text-white">
                   Browse courses
                 </Link>
@@ -128,15 +133,13 @@ export default function AITutorPage() {
               <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
                 {!messages.length && (
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
-                    Ask a question about the selected course. If the answer is not grounded in that course’s materials, the tutor will say so.
+                    Ask Cysensei about the selected course. If the answer is not grounded in that course’s materials, Cysensei will say so.
                   </div>
                 )}
                 {messages.map((message, index) => (
                   <div key={`${message.role}-${index}`} className={`flex gap-3 max-w-[88%] ${message.role === 'user' ? 'ml-auto flex-row-reverse' : ''}`}>
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${message.role === 'assistant' ? 'bg-primary-container' : 'bg-violet-500'}`}>
-                      <span className="material-symbols-outlined text-white text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>
-                        {message.role === 'assistant' ? 'smart_toy' : 'person'}
-                      </span>
+                      <SiteIcon name={message.role === 'assistant' ? 'smart_toy' : 'person'} size={16} className="text-white" />
                     </div>
                     <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-line ${
                       message.role === 'user'
@@ -159,7 +162,7 @@ export default function AITutorPage() {
                 {sending && (
                   <div className="flex gap-3 max-w-[85%]">
                     <div className="w-8 h-8 rounded-lg bg-primary-container flex items-center justify-center flex-shrink-0">
-                      <span className="material-symbols-outlined text-white text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>smart_toy</span>
+                      <SiteIcon name="smart_toy" size={16} className="text-white" />
                     </div>
                     <div className="bg-surface-container-low border border-slate-100 rounded-2xl rounded-tl-none px-4 py-3 text-sm text-slate-500">Reading course materials...</div>
                   </div>
@@ -187,8 +190,9 @@ export default function AITutorPage() {
                     disabled={sending}
                   />
                   <button onClick={() => send(input)} disabled={!input.trim() || sending}
+                    aria-label="Send question to Cysensei"
                     className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-primary-container text-white rounded-lg hover:opacity-90 disabled:opacity-40 transition-all">
-                    <span className="material-symbols-outlined text-[18px]">arrow_upward</span>
+                    <SiteIcon name="arrow_upward" size={18} />
                   </button>
                 </div>
               </div>
@@ -199,21 +203,21 @@ export default function AITutorPage() {
         <section className="hidden lg:block bg-slate-50/50 overflow-y-auto px-6 py-6 space-y-7 flex-shrink-0 w-[32%]">
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-card">
             <h3 className="font-space-grotesk text-[10px] font-bold text-on-surface-variant uppercase tracking-widest flex items-center gap-2 mb-4">
-              <span className="material-symbols-outlined text-secondary text-[16px]">shield_lock</span>
+              <SiteIcon name="shield_lock" size={16} className="text-secondary" />
               Course Boundary
             </h3>
             <p className="text-sm leading-6 text-slate-600">
-              The tutor checks enrollment, reads only the selected course materials, saves chat history to the database, and records usage against the daily limit.
+              Cysensei checks enrollment, reads only the selected course materials, saves chat history to the database, and records usage against the daily limit.
             </p>
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-card">
             <h3 className="font-space-grotesk text-[10px] font-bold text-on-surface-variant uppercase tracking-widest flex items-center gap-2 mb-4">
-              <span className="material-symbols-outlined text-secondary text-[16px]">analytics</span>
+              <SiteIcon name="analytics" size={16} className="text-secondary" />
               Usage
             </h3>
             <p className="text-3xl font-black text-primary">{usage ?? 0}<span className="text-base text-slate-400">/{limit ?? '-'}</span></p>
-            <p className="mt-1 text-sm text-slate-500">Course AI requests used today</p>
+            <p className="mt-1 text-sm text-slate-500">Cysensei requests used today</p>
           </div>
         </section>
       </div>

@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import SideNav from './SideNav'
 import SideNavCollapsed from './SideNavCollapsed'
 import TopAppBar from './TopAppBar'
-import AuthenticatedIconFont from './AuthenticatedIconFont'
 
 export default function AppShell({ children, focusMode = false }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
@@ -27,7 +26,6 @@ export default function AppShell({ children, focusMode = false }) {
 
   return (
     <div className="min-h-screen bg-background">
-      <AuthenticatedIconFont />
       {!focusMode && mobileNavOpen && <button type="button" className="app-nav-backdrop" aria-label="Close navigation" onClick={() => setMobileNavOpen(false)} />}
       {focusMode ? <SideNavCollapsed /> : <SideNav mobileOpen={mobileNavOpen} isMobile={isMobile} onNavigate={() => setMobileNavOpen(false)} />}
       <div className={`app-shell-main ${focusMode ? 'is-focus-mode' : ''}`}>

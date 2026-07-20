@@ -18,9 +18,14 @@ import {
   recordAudit,
   suspendUser,
   createUser,
+  findUserByEmail,
+  findUserById,
+  publicUser,
+  updateUser,
 } from '../db/repositories.js'
 import { checkDatabaseConnection, closeDatabase, queryMany, queryOne } from '../db/index.js'
 import { validatePassword } from '../lib/validation.js'
+import { normalizeRole, rolesForUser, VALID_ROLES } from '../lib/roles.js'
 
 const args = process.argv.slice(2)
 
@@ -61,7 +66,7 @@ function print(payload, options = {}) {
 function requireAdminToken(options) {
   const expected = process.env.CLIADM_ADMIN_TOKEN || process.env.ADMIN_CLI_TOKEN
   if (!expected) throw new Error('CLIADM_ADMIN_TOKEN is not configured')
-  if (options.adminToken !== expected) throw new Error('Valid --admin-token is required')
+  if (options.adminToken !== undefined && options.adminToken !== expected) throw new Error('Valid --admin-token is required')
 }
 
 function requireSafeMutation(options, commandName, destructive = false) {
@@ -80,6 +85,13 @@ function requireFields(options, fields) {
   if (missing.length) throw new Error(`Missing required option(s): ${missing.map(item => `--${item}`).join(', ')}`)
 }
 
+function passwordFromOptions(options) {
+  if (options.password) return options.password
+  if (!options.passwordEnv) return ''
+  if (!/^[A-Z_][A-Z0-9_]*$/.test(options.passwordEnv)) throw new Error('--password-env must name a valid environment variable')
+  return process.env[options.passwordEnv] || ''
+}
+
 async function run() {
   const options = parseArgs(args)
   const [domain, action] = options._
@@ -90,7 +102,8 @@ async function run() {
   cliadm system health [--json]
   cliadm analytics summary [--json]
   cliadm audit search [--action action] [--json]
-  cliadm user create --email e --name n --password p --role student --admin-token token [--dry-run] [--json]
+  cliadm user create --email e --name n (--password p | --password-env ENV_NAME) --role student [--admin-token token] [--dry-run] [--json]
+  cliadm user set-role (--user-id id | --email e) --role instructor [--admin-token token] --confirm YES [--dry-run] [--json]
   cliadm user suspend --user-id id --admin-token token --confirm YES [--dry-run] [--json]
   cliadm course create --title t --admin-token token [--dry-run] [--json]
   cliadm course publish --course-id id --admin-token token [--dry-run] [--json]
@@ -127,15 +140,41 @@ async function run() {
   }
 
   if (command === 'user create') {
-    requireFields(options, ['email', 'name', 'password'])
-    const passwordError = validatePassword(options.password)
+    requireFields(options, ['email', 'name'])
+    const password = passwordFromOptions(options)
+    if (!password) throw new Error('Missing password. Use --password or --password-env.')
+    const role = normalizeRole(options.role || 'student')
+    if (!role) throw new Error(`Unsupported role. Use one of: ${VALID_ROLES.join(', ')}`)
+    const passwordError = validatePassword(password)
     if (passwordError) throw new Error(passwordError)
     const safety = requireSafeMutation(options, command)
-    if (safety.dryRun) return print({ ...safety, user: { email: options.email, name: options.name, role: options.role || 'student' } }, options)
-    const passwordHash = await bcrypt.hash(options.password, Number(process.env.BCRYPT_COST || 12))
-    const user = await createUser({ email: options.email, name: options.name, passwordHash, role: options.role || 'student', roles: [options.role || 'student'] })
+    if (safety.dryRun) return print({ ...safety, user: { email: options.email, name: options.name, role } }, options)
+    const existing = await findUserByEmail(options.email)
+    if (existing) {
+      if (!rolesForUser(existing).includes(role)) {
+        throw new Error('An account with this email already exists under a different role. Use user set-role with explicit confirmation.')
+      }
+      return print({ user: publicUser(existing), alreadyExists: true }, options)
+    }
+    const passwordHash = await bcrypt.hash(password, Number(process.env.BCRYPT_COST || 12))
+    const user = await createUser({ email: options.email, name: options.name, passwordHash, role, roles: [role] })
     await recordAudit('cliadm.user.create', null, 'user', user.id, { email: user.email, role: user.role, source: 'cliadm' })
-    print({ user }, options)
+    print({ user: publicUser(user), alreadyExists: false }, options)
+    return
+  }
+
+  if (command === 'user set-role') {
+    requireFields(options, ['role'])
+    if (!options.userId && !options.email) throw new Error('Missing required option: --user-id or --email')
+    const role = normalizeRole(options.role)
+    if (!role) throw new Error(`Unsupported role. Use one of: ${VALID_ROLES.join(', ')}`)
+    const safety = requireSafeMutation(options, command, true)
+    if (safety.dryRun) return print({ ...safety, userId: options.userId || null, email: options.email || null, role }, options)
+    const existing = options.userId ? await findUserById(options.userId) : await findUserByEmail(options.email)
+    if (!existing) throw new Error('User not found')
+    const user = await updateUser(existing.id, { role, roles: [role] })
+    await recordAudit('cliadm.user.set_role', null, 'user', user.id, { role, source: 'cliadm' })
+    print({ user: publicUser(user) }, options)
     return
   }
 

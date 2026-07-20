@@ -1,4 +1,5 @@
 import ProgressBar from '../ui/ProgressBar'
+import SiteIcon from '../ui/SiteIcon'
 
 export default function QuizProgress({ current, total, timeLeft }) {
   const pct = Math.round((current / total) * 100)
@@ -13,7 +14,7 @@ export default function QuizProgress({ current, total, timeLeft }) {
           Question {current} of {total}
         </span>
         {hasTimer && <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-100">
-          <span className="material-symbols-outlined text-secondary text-[18px]">timer</span>
+          <SiteIcon name="timer" size={18} className="text-secondary" />
           <span className="font-space-grotesk text-sm font-bold text-primary">{mins}:{secs}</span>
         </div>}
       </div>

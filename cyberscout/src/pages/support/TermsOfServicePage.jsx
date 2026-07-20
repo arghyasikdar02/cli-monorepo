@@ -2,7 +2,7 @@ import PublicLegalPage from '../../components/site/PublicLegalPage'
 
 const SECTIONS = [
   { title: 'Acceptance of Terms', content: 'By accessing or using Cyber Lab IN, you agree to be bound by these Terms of Service. If you disagree with any part of these terms, you may not access the service.' },
-  { title: 'Description of Service', content: 'Cyber Lab IN provides an online cybersecurity education platform including courses, labs, AI tutoring, live classes, and community features. Features may change without notice.' },
+  { title: 'Description of Service', content: 'Cyber Lab IN provides an online cybersecurity education platform including courses, labs, Cysensei, live classes, and community features. Features may change without notice.' },
   { title: 'User Accounts', content: 'You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account. Notify us immediately of any unauthorized use.' },
   { title: 'Acceptable Use', content: 'The platform is for authorized educational use only. You may not use Cyber Lab IN to conduct unauthorized security testing on external systems, share credentials, circumvent access controls, or violate any applicable laws.' },
   { title: 'Intellectual Property', content: 'All course content, branding, and platform technology are owned by Cyber Lab IN. You receive a limited, non-transferable license to access content for personal educational purposes.' },

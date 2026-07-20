@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore'
 import { api } from '../../lib/api'
 import SiteIcon from '../../components/ui/SiteIcon'
+import { dashboardPathForUser } from '../../lib/roles'
 
 function safeRedirect(value) {
   if (!value || !value.startsWith('/') || value.startsWith('//')) return ''
@@ -25,8 +26,10 @@ export default function OAuthCallbackPage() {
 
     api.me()
       .then(({ user }) => {
+        const dashboardPath = dashboardPathForUser(user)
+        if (!dashboardPath) throw new Error('Unsupported account role')
         setSession(user)
-        navigate(redirectTarget || '/dashboard', { replace: true })
+        navigate(redirectTarget || dashboardPath, { replace: true })
       })
       .catch(() => {
         navigate('/login?error=oauth_failed', { replace: true })

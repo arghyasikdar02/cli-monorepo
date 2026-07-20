@@ -1,17 +1,12 @@
 import { verifyToken } from '../lib/jwt.js'
 import { findUserById, userHasRole } from '../db/repositories.js'
 import { assertDecision, canAccessBatch, canAccessCourse, canInstructorAccessCourse, canManageCourse } from '../services/authorization.js'
+import { ROLE_GROUPS, rolesForUser } from '../lib/roles.js'
 
-export const ROLE_GROUPS = {
-  student: ['student'],
-  admin: ['admin', 'super_admin'],
-  instructor: ['instructor'],
-  marketing: ['marketing', 'sales'],
-  ops: ['ops', 'lab_creator', 'support', 'finance'],
-}
+export { ROLE_GROUPS }
 
 export function currentRoles(user) {
-  return user?.roles || [user?.role || 'student']
+  return rolesForUser(user)
 }
 
 export async function requireAuth(req, res, next) {
@@ -24,6 +19,7 @@ export async function requireAuth(req, res, next) {
     const user = await findUserById(payload.sub)
     if (!user) return res.status(401).json({ error: 'User not found' })
     if (user.status === 'suspended') return res.status(403).json({ error: 'Account suspended' })
+    if (!rolesForUser(user).length) return res.status(403).json({ error: 'Unsupported account role' })
     if (Number(payload.tokenVersion || 0) !== Number(user.tokenVersion || 0)) {
       return res.status(401).json({ error: 'Session expired' })
     }
@@ -44,7 +40,11 @@ export function requireRole(...roles) {
 }
 
 export function requireDashboardRole(group) {
-  return requireRole(...(ROLE_GROUPS[group] || []))
+  const roles = ROLE_GROUPS[group]
+  if (!roles) {
+    return (_req, res) => res.status(403).json({ error: 'Unsupported dashboard role' })
+  }
+  return requireRole(...roles)
 }
 
 function extractCourseId(req) {

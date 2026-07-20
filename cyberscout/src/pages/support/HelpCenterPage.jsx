@@ -1,6 +1,7 @@
 ﻿import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import AppShell from '../../components/layout/AppShell'
+import SiteIcon from '../../components/ui/SiteIcon'
 
 const CATEGORIES = [
   { icon: 'lock', label: 'Account & Security', to: '/help/account-security', desc: 'Passwords, 2FA, login issues' },
@@ -29,7 +30,7 @@ export default function HelpCenterPage() {
           <h1 className="font-space-grotesk text-3xl font-black text-white mb-2">How can we help?</h1>
           <p className="text-white/60 mb-6">Search our knowledge base or browse categories below.</p>
           <div className="max-w-md mx-auto flex items-center gap-3 bg-white/10 border border-white/20 rounded-xl px-4 py-3">
-            <span className="material-symbols-outlined text-white/50 text-[20px]">search</span>
+            <SiteIcon name="search" size={20} className="text-white/50" />
             <input
               className="flex-1 bg-transparent text-white outline-none placeholder:text-white/40 text-sm"
               placeholder="Search articles..."
@@ -44,7 +45,7 @@ export default function HelpCenterPage() {
             {CATEGORIES.map(cat => (
               <Link key={cat.to} to={cat.to}
                 className="bg-white rounded-xl border border-slate-200 shadow-card p-5 hover:shadow-card-hover hover:border-violet-200 transition-all group">
-                <span className="material-symbols-outlined text-secondary text-[28px] block mb-3 group-hover:scale-110 transition-transform">{cat.icon}</span>
+                <SiteIcon name={cat.icon} size={28} className="mb-3 text-secondary transition-transform group-hover:scale-110" />
                 <p className="font-space-grotesk font-bold text-on-surface text-sm">{cat.label}</p>
                 <p className="text-xs text-on-surface-variant mt-1">{cat.desc}</p>
               </Link>
@@ -61,18 +62,18 @@ export default function HelpCenterPage() {
               <Link key={article.title} to={article.to}
                 className="flex items-center justify-between px-6 py-4 hover:bg-slate-50/50 transition-colors">
                 <div className="flex items-center gap-3">
-                  <span className="material-symbols-outlined text-slate-300 text-[20px]">article</span>
+                  <SiteIcon name="article" size={20} className="text-slate-300" />
                   <span className="text-sm font-medium text-on-surface">{article.title}</span>
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
                   <span className="text-xs text-slate-400">{article.views}</span>
-                  <span className="material-symbols-outlined text-slate-300 text-[18px]">chevron_right</span>
+                  <SiteIcon name="chevron_right" size={18} className="text-slate-300" />
                 </div>
               </Link>
             ))}
             {filtered.length === 0 && (
               <div className="px-6 py-10 text-center text-on-surface-variant">
-                <span className="material-symbols-outlined text-4xl text-slate-300 block mb-2">search_off</span>
+                <SiteIcon name="search_off" size={40} className="mx-auto mb-2 text-slate-300" />
                 <p className="text-sm">No articles found. <Link to="/report-bug" className="text-secondary font-bold hover:underline">Report an issue</Link></p>
               </div>
             )}

@@ -2,11 +2,12 @@
 import CLILogo from '../CLILogo'
 import { useAppStore } from '../../store/useAppStore'
 import { api } from '../../lib/api'
+import SiteIcon from '../ui/SiteIcon'
 
 const mainNav = [
   { to: '/dashboard', icon: 'dashboard', label: 'Dashboard' },
   { to: '/learn/courses', icon: 'school', label: 'Courses' },
-  { to: '/ai-tutor', icon: 'smart_toy', label: 'AI Tutor' },
+  { to: '/ai-tutor', icon: 'smart_toy', label: 'Cysensei' },
   { to: '/live-classes', icon: 'video_chat', label: 'Live Classes' },
   { to: '/leaderboard', icon: 'leaderboard', label: 'Leaderboard' },
 ]
@@ -44,7 +45,7 @@ export default function SideNav({ mobileOpen = false, isMobile = false, onNaviga
       <nav className="flex-1 overflow-y-auto px-3 space-y-0.5">
         {mainNav.map(({ to, icon, label }) => (
           <NavLink key={to} to={to} className={linkClass} onClick={onNavigate}>
-            <span className="material-symbols-outlined text-[20px]">{icon}</span>
+            <SiteIcon name={icon} size={20} />
             <span>{label}</span>
           </NavLink>
         ))}
@@ -55,7 +56,7 @@ export default function SideNav({ mobileOpen = false, isMobile = false, onNaviga
 
         {utilityNav.map(({ to, icon, label }) => (
           <NavLink key={to} to={to} className={linkClass} onClick={onNavigate}>
-            <span className="material-symbols-outlined text-[20px]">{icon}</span>
+            <SiteIcon name={icon} size={20} />
             <span>{label}</span>
           </NavLink>
         ))}
@@ -63,14 +64,14 @@ export default function SideNav({ mobileOpen = false, isMobile = false, onNaviga
 
       <div className="px-3 pt-4 border-t border-slate-200/80 space-y-0.5">
         <NavLink to="/profile" className={linkClass} onClick={onNavigate}>
-          <span className="material-symbols-outlined text-[20px]">account_circle</span>
+          <SiteIcon name="account_circle" size={20} />
           <span>Profile</span>
         </NavLink>
         <button
           onClick={handleLogout}
           className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium font-space-grotesk tracking-tight text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors"
         >
-          <span className="material-symbols-outlined text-[20px]">logout</span>
+          <SiteIcon name="logout" size={20} />
           <span>Sign Out</span>
         </button>
       </div>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import AppShell from '../../components/layout/AppShell'
 import { api } from '../../lib/api'
+import SiteIcon from '../../components/ui/SiteIcon'
 
 export default function LeaderboardPage() {
   const [courses, setCourses] = useState([])
@@ -58,7 +59,7 @@ export default function LeaderboardPage() {
 
         {!loading && !courses.length && (
           <div className="rounded-xl border border-slate-200 bg-white p-10 text-center shadow-card">
-            <span className="material-symbols-outlined text-5xl text-slate-300">school</span>
+            <SiteIcon name="school" size={48} className="mx-auto text-slate-300" />
             <h2 className="mt-3 font-space-grotesk text-xl font-black text-primary">No enrolled courses yet</h2>
             <p className="mt-2 text-sm text-on-surface-variant">Enroll in a course and make progress before leaderboards can be calculated.</p>
           </div>
@@ -66,7 +67,7 @@ export default function LeaderboardPage() {
 
         {!loading && courses.length > 0 && leaderboard.length === 0 && (
           <div className="rounded-xl border border-slate-200 bg-white p-10 text-center shadow-card">
-            <span className="material-symbols-outlined text-5xl text-slate-300">leaderboard</span>
+            <SiteIcon name="leaderboard" size={48} className="mx-auto text-slate-300" />
             <h2 className="mt-3 font-space-grotesk text-xl font-black text-primary">Leaderboard will appear after real progress</h2>
             <p className="mt-2 text-sm text-on-surface-variant">No fabricated rankings are shown. Complete lessons or labs to generate course-specific ranking data.</p>
           </div>

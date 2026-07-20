@@ -4,6 +4,7 @@ import AppShell from '../../components/layout/AppShell'
 import StatCard from '../../components/ui/StatCard'
 import { useAppStore } from '../../store/useAppStore'
 import { api } from '../../lib/api'
+import SiteIcon from '../../components/ui/SiteIcon'
 
 function formatDate(value) {
   if (!value) return 'Not recorded'
@@ -39,10 +40,10 @@ export default function ProfilePage() {
                 <p className="mt-1 text-sm text-on-surface-variant">{user?.email}</p>
               </div>
             </div>
-            <Link to="/settings" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 text-sm font-bold text-slate-700 hover:border-primary hover:text-primary"><span className="material-symbols-outlined text-[18px]">settings</span>Account settings</Link>
+            <Link to="/settings" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 text-sm font-bold text-slate-700 hover:border-primary hover:text-primary"><SiteIcon name="settings" size={18} />Account settings</Link>
           </div>
           <dl className="mt-7 grid gap-4 border-t border-slate-200 pt-5 sm:grid-cols-3">
-            <div><dt className="text-xs font-bold uppercase tracking-widest text-slate-500">Role</dt><dd className="mt-1 text-sm font-semibold capitalize text-slate-800">{user?.role || 'student'}</dd></div>
+            <div><dt className="text-xs font-bold uppercase tracking-widest text-slate-500">Role</dt><dd className="mt-1 text-sm font-semibold capitalize text-slate-800">{user?.role || 'Unassigned'}</dd></div>
             <div><dt className="text-xs font-bold uppercase tracking-widest text-slate-500">Joined</dt><dd className="mt-1 text-sm font-semibold text-slate-800">{formatDate(user?.createdAt)}</dd></div>
             <div><dt className="text-xs font-bold uppercase tracking-widest text-slate-500">Last login</dt><dd className="mt-1 text-sm font-semibold text-slate-800">{formatDate(user?.lastLogin)}</dd></div>
           </dl>

@@ -1,5 +1,7 @@
 ﻿import { Link } from 'react-router-dom'
 
+import SiteIcon from './SiteIcon'
+
 export default function LiveClassCard({ cls }) {
   const isLive = cls.status === 'live'
 
@@ -21,7 +23,7 @@ export default function LiveClassCard({ cls }) {
           {isLive ? (
             <Link to={`/live-classes/${cls.id}/session`}
               className="text-violet-600 text-sm font-bold flex items-center gap-1 hover:underline">
-              Join Session <span className="material-symbols-outlined text-sm">chevron_right</span>
+              Join Session <SiteIcon name="chevron_right" size={14} />
             </Link>
           ) : (
             <>

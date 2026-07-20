@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import ProtectedRoute from './components/layout/ProtectedRoute'
 import RoleProtectedRoute from './components/layout/RoleProtectedRoute'
 import CookieConsent from './components/ui/CookieConsent'
+import { ROLE_GROUPS } from './lib/roles'
 
 // Auth
 import WelcomePage from './pages/auth/WelcomePage'
@@ -76,13 +77,6 @@ const RoleP = ({ children, roles, loginPath }) => (
   <RoleProtectedRoute roles={roles} loginPath={loginPath}>{children}</RoleProtectedRoute>
 )
 
-const roleRoutes = {
-  admin: ['admin', 'super_admin'],
-  instructor: ['instructor'],
-  marketing: ['marketing', 'sales'],
-  ops: ['ops', 'lab_creator', 'support', 'finance'],
-}
-
 export default function App() {
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
@@ -122,19 +116,19 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route
           path="/admin/login"
-          element={<RoleLoginPage title="Admin Login" purpose="Access user, course, enrollment, payment, live monitoring, analytics, and audit controls." allowedRoles={roleRoutes.admin} redirectTo="/admin/dashboard" />}
+          element={<RoleLoginPage title="Admin Login" purpose="Access user, course, enrollment, payment, live monitoring, analytics, and audit controls." allowedRoles={ROLE_GROUPS.admin} redirectTo="/admin/dashboard" />}
         />
         <Route
           path="/instructor/login"
-          element={<RoleLoginPage title="Instructor Login" purpose="Access assigned courses, students, attendance, quiz results, lab attempts, and progress." allowedRoles={roleRoutes.instructor} redirectTo="/instructor/dashboard" />}
+          element={<RoleLoginPage title="Instructor Login" purpose="Access assigned courses, students, attendance, quiz results, lab attempts, and progress." allowedRoles={ROLE_GROUPS.instructor} redirectTo="/instructor/dashboard" />}
         />
         <Route
           path="/marketing/login"
-          element={<RoleLoginPage title="Sales and Marketing Login" purpose="Access leads, course interest, source analytics, conversion status, follow-ups, and sales suggestions." allowedRoles={roleRoutes.marketing} redirectTo="/marketing/dashboard" />}
+          element={<RoleLoginPage title="Sales and Marketing Login" purpose="Access leads, course interest, source analytics, conversion status, follow-ups, and sales suggestions." allowedRoles={ROLE_GROUPS.marketing} redirectTo="/marketing/dashboard" />}
         />
         <Route
           path="/ops/login"
-          element={<RoleLoginPage title="Lab and Admin Ops Login" purpose="Access lab operations, lab sessions, document logs, protected resources, and system health." allowedRoles={roleRoutes.ops} redirectTo="/ops/dashboard" />}
+          element={<RoleLoginPage title="Lab and Admin Ops Login" purpose="Access lab operations, lab sessions, document logs, protected resources, and system health." allowedRoles={ROLE_GROUPS.ops} redirectTo="/ops/dashboard" />}
         />
         <Route path="/signup" element={<SignUpPage />} />
         <Route path="/getting-started" element={<GettingStartedPage />} />
@@ -149,15 +143,15 @@ export default function App() {
         <Route path="/accessibility" element={<AccessibilityPage />} />
 
         {/* Protected — Core */}
-        <Route path="/dashboard" element={<P><DashboardPage /></P>} />
-        <Route path="/dashboard/student" element={<P><DashboardPage /></P>} />
-        <Route path="/dashboard/admin" element={<RoleP roles={roleRoutes.admin} loginPath="/admin/login"><AdminDashboardPage /></RoleP>} />
-        <Route path="/dashboard/instructor" element={<RoleP roles={roleRoutes.instructor} loginPath="/instructor/login"><InstructorDashboardPage /></RoleP>} />
-        <Route path="/dashboard/sales" element={<RoleP roles={roleRoutes.marketing} loginPath="/marketing/login"><MarketingDashboardPage /></RoleP>} />
-        <Route path="/admin/dashboard" element={<RoleP roles={roleRoutes.admin} loginPath="/admin/login"><AdminDashboardPage /></RoleP>} />
-        <Route path="/instructor/dashboard" element={<RoleP roles={roleRoutes.instructor} loginPath="/instructor/login"><InstructorDashboardPage /></RoleP>} />
-        <Route path="/marketing/dashboard" element={<RoleP roles={roleRoutes.marketing} loginPath="/marketing/login"><MarketingDashboardPage /></RoleP>} />
-        <Route path="/ops/dashboard" element={<RoleP roles={roleRoutes.ops} loginPath="/ops/login"><OpsDashboardPage /></RoleP>} />
+        <Route path="/dashboard" element={<RoleP roles={ROLE_GROUPS.student} loginPath="/login"><DashboardPage /></RoleP>} />
+        <Route path="/dashboard/student" element={<RoleP roles={ROLE_GROUPS.student} loginPath="/login"><DashboardPage /></RoleP>} />
+        <Route path="/dashboard/admin" element={<RoleP roles={ROLE_GROUPS.admin} loginPath="/admin/login"><AdminDashboardPage /></RoleP>} />
+        <Route path="/dashboard/instructor" element={<RoleP roles={ROLE_GROUPS.instructor} loginPath="/instructor/login"><InstructorDashboardPage /></RoleP>} />
+        <Route path="/dashboard/sales" element={<RoleP roles={ROLE_GROUPS.marketing} loginPath="/marketing/login"><MarketingDashboardPage /></RoleP>} />
+        <Route path="/admin/dashboard" element={<RoleP roles={ROLE_GROUPS.admin} loginPath="/admin/login"><AdminDashboardPage /></RoleP>} />
+        <Route path="/instructor/dashboard" element={<RoleP roles={ROLE_GROUPS.instructor} loginPath="/instructor/login"><InstructorDashboardPage /></RoleP>} />
+        <Route path="/marketing/dashboard" element={<RoleP roles={ROLE_GROUPS.marketing} loginPath="/marketing/login"><MarketingDashboardPage /></RoleP>} />
+        <Route path="/ops/dashboard" element={<RoleP roles={ROLE_GROUPS.ops} loginPath="/ops/login"><OpsDashboardPage /></RoleP>} />
         <Route path="/learn/courses" element={<P><CourseCatalogPage /></P>} />
         <Route path="/learn/courses/:id" element={<P><CourseDetailPage /></P>} />
         <Route path="/courses/:id" element={<P><CourseDetailPage /></P>} />

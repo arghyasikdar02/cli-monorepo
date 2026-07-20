@@ -2,7 +2,6 @@ import { Link, useNavigate } from 'react-router-dom'
 import CLILogo from '../CLILogo'
 import { useAppStore } from '../../store/useAppStore'
 import { api } from '../../lib/api'
-import AuthenticatedIconFont from './AuthenticatedIconFont'
 
 export default function StaffDashboardShell({ title, subtitle, children, loginPath }) {
   const { user, logout } = useAppStore()
@@ -16,7 +15,6 @@ export default function StaffDashboardShell({ title, subtitle, children, loginPa
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950">
-      <AuthenticatedIconFont />
       <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/85 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
           <Link to="/" className="flex items-center">

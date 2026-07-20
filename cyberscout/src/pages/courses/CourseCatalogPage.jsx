@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import AppShell from '../../components/layout/AppShell'
 import CourseCard from '../../components/ui/CourseCard'
 import { api } from '../../lib/api'
+import SiteIcon from '../../components/ui/SiteIcon'
 
 export default function CourseCatalogPage() {
   const [searchParams] = useSearchParams()
@@ -58,7 +59,7 @@ export default function CourseCatalogPage() {
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4 mb-8">
           <div className="flex items-center gap-2 bg-slate-100 rounded-lg px-3 py-2 flex-1 max-w-xs">
-            <span className="material-symbols-outlined text-slate-400 text-[20px]">search</span>
+            <SiteIcon name="search" size={20} className="text-slate-400" />
             <input
               className="bg-transparent outline-none text-sm w-full placeholder:text-slate-400"
               placeholder="Search courses..."
@@ -116,9 +117,9 @@ export default function CourseCatalogPage() {
           </div>
         ) : !loading && !error ? (
           <div className="text-center py-20 text-on-surface-variant">
-            <span className="material-symbols-outlined text-6xl text-slate-300 block mb-3">search_off</span>
+            <SiteIcon name="search_off" size={54} className="mx-auto mb-3 text-slate-300" />
             <p className="font-space-grotesk font-semibold">No courses found</p>
-            <p className="text-sm mt-1">Try adjusting your filters or run the seed command if the database is empty.</p>
+            <p className="text-sm mt-1">Try adjusting your filters or check again when courses are published.</p>
           </div>
         ) : null}
       </div>

@@ -20,6 +20,7 @@ import { signOAuthState, signToken, verifyOAuthState } from '../lib/jwt.js'
 import { requireAuth } from '../middleware/access.js'
 import { authCookieOptions, clearCookieOptions, csrfCookieOptions, oauthPkceCookieOptions, oauthStateCookieOptions } from '../lib/cookies.js'
 import { validatePassword } from '../lib/validation.js'
+import { dashboardPathForUser, rolesForUser } from '../lib/roles.js'
 import { authSecurityDiagnostics, loginLimiter, registrationLimiter } from '../middleware/security.js'
 import {
   buildGoogleAuthUrl,
@@ -37,15 +38,6 @@ const router = Router()
 const trimTrailingSlash = (value) => value?.replace(/\/+$/, '')
 const FRONTEND_URL = trimTrailingSlash(process.env.FRONTEND_URL) || 'http://localhost:5173'
 
-function dashboardPathForUser(user) {
-  const roles = user.roles || [user.role]
-  if (roles.includes('super_admin') || roles.includes('admin')) return '/admin/dashboard'
-  if (roles.includes('instructor')) return '/instructor/dashboard'
-  if (roles.includes('marketing') || roles.includes('sales')) return '/marketing/dashboard'
-  if (roles.includes('ops') || roles.includes('lab_creator') || roles.includes('support') || roles.includes('finance')) return '/ops/dashboard'
-  return '/dashboard'
-}
-
 function safeRelativeRedirect(value, fallback = '') {
   if (!value || typeof value !== 'string') return fallback
   if (!value.startsWith('/') || value.startsWith('//')) return fallback
@@ -53,11 +45,14 @@ function safeRelativeRedirect(value, fallback = '') {
 }
 
 function signUserToken(user) {
+  const roles = rolesForUser(user)
+  if (!roles.length) throw new Error('Unsupported account role')
+  const role = roles.includes(user.role) ? user.role : roles[0]
   return signToken({
     sub: user.id,
     email: user.email,
-    role: user.role || 'student',
-    roles: user.roles || [user.role || 'student'],
+    role,
+    roles,
     tokenVersion: user.tokenVersion || 0,
   })
 }
@@ -147,9 +142,11 @@ router.post('/login', authSecurityDiagnostics('auth.login'), loginLimiter, async
     await updateUser(user.id, { lastLogin: new Date().toISOString() })
     await recordAudit('auth.login', user.id, 'user', user.id, {})
     const freshUser = await findUserById(user.id)
+    const redirectTo = dashboardPathForUser(freshUser)
+    if (!redirectTo) return res.status(403).json({ error: 'Unsupported account role' })
     const token = signUserToken(freshUser)
     setAuthCookie(res, token)
-    res.json({ user: publicUser(freshUser), redirectTo: dashboardPathForUser(freshUser) })
+    res.json({ user: publicUser(freshUser), redirectTo })
   } catch {
     res.status(500).json({ error: 'Login failed' })
   }
